@@ -1,2 +1,2 @@
-# stageview
+# StageView
 A work in progress...
