@@ -1,2 +1,2 @@
-# StageView
+# PipeViz
 A work in progress...
