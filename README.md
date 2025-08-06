@@ -1,7 +1,7 @@
 # <img src="pix/stageview.png" width="50"> Pipeviz
 **Easy, elegant lineage with a single `.json`**
 
-Use a dead-simple `pipeviz.json` spec to describe your pipelines and tables - and get:
+Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
 
 - a dependency graph (DOT / Graphviz)
 - a full microfrontend UI
@@ -12,12 +12,12 @@ You define what exists. **Pipeviz** draws the lines 🛰️✨
 
 
 ## Features
-- Define pipelines and tables in a simple, declarative JSON format
+- Declarative JSON format
 - Graphviz diagrams, dashboards for free
 - No coupling to Airflow, dbt, Spark, or vendor tooling
 - Works across SQL, Delta, Kafka, S3, APIs (**_any_** stack or language)
-- Each team can emit their own `pipeviz.json` - just merge to compose the full graph
-- Zero runtime hooks, no agents, no AST parsing
+- Each team can emit their own `pipeviz.json` - just merge
+- Zero runtime hooks, agents or daemons
 
 ## Example
 ```json
@@ -52,7 +52,7 @@ You define what exists. **Pipeviz** draws the lines 🛰️✨
 ## Motivation
 Lineage in most modern data stacks is an afterthought: bolted on through log scraping, runtime hooks, or vendor dashboards.
 
-OpenLineage, Marquez, and Monte Carlo assume you’ll instrument every system, run everything through a central orchestrator, and accept whatever graph their agents extract.
+[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument every system, run everything through a central orchestrator, and accept whatever graph their agents extract.
 
 That might work in theory - but not (easily) in large, polyglot OLAP codebases where:
 - DAGs live in Scala, SQL, Python, shell scripts
