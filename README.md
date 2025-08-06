@@ -1,7 +1,6 @@
 # <img src="pix/stageview.png" width="50"> Pipeviz
 **Easy, elegant lineage 🛰️✨**
 
-**Pipeviz** makes your OLAP codebase navigable, without touching how it runs.
 Use a dead-simple `pipeviz.json` spec to describe your pipelines and tables - and get:
 
 - a dependency graph (DOT / Graphviz)
