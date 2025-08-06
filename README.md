@@ -1,5 +1,5 @@
 # <img src="pix/stageview.png" width="50"> Pipeviz
-**Easy, elegant lineage with a single .json 🛰️✨**
+**Easy, elegant lineage with a single `.json`🛰️✨**
 
 Use a dead-simple `pipeviz.json` spec to describe your pipelines and tables - and get:
 
