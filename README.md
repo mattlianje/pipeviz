@@ -4,6 +4,7 @@
 **Pipeviz** makes your OLAP codebase navigable, without touching how it runs.  Use a dead-simple JSON spec to define your pipelines and tables - from that alone, it builds:
 - your lineage graph (DOT / Graphviz)
 - a microfrontend/UI
+
 You just describe what exists. **Pipeviz** draws the lines.
 
 ## Features
