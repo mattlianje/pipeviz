@@ -59,5 +59,5 @@ That might work in theory - but not (easily) in large, polyglot OLAP codebases w
 - Data moves between Snowflake, Delta, Kafka, S3, and APIs
 - Teams own pipelines independently, with no shared runtime
 
-Pipeviz is merely a tiny reorientation. It says "You already know your pipelines and tables". Just declare them.
+Pipeviz is a dead simple reorintation. It says "You already know your pipelines and tables". Just declare them.
 Each team owns a `pipeviz.json`, you merge them, you get the map.
