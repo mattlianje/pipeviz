@@ -1,9 +1,9 @@
 # <img src="pix/stageview.png" width="50"> Pipeviz
 **Visualize any data platform, with just a .json**
 
-**Pipeviz** makes your OLAP codebase navigable, without touching how it runs.  Use a dead-simple JSON spec to define your pipelines and tables - from that alone, it builds:
-- your lineage graph (DOT / Graphviz)
-- a microfrontend/UI
+**Pipeviz** makes your OLAP codebase navigable, without touching how it runs.  Use a dead-simple `pipeviz.json` spec to define your pipelines and tables, and get:
+- Dependency graph (DOT / Graphviz)
+- Microfrontend/UI
 
 You just describe what exists. **Pipeviz** draws the lines.
 
