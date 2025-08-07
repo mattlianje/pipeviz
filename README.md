@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="pix/pipeviz.png" width="700">
+</p>
+
 # <img src="pix/stageview.png" width="50"> Pipeviz
 **Easy, elegant lineage with a single `.json`**
 
