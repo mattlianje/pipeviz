@@ -11,7 +11,7 @@ Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop i
 - a full microfrontend UI
 - a clear map of your data system
 
-You define what exists. **Pipeviz** draws the lines 🛰️✨
+You define what exists. **Pipeviz** draws the lines ✏️✨
 
 
 
