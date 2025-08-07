@@ -66,6 +66,6 @@ That might work in theory - but not (easily) in large, polyglot OLAP codebases w
 - Data moves between different databases, warehouses, messages brokers, RPC services and API's
 - Teams own pipelines independently, with no shared runtime
 
-Pipeviz is a dead simple reorientation. It says: **_"You already know your pipelines and tables. Just declare them"_**
+Pipeviz is a simple reorientation. It says: **_"You already know your pipelines and tables. Just declare them"_**
 
 Each team owns a `pipeviz.json` that they generate how best they see fit (preferably at compile time) ... you merge them, you get the map.
