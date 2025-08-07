@@ -7,7 +7,7 @@
 
 Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
 
-- a dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
+- a dependency graph (in [DOT](https://graphviz.org/doc/info/lang.html))
 - a full microfrontend UI
 - a clear map of your data system
 
