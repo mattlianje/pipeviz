@@ -7,7 +7,7 @@
 
 Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
 
-- a dependency graph (DOT / Graphviz)
+- a dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
 - a full microfrontend UI
 - a clear map of your data system
 
@@ -17,7 +17,7 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 
 ## Features
 - Declarative JSON format
-- Graphviz diagrams, dashboards for free
+- Single file `pipeviz.html` UI
 - No coupling to Airflow, dbt, Spark, or vendor tooling
 - Works across SQL, Delta, Kafka, S3, APIs (**_any_** stack or language)
 - Each team can emit their own `pipeviz.json` - just merge
