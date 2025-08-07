@@ -2,8 +2,8 @@
   <img src="pix/pipeviz.png" width="700">
 </p>
 
-# 🛰️ Pipeviz
-**Easy, elegant lineage with a single `.json`**
+# Pipeviz
+**Easy, elegant lineage with a single `.json` 🛰️**
 
 Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
 
