@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeviz - JSON-Driven Data Lineage</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
+    <script src="https://unpkg.com/d3-graphviz@5.0.2/build/d3-graphviz.min.js"></script>
+    <style>
+        body { 
+            background-color: #fefefe;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .hero-section {
+            background: #ffffff;
+            border: 1px solid #f0f0f0;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin: 2rem auto;
+            padding: 3rem;
+            max-width: 1200px;
+        }
+        .nav-tabs { 
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 2rem;
+        }
+        .nav-tabs .nav-link { 
+            border: none;
+            color: #8b9297;
+            font-weight: 500;
+            padding: 12px 24px;
+            margin-right: 2px;
+            background: transparent;
+            border-radius: 8px 8px 0 0;
+        }
+        .nav-tabs .nav-link:hover {
+            color: #5a6570;
+            background-color: #f8f9fb;
+        }
+        .nav-tabs .nav-link.active { 
+            background-color: #fff;
+            color: #2d3748;
+            border-bottom: 2px solid #7c8fb0;
+            font-weight: 600;
+        }
+        .card { 
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+            background: white;
+        }
+        .table { 
+            background: white; 
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table th {
+            background-color: #f7f8fc;
+            border: none;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .badge {
+            font-weight: 500;
+            font-size: 0.85em;
+            padding: 0.4em 0.8em;
+            border-radius: 12px;
+        }
+        .badge-snowflake { background-color: #f6f8fa; color: #0969da; border: 1px solid #d0d7de; }
+        .badge-delta { background-color: #fff8f2; color: #bc4c00; border: 1px solid #f2cc60; }
+        .badge-s3 { background-color: #fffbf2; color: #9a6700; border: 1px solid #d4a72c; }
+        .badge-api { background-color: #f6f8f6; color: #1a7f37; border: 1px solid #a2c185; }
+        .badge-database { background-color: #fbf8ff; color: #8250df; border: 1px solid #d0bfff; }
+        .badge-tag { background-color: #fff8f2; color: #953800; border: 1px solid #fb8500; }
+        .graph-container { 
+            background: white; 
+            border-radius: 8px;
+            min-height: 500px;
+            position: relative;
+            border: 1px solid #f0f0f0;
+        }
+        .graph-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 10;
+        }
+        #graph svg { 
+            width: 100%; 
+            height: 500px;
+            border-radius: 8px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.96);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #f0f0f0;
+            font-size: 13px;
+            max-width: 200px;
+        }
+        .json-editor {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .node-highlighted {
+            stroke: #ff6b35 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.5));
+        }
+        .node-highlighted text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .node-connected {
+            stroke: #17a2b8 !important;
+            stroke-width: 2px !important;
+            filter: drop-shadow(0 0 3px rgba(23, 162, 184, 0.4));
+        }
+        .node-connected text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .node-dimmed {
+            opacity: 0.3 !important;
+        }
+        .edge-highlighted {
+            stroke: #ff6b35 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(255, 107, 53, 0.6));
+        }
+        .edge-dimmed {
+            opacity: 0.2 !important;
+        }
+        .node-tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            white-space: pre-line;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .node:hover {
+            stroke-width: 2px !important;
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
+        }
+        .node:hover text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .btn-primary {
+            background-color: #7c8fb0;
+            border-color: #7c8fb0;
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #6b7d9e;
+            border-color: #6b7d9e;
+            color: white;
+        }
+        .hero-title {
+            color: #2d3748;
+            font-weight: 700;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .link-icon {
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: white;
+            border: 1px solid #d0d7de;
+            color: #656d76;
+            font-size: 0.8rem;
+            margin: 2px;
+            display: inline-block;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .link-icon:hover {
+            background: #f6f8fa;
+            border-color: #8c959f;
+            color: #24292f;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #7c8fb0;
+            box-shadow: 0 0 0 0.2rem rgba(124, 143, 176, 0.15);
+        }
+        .alert-info {
+            background-color: #f0f4f8;
+            border-color: #bee3f8;
+            color: #2b6cb0;
+        }
+        .text-muted {
+            color: #8b9297 !important;
+        }
+        .lead {
+            color: #5a6570;
+        }
+        .drop-zone {
+            position: relative;
+            border: 2px dashed #d0d7de;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .drop-zone:hover {
+            border-color: #7c8fb0;
+            background-color: #f8f9fa;
+        }
+        .drop-zone.dragover {
+            border-color: #7c8fb0;
+            background-color: #f0f4f8;
+            border-style: solid;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="hero-section">
+            <div class="text-center mb-5">
+                <h1 class="hero-title">🛰️ Pipeviz</h1>
+                <p class="lead text-muted">Easy, elegant lineage with a single <code>.json</code></p>
+            </div>
+
+            <ul class="nav nav-tabs" id="dashboardTabs">
+                <li class="nav-item">
+                    <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">
+                        Configuration
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="pipelines-tab" data-bs-toggle="tab" data-bs-target="#pipelines-pane">
+                        Pipelines
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="datasources-tab" data-bs-toggle="tab" data-bs-target="#datasources-pane">
+                        Data Sources
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph-pane">
+                        Dependency Graph
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Configuration Tab -->
+                <div class="tab-pane fade show active" id="config-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-10">
+                                    <h5 class="mb-3">Configuration</h5>
+                                    <div class="drop-zone" id="drop-zone">
+                                        <textarea class="form-control json-editor" id="json-input" rows="20" 
+                                                  placeholder="Paste your pipeviz.json here, drag & drop a file, or click the button below to browse..."></textarea>
+                                    </div>
+                                    <div class="mt-3">
+                                        <input type="file" id="file-input" accept=".json" style="display: none;" onchange="loadFromFile(event)">
+                                        <button class="btn btn-outline-secondary me-2" onclick="document.getElementById('file-input').click()">Browse File</button>
+                                        <button class="btn btn-outline-secondary me-2" onclick="loadExample()">Load Example</button>
+                                        <button class="btn btn-outline-info" onclick="generateShareableUrl()">Generate Shareable URL</button>
+                                    </div>
+                                    <div id="json-status" class="mt-2"></div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="small text-muted">
+                                        <div class="mb-2"><strong>Load from URL:</strong></div>
+                                        <div class="mb-2">Add <code style="font-size: 0.7rem;">?url=your-json-url</code> to this page's URL to auto-load a config.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipelines Tab -->
+                <div class="tab-pane fade" id="pipelines-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" id="pipeline-search" 
+                                           placeholder="Search pipelines..." onkeyup="filterPipelines()">
+                                </div>
+                                <div class="col-md-6">
+                                    <select class="form-select" id="pipeline-tag-filter" onchange="filterPipelines()">
+                                        <option value="">All tags</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="pipelines-table-container">
+                                <p class="text-muted text-center">Load a configuration to see your pipelines</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Sources Tab -->
+                <div class="tab-pane fade" id="datasources-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" id="datasource-search" 
+                                           placeholder="Search data sources..." onkeyup="filterDatasources()">
+                                </div>
+                                <div class="col-md-4">
+                                    <select class="form-select" id="datasource-type-filter" onchange="filterDatasources()">
+                                        <option value="">All types</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <select class="form-select" id="datasource-tag-filter" onchange="filterDatasources()">
+                                        <option value="">All tags</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="datasources-table-container">
+                                <p class="text-muted text-center">Load a configuration to see your data sources</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Tab -->
+                <div class="tab-pane fade" id="graph-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <strong>Interactive Graph:</strong> Click nodes to highlight connections. Click empty space to clear selection.
+                            </div>
+                            <div class="graph-container position-relative">
+                                <div class="graph-controls">
+                                    <div class="btn-group me-2">
+                                        <button class="btn btn-sm btn-outline-info" id="toggle-tables" onclick="toggleTables()">
+                                            Hide Tables
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="clearSelection()">
+                                            Clear Selection
+                                        </button>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="fitGraph()">Fit</button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">Reset</button>
+                                </div>
+                                <div id="graph"></div>
+                                <div class="legend">
+                                    <div><strong>Legend:</strong></div>
+                                    <div>■ = Pipeline</div>
+                                    <div id="table-legend">● = Data Source</div>
+                                    <div>→ = Data flow</div>
+                                    <div style="color: #ff6b35;">→ = Dependency</div>
+                                    <div class="mt-2 small text-success">Click nodes to highlight</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentConfig = null;
+        let graphviz = null;
+        let showingTables = true;
+        let selectedNode = null;
+
+        const exampleConfig = {
+            "pipelines": [
+                {
+                    "name": "user-enrichment",
+                    "description": "Enriches user data with behavioral signals and ML features",
+                    "input_tables": ["raw_users", "user_events"],
+                    "output_tables": ["enriched_users"],
+                    "schedule": "Every 2 hours",
+                    "tags": ["user-data", "ml", "enrichment"],
+                    "links": {
+                        "airflow": "https://airflow.company.com/dags/user_enrichment",
+                        "monitoring": "https://grafana.company.com/d/user-enrichment",
+                        "docs": "https://docs.company.com/pipelines/user-enrichment"
+                    },
+                    "upstream_pipelines": []
+                },
+                {
+                    "name": "order-processing",
+                    "description": "Validates and processes incoming orders in real-time",
+                    "input_tables": ["raw_orders", "inventory"],
+                    "output_tables": ["processed_orders", "order_audit"],
+                    "schedule": "Every 15 minutes",
+                    "tags": ["orders", "real-time", "validation"],
+                    "links": {
+                        "airflow": "https://airflow.company.com/dags/order_processing",
+                        "monitoring": "https://grafana.company.com/d/orders",
+                        "alerts": "https://pagerduty.company.com/services/orders"
+                    },
+                    "upstream_pipelines": []
+                },
+                {
+                    "name": "analytics-aggregation",
+                    "description": "Daily aggregation of user metrics and business KPIs",
+                    "input_tables": ["enriched_users", "processed_orders", "user_events"],
+                    "output_tables": ["daily_metrics", "user_cohorts"],
+                    "schedule": "Daily at 1:00 AM",
+                    "tags": ["analytics", "aggregation", "daily"],
+                    "links": {
+                        "airflow": "https://airflow.company.com/dags/analytics_agg",
+                        "dashboard": "https://tableau.company.com/analytics-dashboard"
+                    },
+                    "upstream_pipelines": ["user-enrichment", "order-processing"]
+                }
+            ],
+            "datasources": [
+                {
+                    "name": "raw_users",
+                    "description": "Raw user registration and profile data from production database",
+                    "type": "snowflake",
+                    "owner": "data-platform@company.com",
+                    "tags": ["pii", "users", "core-data"],
+                    "metadata": {
+                        "schema": "RAW_DATA",
+                        "table": "USERS",
+                        "size": "2.1TB",
+                        "record_count": "45M",
+                        "refresh_frequency": "real-time"
+                    },
+                    "links": {
+                        "snowflake": "https://company.snowflakecomputing.com/console#/data/databases/PROD/schemas/RAW_DATA/table/USERS",
+                        "monitoring": "https://grafana.company.com/d/raw-users",
+                        "docs": "https://docs.company.com/schemas/raw_users"
+                    }
+                },
+                {
+                    "name": "user_events",
+                    "description": "Clickstream and interaction events from all digital touchpoints",
+                    "type": "s3",
+                    "owner": "analytics-team@company.com",
+                    "tags": ["events", "clickstream", "large-dataset"],
+                    "metadata": {
+                        "bucket": "company-events-prod",
+                        "size": "15TB",
+                        "record_count": "2.5B",
+                        "file_format": "parquet"
+                    },
+                    "links": {
+                        "s3": "https://s3.console.aws.amazon.com/s3/buckets/company-events-prod",
+                        "athena": "https://console.aws.amazon.com/athena/home#query"
+                    }
+                },
+                {
+                    "name": "raw_orders",
+                    "description": "Real-time order data from e-commerce platform",
+                    "type": "api",
+                    "owner": "platform-team@company.com",
+                    "tags": ["orders", "real-time", "revenue"],
+                    "metadata": {
+                        "endpoint": "https://api.company.com/v2/orders",
+                        "rate_limit": "1000 req/min",
+                        "record_count": "120M"
+                    },
+                    "links": {
+                        "api_docs": "https://docs.company.com/api/orders",
+                        "monitoring": "https://grafana.company.com/d/orders-api"
+                    }
+                },
+                {
+                    "name": "inventory",
+                    "description": "Product inventory levels across all warehouses",
+                    "type": "snowflake",
+                    "owner": "supply-chain@company.com",
+                    "tags": ["inventory", "warehouse", "operational"],
+                    "metadata": {
+                        "schema": "INVENTORY",
+                        "size": "150GB",
+                        "refresh_frequency": "every 15 minutes"
+                    },
+                    "links": {
+                        "snowflake": "https://company.snowflakecomputing.com/console#/data/databases/PROD/schemas/INVENTORY",
+                        "tableau": "https://tableau.company.com/views/inventory-dashboard"
+                    }
+                }
+            ]
+        };
+
+        function loadExample() {
+            document.getElementById('json-input').value = JSON.stringify(exampleConfig, null, 2);
+            loadJson();
+        }
+
+        function generateShareableUrl() {
+            if (!currentConfig) {
+                alert('No configuration loaded to share');
+                return;
+            }
+            
+            const configJson = JSON.stringify(currentConfig);
+            const encodedConfig = btoa(configJson);
+            const currentUrl = window.location.origin + window.location.pathname;
+            const shareableUrl = `${currentUrl}?config=${encodedConfig}`;
+            
+            navigator.clipboard.writeText(shareableUrl).then(() => {
+                const statusDiv = document.getElementById('json-status');
+                statusDiv.innerHTML = '<div class="alert alert-success">Shareable URL copied to clipboard!</div>';
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            }).catch(() => {
+                prompt('Copy this shareable URL:', shareableUrl);
+            });
+        }
+
+        function loadFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            const configParam = urlParams.get('config');
+            if (configParam) {
+                try {
+                    const decodedConfig = atob(configParam);
+                    const parsed = JSON.parse(decodedConfig);
+                    document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
+                    loadJson();
+                    return;
+                } catch (error) {
+                    console.error('Error decoding config parameter:', error);
+                }
+            }
+            
+            const urlParam = urlParams.get('url');
+            if (urlParam) {
+                fetch(urlParam)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.text();
+                    })
+                    .then(configText => {
+                        try {
+                            const parsed = JSON.parse(configText);
+                            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
+                            loadJson();
+                        } catch (error) {
+                            document.getElementById('json-input').value = configText;
+                            loadJson();
+                        }
+                    })
+                    .catch(error => {
+                        const statusDiv = document.getElementById('json-status');
+                        statusDiv.innerHTML = `<div class="alert alert-danger">Error loading from URL: ${error.message}</div>`;
+                        loadExample();
+                    });
+                return;
+            }
+            
+            loadExample();
+        }
+
+        function setupDragDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            const textarea = document.getElementById('json-input');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+            });
+            
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.type === "application/json" || file.name.endsWith('.json')) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            try {
+                                const parsed = JSON.parse(e.target.result);
+                                textarea.value = JSON.stringify(parsed, null, 2);
+                                loadJson();
+                            } catch (error) {
+                                textarea.value = e.target.result;
+                                loadJson();
+                            }
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        const statusDiv = document.getElementById('json-status');
+                        statusDiv.innerHTML = '<div class="alert alert-warning">Please drop a JSON file</div>';
+                    }
+                }
+            }
+        }
+
+        function loadFromFile(event) {
+            const file = event.target.files[0];
+            if (file && (file.type === "application/json" || file.name.endsWith('.json'))) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
+                        loadJson();
+                    } catch (error) {
+                        document.getElementById('json-input').value = e.target.result;
+                        loadJson();
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                const statusDiv = document.getElementById('json-status');
+                statusDiv.innerHTML = '<div class="alert alert-warning">Please select a valid JSON file</div>';
+            }
+        }
+
+        function setupAutoProcess() {
+            const textarea = document.getElementById('json-input');
+            let timeout;
+            
+            textarea.addEventListener('input', function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    const content = textarea.value.trim();
+                    if (content && content.startsWith('{') && content.endsWith('}')) {
+                        try {
+                            const parsed = JSON.parse(content);
+                            const prettified = JSON.stringify(parsed, null, 2);
+                            if (prettified !== content) {
+                                textarea.value = prettified;
+                            }
+                            loadJson();
+                        } catch (e) {
+                            // Invalid JSON, don't process yet
+                        }
+                    }
+                }, 1000);
+            });
+        }
+
+        function loadJson() {
+            const jsonText = document.getElementById('json-input').value.trim();
+            const statusDiv = document.getElementById('json-status');
+            
+            if (!jsonText) {
+                statusDiv.innerHTML = '<div class="alert alert-warning">Please enter JSON configuration</div>';
+                return;
+            }
+
+            try {
+                currentConfig = JSON.parse(jsonText);
+                statusDiv.innerHTML = '<div class="alert alert-success">Configuration loaded successfully!</div>';
+                
+                renderPipelines();
+                renderDatasources();
+                updateFilters();
+                renderGraph();
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="alert alert-danger">JSON Parse Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderPipelines() {
+            if (!currentConfig || !currentConfig.pipelines) return;
+            
+            const container = document.getElementById('pipelines-table-container');
+            let html = `
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Pipeline</th>
+                            <th>Description</th>
+                            <th>Schedule</th>
+                            <th>Input Tables</th>
+                            <th>Output Tables</th>
+                            <th>Tags</th>
+                            <th>Links</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            currentConfig.pipelines.forEach(pipeline => {
+                const inputTables = pipeline.input_tables?.map(t => 
+                    `<span class="badge me-1 mb-1" style="background-color: #e3f2fd; color: #1565c0; font-size: 0.85em;">${t}</span>`
+                ).join('') || '';
+                
+                const outputTables = pipeline.output_tables?.map(t => 
+                    `<span class="badge me-1 mb-1" style="background-color: #e8f5e8; color: #2e7d32; font-size: 0.85em;">${t}</span>`
+                ).join('') || '';
+                
+                const tags = pipeline.tags?.map(t => 
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
+                ).join('') || '';
+                
+                const links = pipeline.links ? Object.entries(pipeline.links).map(([name, url]) => 
+                    `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                ).join('') : '';
+                
+                html += `
+                    <tr class="pipeline-row" 
+                        data-name="${pipeline.name.toLowerCase()}" 
+                        data-description="${(pipeline.description || '').toLowerCase()}"
+                        data-tags="${(pipeline.tags || []).join(',').toLowerCase()}">
+                        <td><strong>${pipeline.name}</strong></td>
+                        <td>${pipeline.description || ''}</td>
+                        <td><code class="text-success">${pipeline.schedule || ''}</code></td>
+                        <td>${inputTables}</td>
+                        <td>${outputTables}</td>
+                        <td>${tags}</td>
+                        <td>${links}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderDatasources() {
+            if (!currentConfig || !currentConfig.datasources) return;
+            
+            const container = document.getElementById('datasources-table-container');
+            let html = `
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name & Type</th>
+                            <th>Description</th>
+                            <th>Owner</th>
+                            <th>Metadata</th>
+                            <th>Tags</th>
+                            <th>Links</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            currentConfig.datasources.forEach(ds => {
+                const typeBadge = `<span class="badge badge-${ds.type || 'secondary'}">${(ds.type || 'unknown').toUpperCase()}</span>`;
+                
+                const metadata = ds.metadata ? Object.entries(ds.metadata).map(([k, v]) => 
+                    `<div class="small text-muted mb-1"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
+                ).join('') : '';
+                
+                const tags = ds.tags?.map(t => 
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
+                ).join('') || '';
+                
+                const links = ds.links ? Object.entries(ds.links).map(([name, url]) => 
+                    `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                ).join('') : '';
+                
+                html += `
+                    <tr class="datasource-row" 
+                        data-name="${ds.name.toLowerCase()}"
+                        data-type="${(ds.type || '').toLowerCase()}"
+                        data-tags="${(ds.tags || []).join(',').toLowerCase()}"
+                        data-search="${(ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase()}">
+                        <td>
+                            <div><strong>${ds.name}</strong></div>
+                            <div>${typeBadge}</div>
+                        </td>
+                        <td>${ds.description || ''}</td>
+                        <td class="small text-muted">${ds.owner || ''}</td>
+                        <td>${metadata}</td>
+                        <td>${tags}</td>
+                        <td>${links}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateFilters() {
+            if (!currentConfig) return;
+            
+            const pipelineTags = [...new Set(currentConfig.pipelines?.flatMap(p => p.tags || []) || [])].sort();
+            const pipelineTagFilter = document.getElementById('pipeline-tag-filter');
+            pipelineTagFilter.innerHTML = '<option value="">All tags</option>' + 
+                pipelineTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+            
+            const datasourceTypes = [...new Set(currentConfig.datasources?.map(ds => ds.type || 'unknown') || [])].sort();
+            const datasourceTags = [...new Set(currentConfig.datasources?.flatMap(ds => ds.tags || []) || [])].sort();
+            
+            const typeFilter = document.getElementById('datasource-type-filter');
+            typeFilter.innerHTML = '<option value="">All types</option>' + 
+                datasourceTypes.map(type => `<option value="${type}">${type}</option>`).join('');
+            
+            const dsTagFilter = document.getElementById('datasource-tag-filter');
+            dsTagFilter.innerHTML = '<option value="">All tags</option>' + 
+                datasourceTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+        }
+
+        function filterPipelines() {
+            const searchTerm = document.getElementById('pipeline-search').value.toLowerCase();
+            const selectedTag = document.getElementById('pipeline-tag-filter').value.toLowerCase();
+            const rows = document.querySelectorAll('.pipeline-row');
+            
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                const description = row.getAttribute('data-description');
+                const tags = row.getAttribute('data-tags');
+                
+                const matchesSearch = !searchTerm || name.includes(searchTerm) || description.includes(searchTerm);
+                const matchesTag = !selectedTag || tags.includes(selectedTag);
+                
+                row.style.display = (matchesSearch && matchesTag) ? '' : 'none';
+            });
+        }
+
+        function filterDatasources() {
+            const searchTerm = document.getElementById('datasource-search').value.toLowerCase();
+            const selectedType = document.getElementById('datasource-type-filter').value.toLowerCase();
+            const selectedTag = document.getElementById('datasource-tag-filter').value.toLowerCase();
+            const rows = document.querySelectorAll('.datasource-row');
+            
+            rows.forEach(row => {
+                const searchContent = row.getAttribute('data-search');
+                const type = row.getAttribute('data-type');
+                const tags = row.getAttribute('data-tags');
+                
+                const matchesSearch = !searchTerm || searchContent.includes(searchTerm);
+                const matchesType = !selectedType || type === selectedType;
+                const matchesTag = !selectedTag || tags.includes(selectedTag);
+                
+                row.style.display = (matchesSearch && matchesType && matchesTag) ? '' : 'none';
+            });
+        }
+
+        function generateGraphvizDot(showTables = true) {
+            if (!currentConfig) return '';
+            
+            const pipelines = currentConfig.pipelines || [];
+            const datasources = currentConfig.datasources || [];
+            
+            let dot = `digraph PipevizGraph {
+    rankdir=LR; 
+    bgcolor="transparent";
+    node [fontsize=12]; 
+    edge [fontsize=10];
+    
+`;
+            
+            pipelines.forEach(pipeline => {
+                const schedule = pipeline.schedule ? `\\n${pipeline.schedule}` : '';
+                dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
+        fillcolor="#e3f2fd", color="#1976d2",
+        fontname="Arial Bold",
+        label=<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${schedule.replace('\\n', '')}</I></FONT>>];
+`;
+            });
+            
+            if (showTables) {
+                dot += '\n';
+                datasources.forEach(ds => {
+                    dot += `    "${ds.name}" [shape=ellipse, style=filled,
+        fillcolor="#f3e5f5", color="#7b1fa2",
+        fontname="Arial", fontsize=10];
+`;
+                });
+                
+                dot += '\n';
+                pipelines.forEach(pipeline => {
+                    pipeline.input_tables?.forEach(table => {
+                        dot += `    "${table}" -> "${pipeline.name}" [color="#666", arrowsize=0.8];\n`;
+                    });
+                    pipeline.output_tables?.forEach(table => {
+                        dot += `    "${pipeline.name}" -> "${table}" [color="#666", arrowsize=0.8];\n`;
+                    });
+                });
+            }
+            
+            dot += '\n';
+            pipelines.forEach(pipeline => {
+                pipeline.upstream_pipelines?.forEach(upstream => {
+                    dot += `    "${upstream}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`;
+                });
+            });
+            
+            dot += '\n    overlap=false; splines=true;\n}';
+            return dot;
+        }
+
+        function renderGraph() {
+            if (!currentConfig) return;
+            
+            document.getElementById('graph-tab').addEventListener('shown.bs.tab', function() {
+                if (!graphviz) {
+                    initializeGraph();
+                }
+            });
+            
+            if (document.getElementById('graph-tab').classList.contains('active')) {
+                setTimeout(initializeGraph, 100);
+            }
+        }
+
+        function initializeGraph() {
+            graphviz = d3.select("#graph").graphviz()
+                .on("initEnd", setupGraphInteractivity)
+                .on("renderEnd", setupGraphInteractivity);
+            updateGraph();
+        }
+
+        function updateGraph() {
+            if (graphviz) {
+                const dotSrc = generateGraphvizDot(showingTables);
+                graphviz.renderDot(dotSrc);
+            }
+        }
+
+        function setupGraphInteractivity() {
+            if (document.getElementById('node-tooltip')) {
+                document.getElementById('node-tooltip').remove();
+            }
+            const tooltip = document.createElement('div');
+            tooltip.id = 'node-tooltip';
+            tooltip.className = 'node-tooltip';
+            tooltip.style.display = 'none';
+            document.body.appendChild(tooltip);
+            
+            d3.select("#graph").selectAll(".node")
+                .style("cursor", "pointer")
+                .on("click", function(event, d) {
+                    event.stopPropagation();
+                    const nodeName = d3.select(this).select("title").text();
+                    selectNode(nodeName, this);
+                })
+                .on("mouseover", function(event, d) {
+                    const nodeName = d3.select(this).select("title").text();
+                    showNodeTooltip(event, nodeName);
+                })
+                .on("mousemove", function(event, d) {
+                    tooltip.style.left = (event.pageX + 10) + 'px';
+                    tooltip.style.top = (event.pageY - 10) + 'px';
+                })
+                .on("mouseout", function(event, d) {
+                    hideNodeTooltip();
+                });
+            
+            d3.select("#graph").on("click", function(event) {
+                if (event.target.tagName === "svg") {
+                    clearSelection();
+                }
+            });
+        }
+
+        function showNodeTooltip(event, nodeName) {
+            const tooltip = document.getElementById('node-tooltip');
+            if (!tooltip || !currentConfig) return;
+            
+            let content = '';
+            
+            const pipeline = currentConfig.pipelines?.find(p => p.name === nodeName);
+            if (pipeline) {
+                content = `${pipeline.name}`;
+                if (pipeline.description) content += `\nDescription: ${pipeline.description}`;
+                if (pipeline.schedule) content += `\nSchedule: ${pipeline.schedule}`;
+                if (pipeline.tags && pipeline.tags.length > 0) content += `\nTags: ${pipeline.tags.join(', ')}`;
+                if (pipeline.input_tables && pipeline.input_tables.length > 0) content += `\nInputs: ${pipeline.input_tables.join(', ')}`;
+                if (pipeline.output_tables && pipeline.output_tables.length > 0) content += `\nOutputs: ${pipeline.output_tables.join(', ')}`;
+            }
+            
+            const datasource = currentConfig.datasources?.find(ds => ds.name === nodeName);
+            if (datasource) {
+                content = `${datasource.name}`;
+                if (datasource.type) content += `\nType: ${datasource.type.toUpperCase()}`;
+                if (datasource.description) content += `\nDescription: ${datasource.description}`;
+                if (datasource.owner) content += `\nOwner: ${datasource.owner}`;
+                if (datasource.tags && datasource.tags.length > 0) content += `\nTags: ${datasource.tags.join(', ')}`;
+                
+                if (datasource.metadata) {
+                    const keyFields = ['size', 'record_count', 'refresh_frequency', 'environment'];
+                    keyFields.forEach(field => {
+                        if (datasource.metadata[field]) {
+                            content += `\n${field.replace(/_/g, ' ')}: ${datasource.metadata[field]}`;
+                        }
+                    });
+                }
+            }
+            
+            if (content) {
+                tooltip.textContent = content;
+                tooltip.style.display = 'block';
+                tooltip.style.left = (event.pageX + 10) + 'px';
+                tooltip.style.top = (event.pageY - 10) + 'px';
+            }
+        }
+
+        function hideNodeTooltip() {
+            const tooltip = document.getElementById('node-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function selectNode(nodeName, nodeElement) {
+            selectedNode = nodeName;
+            clearHighlights();
+            d3.select(nodeElement).classed("node-highlighted", true);
+            
+            const connectedNodes = new Set();
+            const connectedEdges = new Set();
+            
+            d3.select("#graph").selectAll(".edge").each(function() {
+                const edge = d3.select(this);
+                const title = edge.select("title").text();
+                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
+                if (match) {
+                    const source = match[1];
+                    const target = match[2];
+                    if (source === nodeName || target === nodeName) {
+                        connectedEdges.add(this);
+                        connectedNodes.add(source === nodeName ? target : source);
+                        edge.classed("edge-highlighted", true);
+                    }
+                }
+            });
+            
+            d3.select("#graph").selectAll(".node").each(function() {
+                const node = d3.select(this);
+                const nodeTitle = node.select("title").text();
+                if (connectedNodes.has(nodeTitle)) {
+                    node.classed("node-connected", true);
+                } else if (nodeTitle !== nodeName) {
+                    node.classed("node-dimmed", true);
+                }
+            });
+            
+            d3.select("#graph").selectAll(".edge").each(function() {
+                if (!connectedEdges.has(this)) {
+                    d3.select(this).classed("edge-dimmed", true);
+                }
+            });
+        }
+
+        function clearSelection() {
+            selectedNode = null;
+            clearHighlights();
+        }
+
+        function clearHighlights() {
+            d3.select("#graph").selectAll(".node")
+                .classed("node-highlighted node-connected node-dimmed", false);
+            d3.select("#graph").selectAll(".edge")
+                .classed("edge-highlighted edge-dimmed", false);
+        }
+
+        function toggleTables() {
+            showingTables = !showingTables;
+            const toggleBtn = document.getElementById("toggle-tables");
+            const tableLegend = document.getElementById("table-legend");
+            
+            if (showingTables) {
+                toggleBtn.textContent = "Hide Tables";
+                toggleBtn.className = "btn btn-sm btn-outline-info";
+                tableLegend.style.display = "";
+            } else {
+                toggleBtn.textContent = "Show Tables";
+                toggleBtn.className = "btn btn-sm btn-outline-warning";
+                tableLegend.style.display = "none";
+            }
+            
+            clearSelection();
+            updateGraph();
+        }
+
+        function fitGraph() {
+            if (graphviz) graphviz.fit(true);
+        }
+
+        function resetGraph() {
+            if (graphviz) graphviz.resetZoom();
+        }
+
+        window.addEventListener('load', function() {
+            setupDragDrop();
+            setupAutoProcess();
+            loadFromUrl();
+        });
+    </script>
+</body>
+</html>
+
