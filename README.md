@@ -56,12 +56,14 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 ## Motivation
 Lineage in most modern data stacks is an afterthought: bolted on through log scraping, runtime hooks, or vendor dashboards.
 
-[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument every system, run everything through a central orchestrator, and accept whatever graph their agents extract.
+[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
 
 That might work in theory - but not (easily) in large, polyglot OLAP codebases where:
 - DAGs live in Scala, SQL, Python, shell scripts
-- Data moves between Snowflake, Delta, Kafka, S3, and APIs
+- Data moves between different databases, warehouses, messages brokers, RPC services and API's
 - Teams own pipelines independently, with no shared runtime
 
-Pipeviz is a dead simple reorientation. It says "You already know your pipelines and tables". Just declare them.
+Pipeviz is a dead simple reorientation. It says:
+> You already know your pipelines and tables . Just declare them.
+
 Each team owns a `pipeviz.json`, you merge them, you get the map.
