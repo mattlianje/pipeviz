@@ -58,6 +58,9 @@ Lineage in most modern data stacks is an afterthought: bolted on through log scr
 
 [OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
 
+[dbt](https://www.getdbt.com/) takes a different (and powerful) approach - but still asks you to bend the knee to a framework.
+You rewrite your pipelines in **their SQL dialect**, commit to **their manifest format**, and structure your project to fit (and be at the mercy) of **their** expectations.
+
 That might work in theory - but not (easily) in large, polyglot OLAP codebases where:
 - DAGs live in Scala, SQL, Python, shell scripts
 - Data moves between different databases, warehouses, messages brokers, RPC services and API's
