@@ -19,7 +19,7 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 - Declarative JSON format
 - Single file `pipeviz.html` UI
 - No coupling to Airflow, dbt, Spark, or vendor tooling
-- Works across SQL, Delta, Kafka, S3, APIs (**_any_** stack or language)
+- Works across SQL, Delta, Kafka, S3, APIs etc (**_any_** stack or language)
 - Each team can emit their own `pipeviz.json` - just merge
 - Zero runtime hooks, agents or daemons
 
