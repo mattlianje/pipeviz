@@ -927,9 +927,50 @@
         }
 
         function renderDatasources() {
-            if (!currentConfig || !currentConfig.datasources) return;
-
+            if (!currentConfig || !currentConfig.pipelines) {
+                const container = document.getElementById('datasources-table-container');
+                container.innerHTML = '<p class="text-muted text-center">Load a configuration to see your data sources</p>';
+                return;
+            }
+        
+            const allDataSources = new Map();
+            
+            if (currentConfig.datasources) {
+                currentConfig.datasources.forEach(ds => {
+                    allDataSources.set(ds.name, ds);
+                });
+            }
+            
+            currentConfig.pipelines.forEach(pipeline => {
+                pipeline.input_sources?.forEach(sourceName => {
+                    if (!allDataSources.has(sourceName)) {
+                        allDataSources.set(sourceName, { 
+                            name: sourceName, 
+                            type: 'auto-created',
+                            description: 'Auto-created from pipeline references',
+                            isAutoCreated: true
+                        });
+                    }
+                });
+                pipeline.output_sources?.forEach(sourceName => {
+                    if (!allDataSources.has(sourceName)) {
+                        allDataSources.set(sourceName, { 
+                            name: sourceName, 
+                            type: 'auto-created',
+                            description: 'Auto-created from pipeline references',
+                            isAutoCreated: true
+                        });
+                    }
+                });
+            });
+        
             const container = document.getElementById('datasources-table-container');
+            
+            if (allDataSources.size === 0) {
+                container.innerHTML = '<p class="text-muted text-center">No data sources found</p>';
+                return;
+            }
+        
             let html = `
                 <table class="table table-striped table-hover">
                     <thead>
@@ -945,25 +986,25 @@
                     </thead>
                     <tbody>
             `;
-
-            currentConfig.datasources.forEach(ds => {
+        
+            allDataSources.forEach(ds => {
                 const typeBadge = `<span class="badge badge-${ds.type || 'secondary'}">${(ds.type || 'unknown').toUpperCase()}</span>`;
-
+        
                 const metadata = ds.metadata ? Object.entries(ds.metadata).map(([k, v]) =>
                     `<div class="small text-muted mb-1"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
                 ).join('') : '';
-
+        
                 const cluster = ds.cluster ?
                     `<span class="badge badge-cluster me-1 mb-1">${ds.cluster}</span>` : '';
-
+        
                 const tags = ds.tags?.map(t =>
                     `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
                 ).join('') || '';
-
+        
                 const links = ds.links ? Object.entries(ds.links).map(([name, url]) =>
                     `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
                 ).join('') : '';
-
+        
                 html += `
                     <tr class="datasource-row"
                         data-name="${ds.name.toLowerCase()}"
@@ -975,7 +1016,7 @@
                             <div><strong>${ds.name}</strong></div>
                             <div>${typeBadge}</div>
                         </td>
-                        <td>${ds.description || ''}</td>
+                        <td>${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</td>
                         <td class="small text-muted">${ds.owner || ''}</td>
                         <td>${metadata}</td>
                         <td>${cluster}</td>
@@ -984,7 +1025,7 @@
                     </tr>
                 `;
             });
-
+        
             html += '</tbody></table>';
             container.innerHTML = html;
         }
@@ -1065,26 +1106,56 @@
 
         function generateGraphvizDot() {
             if (!currentConfig) return '';
-
+        
             const pipelines = currentConfig.pipelines || [];
             const datasources = currentConfig.datasources || [];
             const explicitClusters = currentConfig.clusters || [];
-
+        
+            // Collect ALL data sources (explicit + auto-created from pipeline references)
+            const allDataSources = new Map();
+            
+            // Add explicit data sources
+            datasources.forEach(ds => {
+                allDataSources.set(ds.name, ds);
+            });
+            
+            // Add auto-created data sources from pipeline input/output references
+            pipelines.forEach(pipeline => {
+                pipeline.input_sources?.forEach(sourceName => {
+                    if (!allDataSources.has(sourceName)) {
+                        allDataSources.set(sourceName, { 
+                            name: sourceName, 
+                            type: 'auto-created'
+                            // No cluster assignment - let auto-created sources be unclustered
+                        });
+                    }
+                });
+                pipeline.output_sources?.forEach(sourceName => {
+                    if (!allDataSources.has(sourceName)) {
+                        allDataSources.set(sourceName, { 
+                            name: sourceName, 
+                            type: 'auto-created'
+                            // No cluster assignment - let auto-created sources be unclustered
+                        });
+                    }
+                });
+            });
+        
             // Collect all clusters mentioned in pipelines and datasources
             const allClusterNames = new Set();
             pipelines.forEach(p => { if (p.cluster) allClusterNames.add(p.cluster); });
-            datasources.forEach(ds => { if (ds.cluster) allClusterNames.add(ds.cluster); });
-
+            allDataSources.forEach(ds => { if (ds.cluster) allClusterNames.add(ds.cluster); });
+        
             // Build cluster hierarchy
             const clusterDefinitions = new Map();
             const clusterHierarchy = new Map(); // child -> parent
             const clusterChildren = new Map(); // parent -> [children]
-
+        
             // Process explicit clusters
             explicitClusters.forEach(cluster => {
                 clusterDefinitions.set(cluster.name, cluster);
                 allClusterNames.add(cluster.name);
-
+        
                 if (cluster.parent) {
                     clusterHierarchy.set(cluster.name, cluster.parent);
                     if (!clusterChildren.has(cluster.parent)) {
@@ -1094,31 +1165,31 @@
                     allClusterNames.add(cluster.parent); // Ensure parent exists
                 }
             });
-
+        
             // Add implicit clusters (those referenced but not explicitly defined)
             allClusterNames.forEach(name => {
                 if (!clusterDefinitions.has(name)) {
                     clusterDefinitions.set(name, { name, description: `Auto-generated cluster: ${name}` });
                 }
             });
-
+        
             let dot = `digraph PipevizGraph {
-    rankdir=LR;
-    bgcolor="transparent";
-    node [fontsize=12];
-    edge [fontsize=10];
-
-`;
-
+            rankdir=LR;
+            bgcolor="transparent";
+            node [fontsize=12];
+            edge [fontsize=10];
+        
+        `;
+        
             // Generate cluster colors automatically
             const clusterColors = [
                 "#1976d2", "#7b1fa2", "#388e3c", "#f57c00", "#d32f2f",
                 "#1976d2", "#616161", "#c2185b", "#303f9f", "#f57c00"
             ];
-
+        
             // Group nodes by cluster
             const nodesByCluster = new Map();
-
+        
             pipelines.forEach(pipeline => {
                 const cluster = pipeline.cluster || '_unclustered';
                 if (!nodesByCluster.has(cluster)) {
@@ -1126,15 +1197,16 @@
                 }
                 nodesByCluster.get(cluster).push({ type: 'pipeline', node: pipeline });
             });
-
-            datasources.forEach(ds => {
+        
+            // Use ALL data sources (explicit + auto-created)
+            allDataSources.forEach(ds => {
                 const cluster = ds.cluster || '_unclustered';
                 if (!nodesByCluster.has(cluster)) {
                     nodesByCluster.set(cluster, []);
                 }
                 nodesByCluster.get(cluster).push({ type: 'datasource', node: ds });
             });
-
+        
             // Find root clusters (those without parents)
             const rootClusters = [];
             clusterDefinitions.forEach((cluster, name) => {
@@ -1142,91 +1214,95 @@
                     rootClusters.push(name);
                 }
             });
-
+        
             let colorIndex = 0;
-
+        
             function renderCluster(clusterName, depth = 0) {
                 const cluster = clusterDefinitions.get(clusterName);
                 if (!cluster) return '';
-
+        
                 const nodesInCluster = nodesByCluster.get(clusterName) || [];
                 const children = clusterChildren.get(clusterName) || [];
-
+        
                 // Skip if cluster has no nodes and no children with nodes
                 const hasNodes = nodesInCluster.length > 0;
                 const hasChildrenWithNodes = children.some(child =>
                     nodesByCluster.has(child) && nodesByCluster.get(child).length > 0
                 );
-
+        
                 if (!hasNodes && !hasChildrenWithNodes) return '';
-
+        
                 const clusterColor = clusterColors[colorIndex % clusterColors.length];
                 colorIndex++;
-
+        
                 let result = `${'    '.repeat(depth + 1)}subgraph cluster_${clusterName.replace(/[^a-zA-Z0-9]/g, '_')} {
-${'    '.repeat(depth + 2)}label="${clusterName}";
-${'    '.repeat(depth + 2)}style="dotted";
-${'    '.repeat(depth + 2)}color="#666666";
-${'    '.repeat(depth + 2)}fontsize=11;
-${'    '.repeat(depth + 2)}fontname="Arial";
-
-`;
-
+        ${'    '.repeat(depth + 2)}label="${clusterName}";
+        ${'    '.repeat(depth + 2)}style="dotted";
+        ${'    '.repeat(depth + 2)}color="#666666";
+        ${'    '.repeat(depth + 2)}fontsize=11;
+        ${'    '.repeat(depth + 2)}fontname="Arial";
+        
+        `;
+        
                 // Add nodes in this cluster
                 nodesInCluster.forEach(item => {
                     if (item.type === 'pipeline') {
                         const pipeline = item.node;
-                        const schedule = pipeline.schedule ? `\\n${pipeline.schedule}` : '';
+                        const label = pipeline.schedule ? 
+                            `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
+                            `"${pipeline.name}"`;
                         result += `${'    '.repeat(depth + 2)}"${pipeline.name}" [shape=box, style="filled,rounded",
-${'    '.repeat(depth + 3)}fillcolor="#e3f2fd", color="#1976d2",
-${'    '.repeat(depth + 3)}fontname="Arial Bold",
-${'    '.repeat(depth + 3)}label=<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${schedule.replace('\\n', '')}</I></FONT>>];
-`;
+        ${'    '.repeat(depth + 3)}fillcolor="#e3f2fd", color="#1976d2",
+        ${'    '.repeat(depth + 3)}fontname="Arial Bold",
+        ${'    '.repeat(depth + 3)}label=${label}];
+        `;
                     } else if (item.type === 'datasource') {
                         const ds = item.node;
                         result += `${'    '.repeat(depth + 2)}"${ds.name}" [shape=ellipse, style=filled,
-${'    '.repeat(depth + 3)}fillcolor="#f3e5f5", color="#7b1fa2",
-${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
-`;
+        ${'    '.repeat(depth + 3)}fillcolor="#f3e5f5", color="#7b1fa2",
+        ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
+        `;
                     }
                 });
-
+        
                 // Add child clusters
                 children.forEach(childName => {
                     result += renderCluster(childName, depth + 1);
                 });
-
+        
                 result += `${'    '.repeat(depth + 1)}}
-
-`;
+        
+        `;
                 return result;
             }
-
+        
             // Render all root clusters
             rootClusters.forEach(clusterName => {
                 dot += renderCluster(clusterName);
             });
-
+        
             // Add unclustered nodes
             const unclusteredNodes = nodesByCluster.get('_unclustered') || [];
             unclusteredNodes.forEach(item => {
                 if (item.type === 'pipeline') {
                     const pipeline = item.node;
-                    const schedule = pipeline.schedule ? `\\n${pipeline.schedule}` : '';
+                    const label = pipeline.schedule ? 
+                        `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
+                        `"${pipeline.name}"`;
                     dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
-        fillcolor="#e3f2fd", color="#1976d2",
-        fontname="Arial Bold",
-        label=<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${schedule.replace('\\n', '')}</I></FONT>>];
-`;
+                fillcolor="#e3f2fd", color="#1976d2",
+                fontname="Arial Bold",
+                label=${label}];
+        `;
                 } else if (item.type === 'datasource') {
                     const ds = item.node;
                     dot += `    "${ds.name}" [shape=ellipse, style=filled,
-        fillcolor="#f3e5f5", color="#7b1fa2",
-        fontname="Arial", fontsize=10];
-`;
+                fillcolor="#f3e5f5", color="#7b1fa2",
+                fontname="Arial", fontsize=10];
+        `;
                 }
             });
-
+        
             // Add data flow edges
             dot += '\n';
             pipelines.forEach(pipeline => {
@@ -1237,7 +1313,7 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                     dot += `    "${pipeline.name}" -> "${source}" [color="#666", arrowsize=0.8];\n`;
                 });
             });
-
+        
             // Add pipeline dependencies
             dot += '\n';
             pipelines.forEach(pipeline => {
@@ -1245,10 +1321,12 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                     dot += `    "${upstream}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`;
                 });
             });
-
+        
             dot += '\n    overlap=false; splines=true;\n}';
             return dot;
         }
+
+
 
         function renderGraph() {
             if (!currentConfig) return;
