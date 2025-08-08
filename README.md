@@ -53,7 +53,7 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 ```
 
 ## Motivation
-Lineage in most modern data stacks is an afterthought: bolted on through log scraping, runtime hooks, or vendor dashboards.
+Lineage and dataflow in most modern data stacks are an afterthought.
 
 [OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
 
