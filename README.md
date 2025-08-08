@@ -2,24 +2,24 @@
   <img src="pix/pipeviz.png" width="700">
 </p>
 
-# <img src="pix/stageview.png" width="50"> Pipeviz
-**Easy, elegant lineage with a single `.json`**
+# Pipeviz
+**Easy, elegant lineage with a single `.json` 🛰️**
 
 Pipeviz is a dead simple JSON spec to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
 
-- a dependency graph (DOT / Graphviz)
+- a dependency graph (in [DOT](https://graphviz.org/doc/info/lang.html))
 - a full microfrontend UI
 - a clear map of your data system
 
-You define what exists. **Pipeviz** draws the lines 🛰️✨
+You define what exists. **Pipeviz** draws the lines ✏️✨
 
 
 
 ## Features
 - Declarative JSON format
-- Graphviz diagrams, dashboards for free
+- Single file `pipeviz.html` UI
 - No coupling to Airflow, dbt, Spark, or vendor tooling
-- Works across SQL, Delta, Kafka, S3, APIs (**_any_** stack or language)
+- Works across SQL, Delta, Kafka, S3, APIs etc (**_any_** stack or language)
 - Each team can emit their own `pipeviz.json` - just merge
 - Zero runtime hooks, agents or daemons
 
@@ -56,12 +56,16 @@ You define what exists. **Pipeviz** draws the lines 🛰️✨
 ## Motivation
 Lineage in most modern data stacks is an afterthought: bolted on through log scraping, runtime hooks, or vendor dashboards.
 
-[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument every system, run everything through a central orchestrator, and accept whatever graph their agents extract.
+[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
+
+[dbt](https://www.getdbt.com/) takes a different (and powerful) approach - but still asks you to bend the knee to a framework.
+You rewrite your pipelines in **their SQL dialect**, commit to **their manifest format**, and structure your project to fit (and be at the mercy) of **their** expectations.
 
 That might work in theory - but not (easily) in large, polyglot OLAP codebases where:
 - DAGs live in Scala, SQL, Python, shell scripts
-- Data moves between Snowflake, Delta, Kafka, S3, and APIs
+- Data moves between different databases, warehouses, messages brokers, RPC services and API's
 - Teams own pipelines independently, with no shared runtime
 
-Pipeviz is a dead simple reorientation. It says "You already know your pipelines and tables". Just declare them.
-Each team owns a `pipeviz.json`, you merge them, you get the map.
+Pipeviz is a simple reorientation. It says: **_"You already know your pipelines and tables. Just declare them"_**
+
+Each team owns a `pipeviz.json` that they generate how best they see fit (preferably at compile time) ... you merge them, you get the map.
