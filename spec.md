@@ -1,73 +1,127 @@
-# Pipeviz JSON Specification (v1.0)
+# Pipeviz JSON Specification (v1.1)
 
-## Schema
+A single JSON file that declares your data system. No agents, no framework buy-in.
+You describe reality: **Pipeviz** renders the map.
+
+**_Programmer oath_**
+> I will declare my data system truthfully and completely in my `.json`
+I will not omit a pipeline or data source I know exists.
+I will generate this file automatically from my source of truth
+so that it reflects reality without drift or manual edits.
+
+## Goals / Non-Goals
+Goals: portable lineage, zero runtime coupling, vendor-agnostic, mergeable across teams.
+
+Non-Goals: execution/orchestration, policy/ACLs, runtime telemetry.
+
+## File
+- Filetype: `.json`
+- Encoding: UTF-8
+- Top-level fields:
+  - `pipelines` (required) — array of Pipeline
+  - `datasources` (optional) — array of DataSource
+  - `clusters` (optional) — array of Cluster
+  - `version` (optional) — string, spec version (e.g. "1.0")
+
+## Identifiers
+- `name` values are case-sensitive, unique within their type
+- Allowed chars: letters, digits, `_ - . / :`
+- A node may belong to at most one `cluster`
+
+## Pipeline
 ```json
 {
-  "pipelines": [              // Required
-    {
-      "name": "string",       // Required
-      "description": "string",
-      "input_sources": ["string"],
-      "output_sources": ["string"],
-      "schedule": "string",
-      "tags": ["string"],
-      "cluster": "string",
-      "upstream_pipelines": ["string"],  // Dependencies
-      "links": { "key": "url" }
-    }
-  ],
-  "datasources": [            // Optional
-    {
-      "name": "string",       // Required
-      "description": "string",
-      "type": "string",
-      "owner": "string",
-      "tags": ["string"],
-      "cluster": "string",
-      "metadata": { "key": "value" },
-      "links": { "key": "url" }
-    }
-  ],
-  "clusters": [               // Optional
-    {
-      "name": "string",       // Required
-      "description": "string",
-      "parent": "string"      // Creates hierarchy
-    }
-  ]
+  "name": "analytics-aggregation",  // Required
+  "description": "Daily metrics",
+  "input_sources": ["enriched_users", "processed_orders"],
+  "output_sources": ["daily_metrics"],
+  "upstream_pipelines": ["user-enrichment"],
+  "schedule": "Daily 01:00",
+  "tags": ["analytics","daily"],
+  "cluster": "analytics",
+  "links": { "airflow": "https://...", "monitoring": "https://..." }
 }
 ```
 
-## Behavior
+**Rules**
+- `name` required.
+- `input_sources` / `output_sources` declare data flow to/from DataSource nodes.
+- `upstream_pipelines` draws pipeline-to-pipeline dependencies.
 
-- Referenced clusters and datasources are created implicitly
-- Names must be unique within their type
-- For rendering `input_sources` → `pipeline` → `output_sources` creates data flow, `upstream_pipelines` creates dependencies
+All fields are additive, unknown fields are ignored by renderers.
 
-## Real-world example
+## DataSource
 ```json
 {
-  "clusters": [
-    { "name": "ingestion" },
-    { "name": "real-time", "parent": "ingestion" }
-  ],
+  "name": "enriched_users",   // Required
+  "description": "Enriched user profile table",
+  "type": "snowflake",
+  "owner": "data@company.com",
+  "tags": ["pii","users"],
+  "cluster": "user-processing",
+  "metadata": { "schema": "ANALYTICS", "size": "2.1TB" },
+  "links": { "docs": "https://..." }
+}
+```
+**Rules**
+- `name` required
+- If a DataSource is referenced by a Pipeline but not defined here, it is auto-created with type: "auto-created"
+
+## Cluster
+```json
+{
+  "name": "real-time",   // Required
+  "description": "Streaming workloads",
+  "parent": "order-management"
+}
+```
+**Rules**
+- Clusters are optional - referenced names that lack a definition are implicitly created
+- Nesting via `parent` is supported
+
+## Rendering Semantics
+- Nodes: Pipeline -> box, DataSource -> ellipse, Cluster -> subgraph.
+- Edges:
+   - `source -> pipeline` and `pipeline -> source` from `input_sources` / `output_sources`.
+   - `upstream -> pipeline` (distinct style) for logical dependencies.
+- Layout is implementation-defined; semantics come from edges, not coordinates.
+
+## Validation
+- Minimal valid file requires `pipelines: [{ "name": "…" }]`.
+- Recommended checks:
+    - uniqueness of `name` per type,
+    - referenced `upstream_pipelines` exist,
+    - referenced `clusters` resolve (or are implicitly created).
+
+## Compatibility & Versioning
+- The spec is forward-additive: new optional fields may appear without breaking consumers.
+- Include "version" when you need to pin behavior - renderers **_should_** treat unknown versions as the latest compatible.
+
+## Generation Guidance
+- Best practice: generate a `.json` at build time from your source of truth.
+- Avoid hand-editing - manual edits risk drift and stale lineage.
+- Each team can emit a file - merge by concatenating arrays then de-dupe on name.
+
+## Semi-realistic example
+```json
+{
   "pipelines": [
-    {
-      "name": "events-pipeline",
-      "input_sources": ["api"],
-      "output_sources": ["events-table"],
-      "cluster": "real-time",
-      "upstream_pipelines": ["auth-pipeline"],
-      "links": { "airflow": "https://..." }
-    }
+    { "name": "user-enrichment",
+      "input_sources": ["raw_users"],
+      "output_sources": ["enriched_users"],
+      "schedule": "Hourly" }
   ],
   "datasources": [
-    {
-      "name": "events-table",
-      "type": "snowflake",
-      "owner": "data-team@co.com",
-      "metadata": { "size": "2TB" }
-    }
+    { "name": "raw_users", "type": "snowflake" }
   ]
 }
 ```
+
+## Changelog
+- **1.1** - Added version top-level field.
+   - Renderer SHOULD treat unknown versions as latest compatible.
+- **1.0**- Initial release.
+   - Required pipelines array with name.
+   - Optional datasources and clusters.
+   - Support for input_sources, output_sources, upstream_pipelines, tags, cluster, links, metadata.
+   - Auto-creation of datasources/clusters when referenced.
