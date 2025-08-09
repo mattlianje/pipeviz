@@ -28,57 +28,44 @@ so that it reflects reality without drift or manual edits.
 - Allowed chars: letters, digits, `_ - . / :`
 - A node may belong to at most one `cluster`
 
-## Pipeline
+## v1.1
 ```json
 {
-  "name": "analytics-aggregation",  // Required
-  "description": "Daily metrics",
-  "input_sources": ["enriched_users", "processed_orders"],
-  "output_sources": ["daily_metrics"],
-  "upstream_pipelines": ["user-enrichment"],
-  "schedule": "Daily 01:00",
-  "tags": ["analytics","daily"],
-  "cluster": "analytics",
-  "links": { "airflow": "https://...", "monitoring": "https://..." }
+  "version": "1.0",   // Optional
+  "pipelines": [
+    {
+      "name": "analytics-aggregation",  // Required
+      "description": "Daily metrics",
+      "input_sources": ["enriched_users", "processed_orders"], // Data flow in
+      "output_sources": ["daily_metrics"],                     // Data flow out
+      "upstream_pipelines": ["user-enrichment"],               // Pipeline deps
+      "schedule": "Daily 01:00",
+      "tags": ["analytics","daily"],
+      "cluster": "analytics",                                  // Groups in UI
+      "links": { "airflow": "https://...", "monitoring": "https://..." }
+    }
+  ],
+  "datasources": [   // Optional
+    {
+      "name": "enriched_users",   // Required
+      "description": "Enriched user profile table",
+      "type": "snowflake",
+      "owner": "data@company.com",
+      "tags": ["pii","users"],
+      "cluster": "user-processing",
+      "metadata": { "schema": "ANALYTICS", "size": "2.1TB" },
+      "links": { "docs": "https://..." }
+    }
+  ],
+  "clusters": [   // Optional
+    {
+      "name": "real-time",         // Required
+      "description": "Streaming workloads",
+      "parent": "order-management" // Nesting
+    }
+  ]
 }
 ```
-
-**Rules**
-- `name` required.
-- `input_sources` / `output_sources` declare data flow to/from DataSource nodes.
-- `upstream_pipelines` draws pipeline-to-pipeline dependencies.
-
-All fields are additive, unknown fields are ignored by renderers.
-
-## DataSource
-```json
-{
-  "name": "enriched_users",   // Required
-  "description": "Enriched user profile table",
-  "type": "snowflake",
-  "owner": "data@company.com",
-  "tags": ["pii","users"],
-  "cluster": "user-processing",
-  "metadata": { "schema": "ANALYTICS", "size": "2.1TB" },
-  "links": { "docs": "https://..." }
-}
-```
-**Rules**
-- `name` required
-- If a DataSource is referenced by a Pipeline but not defined here, it is auto-created with type: "auto-created"
-
-## Cluster
-```json
-{
-  "name": "real-time",   // Required
-  "description": "Streaming workloads",
-  "parent": "order-management"
-}
-```
-**Rules**
-- Clusters are optional - referenced names that lack a definition are implicitly created
-- Nesting via `parent` is supported
-
 ## Rendering Semantics
 - Nodes: Pipeline -> box, DataSource -> ellipse, Cluster -> subgraph.
 - Edges:
@@ -101,21 +88,6 @@ All fields are additive, unknown fields are ignored by renderers.
 - Best practice: generate a `.json` at build time from your source of truth.
 - Avoid hand-editing - manual edits risk drift and stale lineage.
 - Each team can emit a file - merge by concatenating arrays then de-dupe on name.
-
-## Semi-realistic example
-```json
-{
-  "pipelines": [
-    { "name": "user-enrichment",
-      "input_sources": ["raw_users"],
-      "output_sources": ["enriched_users"],
-      "schedule": "Hourly" }
-  ],
-  "datasources": [
-    { "name": "raw_users", "type": "snowflake" }
-  ]
-}
-```
 
 ## Changelog
 > All changes are backwards-compatible unless marked ⚠️ breaking.
