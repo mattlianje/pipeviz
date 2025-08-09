@@ -5,7 +5,7 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a dead simple [JSON spec](spec.md) to describe your pipelines and tables. Drop in a `pipeviz.json`, and get:
+Pipeviz is a dead simple [JSON spec](spec.md) to describe data systems. Drop in a `pipeviz.json`, and get:
 
 - a dependency graph (in [DOT](https://graphviz.org/doc/info/lang.html))
 - a full microfrontend UI
