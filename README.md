@@ -40,6 +40,10 @@ This pipeviz:
 ```
 Renders this:
 
+<p align="center">
+  <img src="pix/pipeviz-example.png" width="500">
+</p>
+
 ## Using & Hosting
 Pipeviz is just a single static HTML file (`pipeviz.html`) plus your `.json`.
 
