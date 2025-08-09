@@ -11,9 +11,8 @@ A single JSON file that declares your data system. No agents, no framework buy-i
 so that it reflects reality without drift or manual edits.
 
 ## Goals / Non-Goals
-Goals: portable lineage, zero runtime coupling, vendor-agnostic, mergeable across teams.
-
-Non-Goals: execution/orchestration, policy/ACLs, runtime telemetry.
+- **Goals:** portable lineage, zero runtime coupling, vendor-agnostic, mergeable across teams.
+- **Non-Goals:** execution/orchestration, column-level lineage, policy/ACLs, runtime telemetry.
 
 ## File
 - Filetype: `.json`
