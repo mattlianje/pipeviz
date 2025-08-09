@@ -27,7 +27,7 @@ so that it reflects reality without drift or manual edits.
 ```json
 {
   "version": "1.0",   // Optional
-  "pipelines": [
+  "pipelines": [   // Required
     {
       "name": "analytics-aggregation",  // Required
       "description": "Daily metrics",
