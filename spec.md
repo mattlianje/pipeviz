@@ -2,7 +2,7 @@
 
 A single JSON file that declares your data system. No agents, no framework buy-in
 
-**_Programmer oath_** (In semi-serious good-nature)
+**Pipeviz oath_** (In semi-serious good-nature)
 > I will declare my data system truthfully and completely in my `.json`
 >
 > I will not omit a pipeline or data source I know exists.
@@ -26,7 +26,7 @@ so that it reflects reality without drift or manual edits.
 ## v1.1
 ```json
 {
-  "version": "1.0",   // Optional
+  "version": "1.1",   // Optional
   "pipelines": [   // Required
     {
       "name": "analytics-aggregation",  // Required
