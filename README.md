@@ -15,11 +15,12 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 
 
 ## Features
-- Declarative JSON format
+- Declarative, simple data-as-code lineage
 - Single file `pipeviz.html` UI
 - No coupling to Airflow, dbt, Spark, or vendor tooling
+   - No being tricked by lineage-framework merchants
 - Works across SQL, Delta, Kafka, S3, APIs etc (**_any_** stack or language)
-- Each team can emit their own `pipeviz.json` - just merge
+- Each team can emit their own `.json` - just merge them to get the big picture
 - Zero runtime hooks, agents or daemons
 
 ## Quickstart
