@@ -22,35 +22,54 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 - Each team can emit their own `pipeviz.json` - just merge
 - Zero runtime hooks, agents or daemons
 
-## Example
+## Quickstart
+Try it live 👉 [HERE](https://mattlianje.github.io/pipeviz/pipeviz.html)
+
+This pipeviz:
 ```json
 {
   "pipelines": [
     {
       "name": "user-enrichment",
-      "input_tables": ["raw_users"],
-      "output_tables": ["enriched_users"],
-      "tags": ["user", "ml"],
-      "schedule": "Hourly",
-      "links": {
-        "af": "https://airflow.company.com/user_enrichment",
-        "monitoring": "https://grafana.company.com/user_enrichment"
-      }
-    }
-  ],
-  "datasources": [
-    {
-      "name": "raw_users",
-      "type": "snowflake",
-      "metadata": {
-        "schema": "RAW_DATA",
-        "size": "2.1TB"
-      },
-      "tags": ["pii"]
+      "input_sources": ["raw_users"],
+      "output_sources": ["enriched_users"]
     }
   ]
 }
 ```
+Renders this:
+
+## Using & Hosting
+Pipeviz is just a single static HTML file (`pipeviz.html`) plus your `.json`.
+
+There’s no backend, no build step, no install, open the file in your browser or serve it from anywhere you can host static content.
+
+### Option 1 - Open locally
+- Download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html)
+- Save your .json in the same folder.
+- Open `pipeviz.html` in your browser.
+- Paste your JSON into the “Configuration” tab, or drag-and-drop the file.
+
+### Option 2 - Serve over HTTP
+Any static hosting works:
+- GitHub Pages, commit pipeviz.html + your pipeviz.json and enable Pages.
+- S3 + CloudFront, Netlify, Vercel ... upload both files.
+- Your own webserver - put them in `/var/www` or equivalent.
+
+To auto-load your JSON:
+
+```bash
+https://yourdomain/pipeviz.html?url=https://yourdomain/pipeviz.json
+```
+Or inline it in the URL:
+
+```bash
+https://yourdomain/pipeviz.html?config=BASE64_ENCODED_JSON
+```
+
+### Option 3 - Embed in an internal portal
+- Drop the HTML into an <iframe> in your docs/wiki tool.
+- Preload the JSON via `?url=…` so users see the lineage instantly.
 
 ## Motivation
 Lineage and dataflow in most modern data stacks are an afterthought.
@@ -68,3 +87,6 @@ That might work in theory - but not (easily) in large, polyglot OLAP codebases w
 Pipeviz is a simple reorientation. It says: **_"You already know your pipelines and tables. Just declare them"_**
 
 Each team owns a `pipeviz.json` that they generate how best they see fit (preferably at compile time) ... you merge them, you get the map.
+
+## Inspiration
+- [Data-Oriented Programming](https://www.manning.com/books/data-oriented-programming) by Yehonathan Sharvit
