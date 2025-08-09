@@ -68,7 +68,7 @@ https://yourdomain/pipeviz.html?config=BASE64_ENCODED_JSON
 ```
 
 ### Option 3 - Embed in an internal portal
-- Drop the HTML into an <iframe> in your docs/wiki tool.
+- Drop the HTML into an `<iframe>` in your docs/wiki tool.
 - Preload the JSON via `?url=…` so users see the lineage instantly.
 
 ## Motivation
