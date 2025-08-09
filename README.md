@@ -77,7 +77,7 @@ https://yourdomain/pipeviz.html?config=BASE64_ENCODED_JSON
 - Preload the JSON via `?url=…` so users see the lineage instantly.
 
 ## Motivation
-Lineage and dataflow in most modern data stacks are an afterthought.
+Lineage and dataflow in most modern data stacks are an afterthought - bolted on and complecting runtime behaviour.
 
 [OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
 
