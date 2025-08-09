@@ -17,11 +17,6 @@ so that it reflects reality without drift or manual edits.
 ## File
 - Filetype: `.json`
 - Encoding: UTF-8
-- Top-level fields:
-  - `pipelines` (required) — array of Pipeline
-  - `datasources` (optional) — array of DataSource
-  - `clusters` (optional) — array of Cluster
-  - `version` (optional) — string, spec version (e.g. "1.0")
 
 ## Identifiers
 - `name` values are case-sensitive, unique within their type
