@@ -121,7 +121,7 @@ All fields are additive, unknown fields are ignored by renderers.
 > All changes are backwards-compatible unless marked ⚠️ breaking.
 
 - **1.1** - Added version top-level field.
-   - Renderer SHOULD treat unknown versions as latest compatible.
+   - Renderer should treat unknown versions as latest compatible.
 - **1.0**- Initial release.
    - Required pipelines array with name.
    - Optional datasources and clusters.
