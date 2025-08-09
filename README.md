@@ -5,14 +5,14 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a dead simple [JSON spec](spec.md) for declaring your entire data system - pipelines, data sources, and clusters (logical groupings like domain boundaries or environments).
+Pipeviz is a dead simple [JSON spec](spec.md) for declaring data systems - pipelines, data sources, and clusters.
 
 Give it a `.json` and you instantly get:
 - a dependency graph (in [DOT](https://graphviz.org/doc/info/lang.html))
 - a full microfrontend UI
 - a clear map of your data system
 
-> You define what exists. **Pipeviz** draws the lines ✏️✨
+You define what exists. **Pipeviz** draws the lines ✏️✨
 
 
 ## Features
