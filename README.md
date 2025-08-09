@@ -5,24 +5,23 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a dead simple [JSON spec](spec.md) for declaring data systems - pipelines, data sources, and clusters.
+Pipeviz is a minimal, declarative [JSON spec](spec.md) for describing your data systems - pipelines, data sources, and logical-groupings - without bending the knee to any specific framework.
 
 Give it a `.json` and you instantly get:
-- a dependency graph (in [DOT](https://graphviz.org/doc/info/lang.html))
-- a full microfrontend UI
-- a clear map of your data system
+- A dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
+- A full microfrontend UI
+- A clear, unified map of your data system
 
 You define what exists. **Pipeviz** draws the lines ✏️✨
 
 
 ## Features
-- Declarative, simple data-as-code lineage
-- Single file `pipeviz.html` UI
-- No coupling to Airflow, dbt, Spark, or vendor tooling
-   - No lock-in to lineage-frameworks
-- Works across SQL, Delta, Kafka, S3, APIs etc (**_any_** stack or language)
-- Each team can emit their own `.json` - just merge them to get the big picture
-- Zero runtime hooks, agents or daemons
+- Declarative, data-as-code lineage
+- One file UI (`pipeviz.html`) - no installs, no backend
+- Framework-agnostic - not tied to Airflow, dbt, Spark, or vendor tools
+- Works across SQL, Delta, Kafka, S3, APIs… **_any_** stack, any language (just JSON)
+- Merge `.json` files from multiple teams for the big picture
+- No runtime hooks, agents, or daemons
 
 ## Quickstart
 Try it live 👉 [HERE](https://mattlianje.github.io/pipeviz/pipeviz.html)
