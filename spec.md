@@ -1,12 +1,13 @@
 # Pipeviz JSON Specification (v1.1)
 
-A single JSON file that declares your data system. No agents, no framework buy-in.
-You describe reality: **Pipeviz** renders the map.
+A single JSON file that declares your data system. No agents, no framework buy-in
 
 **_Programmer oath_**
 > I will declare my data system truthfully and completely in my `.json`
-I will not omit a pipeline or data source I know exists.
-I will generate this file automatically from my source of truth
+>
+> I will not omit a pipeline or data source I know exists.
+>
+> I will generate this file automatically from my source of truth
 so that it reflects reality without drift or manual edits.
 
 ## Goals / Non-Goals
@@ -118,6 +119,8 @@ All fields are additive, unknown fields are ignored by renderers.
 ```
 
 ## Changelog
+> All changes are backwards-compatible unless marked ⚠️ breaking.
+
 - **1.1** - Added version top-level field.
    - Renderer SHOULD treat unknown versions as latest compatible.
 - **1.0**- Initial release.
