@@ -2,7 +2,7 @@
 
 A single JSON file that declares your data system. No agents, no framework buy-in
 
-**Pipeviz oath_** (In semi-serious good-nature)
+**Pipeviz oath** (In semi-serious good-nature)
 > I will declare my data system truthfully and completely in my `.json`
 >
 > I will not omit a pipeline or data source I know exists.
