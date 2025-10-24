@@ -5,12 +5,13 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a minimal, declarative [JSON spec](spec.md) for describing your data systems - pipelines, data sources, and logical-groupings - without bending the knee to any specific framework.
+Pipeviz is a minimal, declarative [JSON spec](spec.md) for describing your data systems.
 
 Give it a `.json` and you instantly get:
 - A dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
 - A full microfrontend UI
 - A clear, unified map of your data system
+- Attribute-level lineage
 
 You define what exists. **Pipeviz** draws the lines ✏️✨
 
@@ -22,6 +23,7 @@ You define what exists. **Pipeviz** draws the lines ✏️✨
 - Works across SQL, Delta, Kafka, S3, APIs… **_any_** stack, any language (just JSON)
 - Merge `.json` files from multiple teams for the big picture
 - No runtime hooks, agents, or daemons
+- Separate visualization for column-level lineage
 
 ## Quickstart
 Try it live 👉 [HERE](https://mattlianje.github.io/pipeviz/pipeviz.html)
