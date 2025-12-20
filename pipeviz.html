@@ -9,26 +9,51 @@
     <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
     <script src="https://unpkg.com/d3-graphviz@5.0.2/build/d3-graphviz.min.js"></script>
     <style>
+        :root {
+            --bg-primary: #fff;
+            --bg-secondary: #f5f5f5;
+            --bg-code: #f5f5f5;
+            --text-primary: #000;
+            --text-secondary: #666;
+            --text-muted: #828282;
+            --border-color: #ccc;
+            --border-light: #eee;
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252525;
+            --bg-code: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #888;
+            --border-color: #444;
+            --border-light: #333;
+        }
         body {
-            background-color: #f6f6ef;
+            background-color: var(--bg-primary);
             min-height: 100vh;
             font-family: Verdana, Geneva, sans-serif;
             font-size: 13px;
-            color: #000;
+            color: var(--text-primary);
         }
         .hero-section {
-            background: #fff;
+            background: var(--bg-primary);
             margin: 1rem auto;
-            padding: 1.5rem 2rem;
+            padding: 1.5rem 4rem;
             max-width: 1600px;
         }
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 1.5rem 1.5rem;
+            }
+        }
         .nav-tabs {
-            border-bottom: 1px solid #ccc;
+            border-bottom: 1px solid var(--border-color);
             margin-bottom: 1.5rem;
         }
         .nav-tabs .nav-link {
             border: none;
-            color: #828282;
+            color: var(--text-muted);
             font-weight: 400;
             padding: 6px 12px;
             margin-right: 2px;
@@ -37,13 +62,13 @@
             font-size: 12px;
         }
         .nav-tabs .nav-link:hover {
-            color: #000;
-            background-color: #eee;
+            color: var(--text-primary);
+            background-color: var(--bg-secondary);
         }
         .nav-tabs .nav-link.active {
-            background-color: #fff;
-            color: #000;
-            border-bottom: 2px solid #333;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--text-primary);
             font-weight: 600;
         }
         .card {
@@ -60,21 +85,22 @@
             -webkit-overflow-scrolling: touch;
         }
         .table {
-            background: #fff;
+            background: var(--bg-primary);
             font-size: 13px;
             border-collapse: collapse;
         }
         .table th {
-            background-color: #f6f6ef;
-            border-bottom: 1px solid #ccc;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             font-weight: bold;
-            color: #000;
+            color: var(--text-primary);
             white-space: nowrap;
             font-size: 11px;
         }
         .table td {
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-light);
             vertical-align: top;
+            color: var(--text-primary);
         }
         .table tr:last-child td {
             border-bottom: none;
@@ -129,10 +155,10 @@
         .badge-tag { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; }
         .badge-cluster { background-color: #e3f2fd; color: #1565c0; border: 1px solid #1565c0; }
         .graph-container {
-            background: #fff;
+            background: var(--bg-primary);
             min-height: 500px;
             position: relative;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color);
         }
         .graph-controls {
             position: absolute;
@@ -148,21 +174,23 @@
             position: absolute;
             bottom: 10px;
             left: 10px;
-            background: #fff;
+            background: var(--bg-primary);
             padding: 8px 12px;
             font-size: 11px;
             max-width: 160px;
             opacity: 0.9;
+            color: var(--text-primary);
         }
         .json-editor {
             font-family: monospace;
             font-size: 12px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color);
             border-radius: 2px;
-            background: #fff;
+            background: var(--bg-primary);
+            color: var(--text-primary);
         }
         .json-editor:focus {
-            border-color: #828282;
+            border-color: var(--text-muted);
             box-shadow: none;
             outline: none;
         }
@@ -225,30 +253,30 @@
             stroke-width: 0 !important;
         }
         .node-details-panel {
-            background: #fff;
-            border: 1px solid #ccc;
+            background: var(--bg-primary);
             padding: 1rem;
             min-height: 500px;
             max-height: 500px;
             overflow-y: auto;
         }
         .node-details-panel h5 {
-            color: #000;
+            color: var(--text-primary);
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid #ccc;
+            border-bottom: 1px solid var(--border-color);
             font-weight: bold;
             font-size: 13px;
         }
         .node-details-panel .detail-label {
             font-size: 10px;
-            color: #828282;
+            color: var(--text-muted);
             font-weight: bold;
             margin-bottom: 0.25rem;
         }
         .node-details-panel .detail-value {
             margin-bottom: 1rem;
             font-size: 12px;
+            color: var(--text-primary);
         }
         .node-details-panel .detail-value:last-child {
             margin-bottom: 0;
@@ -259,18 +287,35 @@
             border-top: 1px solid #eee;
         }
         .node-details-panel .link-btn {
-            display: block;
-            width: 100%;
+            display: inline-block;
+            margin-right: 0.5rem;
             margin-bottom: 0.5rem;
-            text-align: left;
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+        }
+        .node-details-panel .link-btn:hover {
+            background-color: var(--text-secondary);
+            border-color: var(--text-secondary);
+            color: var(--bg-primary);
+        }
+        [data-theme="dark"] .node-details-panel .link-btn {
+            border-color: #666;
+            color: #ccc;
+            background: #333;
+        }
+        [data-theme="dark"] .node-details-panel .link-btn:hover {
+            background-color: #888;
+            border-color: #888;
+            color: #fff;
         }
         .search-results-dropdown {
             position: absolute;
             top: 100%;
             left: 0;
             right: 0;
-            background: #fff;
-            border: 1px solid #999;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-top: none;
             max-height: 300px;
             overflow-y: auto;
@@ -283,17 +328,18 @@
         .search-result-item {
             padding: 6px 10px;
             cursor: pointer;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid var(--border-light);
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 12px;
+            color: var(--text-primary);
         }
         .search-result-item:last-child {
             border-bottom: none;
         }
         .search-result-item:hover {
-            background-color: #f0f0f0;
+            background-color: var(--bg-secondary);
         }
         .search-result-item .result-type {
             font-size: 9px;
@@ -373,7 +419,7 @@
             color: #fff;
         }
         .hero-title {
-            color: #000;
+            color: var(--text-primary);
             font-weight: bold;
             font-size: 1.5rem;
             margin-bottom: 0.25rem;
@@ -381,26 +427,43 @@
         .link-icon {
             text-decoration: none;
             padding: 4px 8px;
-            background: #f5f5f5;
-            border: 1px solid #ccc;
-            color: #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
             font-size: 12px;
             margin: 2px;
             display: inline-block;
         }
         .link-icon:hover {
+            background: #555;
+            border-color: #555;
+            color: #fff;
+        }
+        [data-theme="dark"] .link-icon {
             background: #333;
-            border-color: #333;
+            border-color: #555;
+            color: #ccc;
+        }
+        [data-theme="dark"] .link-icon:hover {
+            background: #666;
+            border-color: #666;
             color: #fff;
         }
         .form-control, .form-select {
             border-radius: 0;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color);
             font-size: 13px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
         }
         .form-control:focus, .form-select:focus {
-            border-color: #333;
+            border-color: var(--text-muted);
             box-shadow: none;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .form-control::placeholder {
+            color: var(--text-muted);
         }
         .alert {
             border-radius: 0;
@@ -427,11 +490,22 @@
             color: #e65100;
         }
         .text-muted {
-            color: #666 !important;
+            color: var(--text-secondary) !important;
         }
         .lead {
-            color: #828282;
+            color: var(--text-muted);
             font-size: 12px;
+        }
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 0;
+        }
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
         }
         .drop-zone {
             position: relative;
@@ -450,19 +524,23 @@
         }
         .modal-content {
             border-radius: 0;
-            border: 1px solid #999;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
         }
         .modal-header {
-            background: #f5f5f5;
-            border-bottom: 1px solid #ccc;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             padding: 0.75rem 1rem;
         }
         .modal-title {
             font-size: 14px;
             font-weight: 600;
+            color: var(--text-primary);
         }
         .modal-body {
             font-size: 13px;
+            color: var(--text-primary);
         }
         .modal-body pre {
             background: #1a1a1a;
@@ -474,12 +552,12 @@
         }
         .modal-body code {
             color: #d63384;
-            background: #f6f6ef;
+            background: var(--bg-code);
             padding: 1px 4px;
             font-size: 11px;
         }
         .modal-footer {
-            border-top: 1px solid #ccc;
+            border-top: 1px solid var(--border-color);
             padding: 0.5rem 1rem;
         }
         code {
@@ -492,18 +570,18 @@
             margin: 2px;
             font-size: 11px;
             cursor: pointer;
-            background: #fff;
-            border: 1px solid #ccc;
-            color: #666;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
         }
         .filter-tag:hover {
-            border-color: #999;
-            color: #000;
+            border-color: var(--text-muted);
+            color: var(--text-primary);
         }
         .filter-tag.active {
-            background: #000;
-            border-color: #000;
-            color: #fff;
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg-primary);
         }
         .filter-group {
             display: inline-block;
@@ -511,17 +589,74 @@
         }
         .filter-group-label {
             font-size: 10px;
-            color: #828282;
+            color: var(--text-muted);
             margin-right: 4px;
+        }
+        /* Dark mode graph text fix */
+        [data-theme="dark"] #graph text,
+        [data-theme="dark"] #splash-graph text {
+            fill: #e0e0e0 !important;
+        }
+        [data-theme="dark"] #graph .node text,
+        [data-theme="dark"] #splash-graph .node text {
+            fill: #000 !important;
+        }
+        [data-theme="dark"] #graph .graph > polygon,
+        [data-theme="dark"] #splash-graph .graph > polygon {
+            fill: transparent !important;
+        }
+        [data-theme="dark"] #graph .cluster > polygon,
+        [data-theme="dark"] #graph .cluster > path {
+            fill: #2a2a2a !important;
+            stroke: #555 !important;
+        }
+        [data-theme="dark"] #graph .cluster text {
+            fill: #e0e0e0 !important;
+        }
+        /* Dark mode Bootstrap table overrides */
+        [data-theme="dark"] .table {
+            --bs-table-bg: var(--bg-primary);
+            --bs-table-striped-bg: var(--bg-secondary);
+            --bs-table-hover-bg: #333;
+            --bs-table-color: var(--text-primary);
+            --bs-table-striped-color: var(--text-primary);
+            --bs-table-hover-color: var(--text-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        [data-theme="dark"] .table > :not(caption) > * > * {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-bottom-color: var(--border-light);
+        }
+        [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: var(--bg-secondary);
+        }
+        [data-theme="dark"] .table th {
+            background-color: #252525 !important;
+            color: #e0e0e0 !important;
+        }
+        /* Dark mode for table link buttons */
+        [data-theme="dark"] .table .btn-outline-primary {
+            border-color: #666;
+            color: #aaa;
+        }
+        [data-theme="dark"] .table .btn-outline-primary:hover {
+            background-color: #555;
+            border-color: #555;
+            color: #fff;
         }
     </style>
 </head>
 <body>
     <div class="container-fluid py-4">
         <div class="hero-section">
-            <div class="mb-4">
-                <h1 class="hero-title">🛰️ Pipeviz</h1>
-                <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
+            <div class="mb-4 d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="hero-title">🛰️ Pipeviz</h1>
+                    <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
+                </div>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
             </div>
 
             <ul class="nav nav-tabs" id="dashboardTabs">
@@ -543,6 +678,9 @@
                 <li class="nav-item">
                     <button class="nav-link" id="dot-tab" data-bs-toggle="tab" data-bs-target="#dot-pane">Dot</button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="spec-tab" data-bs-toggle="tab" data-bs-target="#spec-pane">Spec</button>
+                </li>
             </ul>
 
             <div class="tab-content">
@@ -555,41 +693,47 @@
                         </p>
 
                         <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">example:</div>
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Example</div>
                             <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; white-space: pre; min-width: 320px;">{
+<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; white-space: pre; min-width: 320px; color: var(--text-primary);">{
   "pipelines": [{
     "name": "etl-job",
     "input_sources": ["raw_events"],
     "output_sources": ["cleaned_events"]
   }]
 }</pre>
-                                <div id="splash-graph" style="flex: 1; min-width: 200px; min-height: 120px; background: #fff; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center;"></div>
+                                <div id="splash-graph" style="flex: 1; min-width: 200px; min-height: 120px; background: var(--bg-primary); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;"></div>
                             </div>
                         </div>
 
                         <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">how:</div>
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">How</div>
                             <ol style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
-                                <li>Write a <code>pipeviz.json</code></li>
-                                <li>Put it next to this file, or paste in <strong>Configuration</strong></li>
+                                <li>Write a <code>pipeviz.json</code> (see the <a href="#" onclick="document.getElementById('spec-tab').click(); return false;" style="color: #0366d6;">Spec</a>)</li>
+                                <li>Put it next to this file, or paste in <strong>Config</strong></li>
                                 <li>See your lineage in <strong>Graph</strong></li>
                             </ol>
                         </div>
 
                         <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">merge team configs:</div>
-<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; overflow-x: auto;">jq -s '{
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Federated Lineage</div>
+                            <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
+                                Tools like OpenLineage, Marquez, and dbt instrument your runtime or require you to adopt their framework. Lineage ends up in a central database, parsed from proprietary formats.
+                            </p>
+                            <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
+                                Pipeviz flips this. Generate your <code>.json</code> at build time from your own code. Each team versions it in their repo, reviews it, reasons about their own slice. When you need the full picture, merge with <code>jq</code>:
+                            </p>
+<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);">jq -s '{
   pipelines: map(.pipelines // []) | add,
   datasources: map(.datasources // []) | add
 }' team-*.json > pipeviz.json</pre>
-                            <div style="font-size: 12px; color: #828282; margin-top: 6px;">
-                                Each team owns their .json. One jq call stitches them into the full map.
-                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 0.5rem 0 0 0;">
+                                No central database, no custom parsers. JSON in, JSON out.
+                            </p>
                         </div>
 
                         <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">why:</div>
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Why</div>
                             <ul style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
                                 <li>No vendor, no framework, no runtime agents</li>
                                 <li>Works with any stack. SQL, Spark, Kafka, APIs, scripts</li>
@@ -599,9 +743,9 @@
                         </div>
 
                         <div style="font-size: 12px;">
-                            <a href="#" onclick="showSpecModal(); return false;" style="color: #828282;">spec</a>
-                            <span style="color: #ccc; margin: 0 6px;">·</span>
-                            <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: #828282;">github</a>
+                            <a href="#" onclick="document.getElementById('spec-tab').click(); return false;" style="color: var(--text-muted);">spec</a>
+                            <span style="color: var(--border-color); margin: 0 6px;">·</span>
+                            <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: var(--text-muted);">github</a>
                         </div>
                     </div>
                 </div>
@@ -629,7 +773,7 @@
                                     <div class="small text-muted">
                                         <div class="mb-3"><strong>Documentation:</strong></div>
                                         <div class="mb-2">
-                                            <a href="#" onclick="showSpecModal()" class="link-icon">
+                                            <a href="#" onclick="document.getElementById('spec-tab').click(); return false;" class="link-icon">
                                                 spec
                                             </a>
                                         </div>
@@ -736,6 +880,85 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Spec Tab -->
+                <div class="tab-pane fade" id="spec-pane">
+                    <div style="max-width: 800px; padding: 1rem 0;">
+                        <div class="mb-4">
+                            <h5 style="font-weight: bold; margin-bottom: 1rem;">JSON Spec</h5>
+                            <p style="color: var(--text-secondary);">Pipeviz uses a simple JSON configuration to define your data lineage. Only pipelines are required. Clusters and datasources are auto-created when referenced, but you can add rich descriptors for better documentation.</p>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 style="font-weight: bold;">Root Structure</h6>
+                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+  "clusters": [ ... ],     // Optional: cluster definitions
+  "pipelines": [ ... ],    // Required: pipeline definitions
+  "datasources": [ ... ]   // Optional: rich data source definitions
+}</pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 style="font-weight: bold;">Clusters (Optional)</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px;">Clusters can be declared upfront or referenced on-the-fly. Support nested hierarchies with parent relationships.</p>
+                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+  "name": "real-time",
+  "description": "Real-time processing cluster",  // Optional
+  "parent": "order-management"                    // Optional: creates nested cluster
+}</pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 style="font-weight: bold;">Pipelines</h6>
+                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+  "name": "user-enrichment",
+  "description": "Enriches user data...",       // Optional
+  "input_sources": ["raw_users", "events"],     // Optional
+  "output_sources": ["enriched_users"],         // Optional
+  "schedule": "Every 2 hours",                  // Optional
+  "tags": ["user-data", "ml"],                  // Optional
+  "cluster": "user-processing",                 // Optional: single cluster
+  "upstream_pipelines": ["data-ingestion"],     // Optional
+  "links": {                                    // Optional
+    "airflow": "https://...",
+    "monitoring": "https://..."
+  }
+}</pre>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 style="font-weight: bold;">Data Sources (Optional)</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px;">Data sources are auto-created when referenced in pipelines. Define them explicitly to add rich metadata, ownership, and documentation.</p>
+                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+  "name": "raw_users",
+  "description": "Raw user data...",            // Optional
+  "type": "snowflake",                          // Optional
+  "owner": "data-team@company.com",             // Optional
+  "tags": ["pii", "users"],                     // Optional
+  "cluster": "user-processing",                 // Optional
+  "metadata": {                                 // Optional
+    "size": "2.1TB",
+    "record_count": "45M"
+  },
+  "links": {                                    // Optional
+    "snowflake": "https://...",
+    "docs": "https://..."
+  }
+}</pre>
+                        </div>
+
+                        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1rem;">
+                            <strong>Tips</strong>
+                            <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 13px;">
+                                <li>Only <code>pipelines</code> array with pipeline <code>name</code> fields is required</li>
+                                <li>Clusters and datasources are auto-created when referenced</li>
+                                <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
+                                <li>Create nested clusters using the <code>parent</code> field</li>
+                                <li>Links can point to any external tools (Airflow, monitoring, docs, etc.)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -751,7 +974,7 @@
                 <div class="modal-body">
                     <div class="mb-4">
                         <h6>Overview</h6>
-                        <p class="text-muted">Pipeviz uses a simple JSON configuration to define your data lineage. Only pipelines are required - clusters and datasources are auto-created when referenced, but you can add rich descriptors for better documentation.</p>
+                        <p class="text-muted">Pipeviz uses a simple JSON configuration to define your data lineage. Only pipelines are required. Clusters and datasources are auto-created when referenced, but you can add rich descriptors for better documentation.</p>
                     </div>
 
                     <div class="mb-4">
@@ -813,7 +1036,7 @@
                     </div>
 
                     <div class="alert alert-info">
-                        <strong>💡 Pro Tips:</strong>
+                        <strong>Tips:</strong>
                         <ul class="mb-0 mt-2">
                             <li>Only <code>pipelines</code> array with pipeline <code>name</code> fields is required</li>
                             <li>Clusters and datasources are auto-created when referenced in pipelines</li>
@@ -834,6 +1057,35 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const btn = document.getElementById('theme-toggle');
+            if (html.getAttribute('data-theme') === 'dark') {
+                html.removeAttribute('data-theme');
+                btn.textContent = '☀️';
+                localStorage.setItem('pipeviz-theme', 'light');
+            } else {
+                html.setAttribute('data-theme', 'dark');
+                btn.textContent = '🌙';
+                localStorage.setItem('pipeviz-theme', 'dark');
+            }
+            // Re-render splash graph for theme
+            if (typeof renderSplashGraph === 'function') {
+                setTimeout(renderSplashGraph, 50);
+            }
+        }
+        // Initialize theme from localStorage
+        (function() {
+            const saved = localStorage.getItem('pipeviz-theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('theme-toggle').textContent = '🌙';
+                });
+            }
+        })();
+
         let currentConfig = null;
         let graphviz = null;
         let selectedNode = null;
@@ -2246,9 +2498,12 @@
         }
 
         function renderSplashGraph() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const textColor = isDark ? '#e0e0e0' : '#000000';
             const dot = `digraph {
                 rankdir=LR
-                node [fontname="Arial" fontsize="10"]
+                bgcolor="transparent"
+                node [fontname="Arial" fontsize="10" fontcolor="${textColor}"]
                 edge [color="#999999"]
                 "raw_events" [shape=ellipse style=filled fillcolor="#f3e5f5" color="#7b1fa2"]
                 "etl-job" [shape=box style="filled,rounded" fillcolor="#e3f2fd" color="#1976d2" fontname="Arial Bold"]
