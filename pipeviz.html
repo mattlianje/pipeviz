@@ -3,113 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛰️ Pipeviz</title>
+    <title>🛰️ pipeviz</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
     <script src="https://unpkg.com/d3-graphviz@5.0.2/build/d3-graphviz.min.js"></script>
     <style>
         body {
-            background-color: #fefefe;
+            background-color: #f6f6ef;
             min-height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 13px;
+            color: #000;
         }
         .hero-section {
-            background: #ffffff;
-            border: 1px solid #f0f0f0;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            margin: 2rem auto;
-            padding: 3rem;
-            max-width: 1200px;
+            background: #fff;
+            margin: 1rem auto;
+            padding: 1.5rem 2rem;
+            max-width: 1600px;
         }
         .nav-tabs {
-            border-bottom: 1px solid #f0f0f0;
-            margin-bottom: 2rem;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 1.5rem;
         }
         .nav-tabs .nav-link {
             border: none;
-            color: #8b9297;
-            font-weight: 500;
-            padding: 12px 24px;
-            margin-right: 2px;
+            color: #666;
+            font-weight: 400;
+            padding: 8px 16px;
+            margin-right: 4px;
             background: transparent;
-            border-radius: 8px 8px 0 0;
+            border-radius: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .nav-tabs .nav-link:hover {
-            color: #5a6570;
-            background-color: #f8f9fb;
+            color: #000;
+            background-color: #eee;
         }
         .nav-tabs .nav-link.active {
             background-color: #fff;
-            color: #2d3748;
-            border-bottom: 2px solid #7c8fb0;
+            color: #000;
+            border-bottom: 2px solid #333;
             font-weight: 600;
         }
         .card {
-            border: 1px solid #f0f0f0;
-            border-radius: 8px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-            background: white;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .table {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
+            background: #fff;
+            font-size: 13px;
+            border-collapse: collapse;
         }
         .table th {
-            background-color: #f7f8fc;
-            border: none;
-            font-weight: 600;
-            color: #4a5568;
+            background-color: #f6f6ef;
+            border-bottom: 1px solid #ccc;
+            font-weight: bold;
+            color: #000;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .table td {
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+        .table .col-name {
+            min-width: 140px;
+            white-space: nowrap;
+        }
+        .table .col-desc {
+            min-width: 200px;
+            max-width: 400px;
+        }
+        .table .col-schedule {
+            min-width: 100px;
+            white-space: nowrap;
+        }
+        .table .col-sources {
+            min-width: 140px;
+            max-width: 300px;
+        }
+        .table .col-cluster {
+            min-width: 80px;
+        }
+        .table .col-tags {
+            min-width: 120px;
+            max-width: 280px;
+        }
+        .table .col-links {
+            min-width: 100px;
+        }
+        .table .col-owner {
+            min-width: 140px;
+            max-width: 250px;
+        }
+        .table .col-metadata {
+            min-width: 160px;
+            max-width: 320px;
         }
         .badge {
-            font-weight: 500;
-            font-size: 0.85em;
-            padding: 0.4em 0.8em;
-            border-radius: 12px;
+            font-weight: normal;
+            font-size: 11px;
+            padding: 2px 5px;
+            border-radius: 2px;
+            display: inline-block;
+            margin-bottom: 2px;
         }
-        .badge-snowflake { background-color: #f6f8fa; color: #0969da; border: 1px solid #d0d7de; }
-        .badge-delta { background-color: #fff8f2; color: #bc4c00; border: 1px solid #f2cc60; }
-        .badge-s3 { background-color: #fffbf2; color: #9a6700; border: 1px solid #d4a72c; }
-        .badge-api { background-color: #f6f8f6; color: #1a7f37; border: 1px solid #a2c185; }
-        .badge-database { background-color: #fbf8ff; color: #8250df; border: 1px solid #d0bfff; }
-        .badge-tag { background-color: #fff8f2; color: #953800; border: 1px solid #fb8500; }
-        .badge-cluster { background-color: #f0f9ff; color: #0c4a6e; border: 1px solid #7dd3fc; }
+        .badge-snowflake { background-color: #e8f4fd; color: #0366d6; border: 1px solid #0366d6; }
+        .badge-delta { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; }
+        .badge-s3 { background-color: #fff8e1; color: #f57c00; border: 1px solid #f57c00; }
+        .badge-api { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
+        .badge-database { background-color: #f3e5f5; color: #7b1fa2; border: 1px solid #7b1fa2; }
+        .badge-tag { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; }
+        .badge-cluster { background-color: #e3f2fd; color: #1565c0; border: 1px solid #1565c0; }
         .graph-container {
-            background: white;
-            border-radius: 8px;
+            background: #fff;
             min-height: 500px;
             position: relative;
-            border: 1px solid #f0f0f0;
+            border: 1px solid #ccc;
         }
         .graph-controls {
             position: absolute;
-            top: 15px;
-            right: 15px;
+            top: 10px;
+            right: 10px;
             z-index: 10;
         }
         #graph svg {
             width: 100%;
             height: 500px;
-            border-radius: 8px;
         }
         .legend {
             position: absolute;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(255, 255, 255, 0.96);
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #f0f0f0;
-            font-size: 13px;
-            max-width: 200px;
+            bottom: 10px;
+            left: 10px;
+            background: #fff;
+            padding: 8px 12px;
+            font-size: 11px;
+            max-width: 160px;
+            opacity: 0.9;
         }
         .json-editor {
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            background: #fff;
+        }
+        .json-editor:focus {
+            border-color: #828282;
+            box-shadow: none;
+            outline: none;
         }
         .node-highlighted {
             stroke: #ff6b35 !important;
@@ -146,17 +203,14 @@
         }
         .node-tooltip {
             position: absolute;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 12px;
+            background: #000;
+            color: #fff;
+            padding: 6px 8px;
+            font-size: 11px;
             pointer-events: none;
             z-index: 1000;
-            max-width: 300px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 280px;
             white-space: pre-line;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         .node {
             cursor: pointer;
@@ -172,90 +226,314 @@
             stroke: none !important;
             stroke-width: 0 !important;
         }
+        .node-details-panel {
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 1rem;
+            min-height: 500px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .node-details-panel h5 {
+            color: #000;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #ccc;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .node-details-panel .detail-label {
+            font-size: 10px;
+            color: #828282;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        .node-details-panel .detail-value {
+            margin-bottom: 1rem;
+            font-size: 12px;
+        }
+        .node-details-panel .detail-value:last-child {
+            margin-bottom: 0;
+        }
+        .node-details-panel .links-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+        .node-details-panel .link-btn {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.5rem;
+            text-align: left;
+        }
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #999;
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        .search-results-dropdown.show {
+            display: block;
+        }
+        .search-result-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-item:hover {
+            background-color: #f0f0f0;
+        }
+        .search-result-item .result-type {
+            font-size: 9px;
+            padding: 2px 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .search-result-item .result-type.pipeline {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #1565c0;
+        }
+        .search-result-item .result-type.datasource {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #7b1fa2;
+        }
+        .search-result-item .result-name {
+            font-weight: 400;
+        }
+        .search-result-item .result-match {
+            color: #d84315;
+            font-weight: 600;
+        }
+        .btn {
+            border-radius: 0;
+            font-size: 12px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
         .btn-primary {
-            background-color: #7c8fb0;
-            border-color: #7c8fb0;
-            color: white;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.2s ease;
+            background-color: #333;
+            border-color: #333;
+            color: #fff;
         }
         .btn-primary:hover {
-            background-color: #6b7d9e;
-            border-color: #6b7d9e;
-            color: white;
+            background-color: #000;
+            border-color: #000;
+            color: #fff;
+        }
+        .btn-outline-primary {
+            color: #333;
+            border-color: #333;
+        }
+        .btn-outline-primary:hover {
+            background-color: #333;
+            border-color: #333;
+            color: #fff;
+        }
+        .btn-outline-secondary {
+            color: #666;
+            border-color: #999;
+        }
+        .btn-outline-secondary:hover {
+            background-color: #666;
+            border-color: #666;
+            color: #fff;
+        }
+        .btn-outline-warning {
+            color: #b45309;
+            border-color: #b45309;
+        }
+        .btn-outline-warning:hover {
+            background-color: #b45309;
+            border-color: #b45309;
+            color: #fff;
+        }
+        .btn-outline-info {
+            color: #0369a1;
+            border-color: #0369a1;
+        }
+        .btn-outline-info:hover {
+            background-color: #0369a1;
+            border-color: #0369a1;
+            color: #fff;
         }
         .hero-title {
-            color: #2d3748;
-            font-weight: 700;
-            font-size: 3rem;
-            margin-bottom: 1rem;
+            color: #000;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
         }
         .link-icon {
             text-decoration: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            background: white;
-            border: 1px solid #d0d7de;
-            color: #656d76;
-            font-size: 0.8rem;
+            padding: 4px 8px;
+            background: #f5f5f5;
+            border: 1px solid #ccc;
+            color: #333;
+            font-size: 12px;
             margin: 2px;
             display: inline-block;
-            transition: all 0.2s ease;
-            font-weight: 500;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
         }
         .link-icon:hover {
-            background: #f6f8fa;
-            border-color: #8c959f;
-            color: #24292f;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            background: #333;
+            border-color: #333;
+            color: #fff;
+        }
+        .form-control, .form-select {
+            border-radius: 0;
+            border: 1px solid #ccc;
+            font-size: 13px;
         }
         .form-control:focus, .form-select:focus {
-            border-color: #7c8fb0;
-            box-shadow: 0 0 0 0.2rem rgba(124, 143, 176, 0.15);
+            border-color: #333;
+            box-shadow: none;
+        }
+        .alert {
+            border-radius: 0;
+            font-size: 13px;
         }
         .alert-info {
-            background-color: #f0f4f8;
-            border-color: #bee3f8;
-            color: #2b6cb0;
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            color: #333;
+        }
+        .alert-success {
+            background-color: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .alert-danger {
+            background-color: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        .alert-warning {
+            background-color: #fff8e1;
+            border: 1px solid #ff9800;
+            color: #e65100;
         }
         .text-muted {
-            color: #8b9297 !important;
+            color: #666 !important;
         }
         .lead {
-            color: #5a6570;
+            color: #828282;
+            font-size: 12px;
         }
         .drop-zone {
             position: relative;
-            border: 2px dashed #d0d7de;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            border: 1px dashed #999;
+            transition: all 0.2s ease;
             cursor: pointer;
         }
         .drop-zone:hover {
-            border-color: #7c8fb0;
-            background-color: #f8f9fa;
+            border-color: #333;
+            background-color: #fafafa;
         }
         .drop-zone.dragover {
-            border-color: #7c8fb0;
-            background-color: #f0f4f8;
+            border-color: #333;
+            background-color: #f0f0f0;
             border-style: solid;
+        }
+        .modal-content {
+            border-radius: 0;
+            border: 1px solid #999;
+        }
+        .modal-header {
+            background: #f5f5f5;
+            border-bottom: 1px solid #ccc;
+            padding: 0.75rem 1rem;
+        }
+        .modal-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .modal-body {
+            font-size: 13px;
+        }
+        .modal-body pre {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            padding: 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 0;
+        }
+        .modal-body code {
+            color: #d63384;
+            background: #f6f6ef;
+            padding: 1px 4px;
+            font-size: 11px;
+        }
+        .modal-footer {
+            border-top: 1px solid #ccc;
+            padding: 0.5rem 1rem;
+        }
+        code {
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .filter-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            font-size: 11px;
+            cursor: pointer;
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #666;
+        }
+        .filter-tag:hover {
+            border-color: #999;
+            color: #000;
+        }
+        .filter-tag.active {
+            background: #000;
+            border-color: #000;
+            color: #fff;
+        }
+        .filter-group {
+            display: inline-block;
+            margin-right: 1rem;
+        }
+        .filter-group-label {
+            font-size: 10px;
+            color: #828282;
+            margin-right: 4px;
         }
     </style>
 </head>
 <body>
     <div class="container-fluid py-4">
         <div class="hero-section">
-            <div class="text-center mb-5">
-                <h1 class="hero-title">🛰️ Pipeviz</h1>
-                <p class="lead text-muted">Easy, elegant lineage with a single <code>.json</code></p>
+            <div class="mb-4">
+                <h1 class="hero-title">🛰️ pipeviz</h1>
+                <p class="lead">data lineage from a <span style="color: #d63384;">.json</span></p>
             </div>
 
             <ul class="nav nav-tabs" id="dashboardTabs">
                 <li class="nav-item">
-                    <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">
+                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-pane">
+                        Home
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">
                         Configuration
                     </button>
                 </li>
@@ -282,8 +560,68 @@
             </ul>
 
             <div class="tab-content">
+                <!-- Home Tab -->
+                <div class="tab-pane fade show active" id="home-pane">
+                    <div style="max-width: 620px; padding: 1rem 0;">
+                        <p style="font-size: 14px; line-height: 1.7; margin-bottom: 1.5rem;">
+                            Describe your pipelines and data sources in JSON.<br>
+                            Get a dependency graph. No install, no backend, no agents.
+                        </p>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">example:</div>
+                            <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; flex: 1; min-width: 280px;">{
+  "pipelines": [{
+    "name": "etl-job",
+    "input_sources": ["raw_events"],
+    "output_sources": ["cleaned_events"]
+  }]
+}</pre>
+                                <div id="splash-graph" style="flex: 1; min-width: 200px; min-height: 120px; background: #fff; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">how:</div>
+                            <ol style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
+                                <li>Write a <code>pipeviz.json</code></li>
+                                <li>Put it next to this file, or paste in <strong>Configuration</strong></li>
+                                <li>See your lineage in <strong>Graph</strong></li>
+                            </ol>
+                        </div>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">merge team configs:</div>
+<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; overflow-x: auto;">jq -s '{
+  pipelines: map(.pipelines // []) | add,
+  datasources: map(.datasources // []) | add
+}' team-*.json > pipeviz.json</pre>
+                            <div style="font-size: 12px; color: #828282; margin-top: 6px;">
+                                Each team owns their .json. One jq call stitches them into the full map.
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">why:</div>
+                            <ul style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
+                                <li>No vendor, no framework, no runtime agents</li>
+                                <li>Works with any stack. SQL, Spark, Kafka, APIs, scripts</li>
+                                <li>Each team owns their JSON, merge for the full map</li>
+                                <li>One HTML file, host anywhere, runs offline</li>
+                            </ul>
+                        </div>
+
+                        <div style="font-size: 12px;">
+                            <a href="#" onclick="showSpecModal(); return false;" style="color: #828282;">spec</a>
+                            <span style="color: #ccc; margin: 0 6px;">·</span>
+                            <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: #828282;">github</a>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Configuration Tab -->
-                <div class="tab-pane fade show active" id="config-pane">
+                <div class="tab-pane fade" id="config-pane">
                     <div class="card">
                         <div class="card-body">
                             <div class="row">
@@ -306,7 +644,7 @@
                                         <div class="mb-3"><strong>Documentation:</strong></div>
                                         <div class="mb-2">
                                             <a href="#" onclick="showSpecModal()" class="link-icon">
-                                                📋 JSON Spec
+                                                spec
                                             </a>
                                         </div>
                                         <div class="mb-3"><strong>Load from URL:</strong></div>
@@ -322,22 +660,11 @@
                 <div class="tab-pane fade" id="pipelines-pane">
                     <div class="card">
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <input type="text" class="form-control" id="pipeline-search"
-                                           placeholder="Search pipelines..." onkeyup="filterPipelines()">
-                                </div>
-                                <div class="col-md-4">
-                                    <select class="form-select" id="pipeline-tag-filter" onchange="filterPipelines()">
-                                        <option value="">All tags</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <select class="form-select" id="pipeline-cluster-filter" onchange="filterPipelines()">
-                                        <option value="">All clusters</option>
-                                    </select>
-                                </div>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="pipeline-search"
+                                       placeholder="Search pipelines..." onkeyup="filterPipelines()" style="max-width: 300px;">
                             </div>
+                            <div class="mb-3" id="pipeline-filters"></div>
                             <div id="pipelines-table-container">
                                 <p class="text-muted text-center">Load a configuration to see your pipelines</p>
                             </div>
@@ -349,27 +676,11 @@
                 <div class="tab-pane fade" id="datasources-pane">
                     <div class="card">
                         <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-3">
-                                    <input type="text" class="form-control" id="datasource-search"
-                                           placeholder="Search data sources..." onkeyup="filterDatasources()">
-                                </div>
-                                <div class="col-md-3">
-                                    <select class="form-select" id="datasource-type-filter" onchange="filterDatasources()">
-                                        <option value="">All types</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <select class="form-select" id="datasource-tag-filter" onchange="filterDatasources()">
-                                        <option value="">All tags</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <select class="form-select" id="datasource-cluster-filter" onchange="filterDatasources()">
-                                        <option value="">All clusters</option>
-                                    </select>
-                                </div>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="datasource-search"
+                                       placeholder="Search data sources..." onkeyup="filterDatasources()" style="max-width: 300px;">
                             </div>
+                            <div class="mb-3" id="datasource-filters"></div>
                             <div id="datasources-table-container">
                                 <p class="text-muted text-center">Load a configuration to see your data sources</p>
                             </div>
@@ -381,28 +692,42 @@
                 <div class="tab-pane fade" id="graph-pane">
                     <div class="card">
                         <div class="card-body">
-                            <div class="alert alert-info">
-                                <strong>Interactive Graph:</strong> Click nodes to highlight connections. Click empty space to clear selection.
-                            </div>
-                            <div class="graph-container position-relative">
-                                <div class="graph-controls">
-                                    <div class="btn-group me-2">
-                                        <button class="btn btn-sm btn-outline-warning" onclick="clearSelection()">
-                                            Clear Selection
-                                        </button>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="graph-search"
+                                               placeholder="Search nodes..." onkeyup="searchNodes(event)">
+                                        <div id="graph-search-results" class="search-results-dropdown"></div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="fitGraph()">Fit</button>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">Reset</button>
                                 </div>
-                                <div id="graph"></div>
-                                <div class="legend">
-                                    <div><strong>Legend:</strong></div>
-                                    <div>■ = Pipeline</div>
-                                    <div>● = Data Source</div>
-                                    <div>□ = Cluster</div>
-                                    <div>→ = Data flow</div>
-                                    <div style="color: #ff6b35;">→ = Dependency</div>
-                                    <div class="mt-2 small text-success">Click nodes to highlight</div>
+                            </div>
+                            <div class="row">
+                                <div id="graph-col" class="col-md-12">
+                                    <div class="graph-container position-relative">
+                                        <div class="graph-controls">
+                                            <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-warning" onclick="clearSelection()">
+                                                    Clear Selection
+                                                </button>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-primary me-2" onclick="fitGraph()">Fit</button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">Reset</button>
+                                        </div>
+                                        <div id="graph"></div>
+                                        <div class="legend">
+                                            <div><strong>Legend:</strong></div>
+                                            <div>■ = Pipeline</div>
+                                            <div>● = Data Source</div>
+                                            <div>□ = Cluster</div>
+                                            <div>→ = Data flow</div>
+                                            <div style="color: #ff6b35;">→ = Dependency</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" id="node-details-col" style="display: none;">
+                                    <div class="node-details-panel" id="node-details-panel">
+                                        <div id="node-details-content"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -438,7 +763,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="specModalLabel">📋 Pipeviz JSON Specification</h5>
+                    <h5 class="modal-title" id="specModalLabel">json spec</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -707,9 +1032,7 @@
                 if (response.ok) {
                     const configText = await response.text();
                     const parsed = JSON.parse(configText);
-                    // Apply inference before displaying
-                    const inferredConfig = inferUpstreamPipelines(parsed);
-                    document.getElementById('json-input').value = JSON.stringify(inferredConfig, null, 2);
+                    document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                     loadJson();
                     const statusDiv = document.getElementById('json-status');
                     statusDiv.innerHTML = '<div class="alert alert-success">Loaded pipeviz.json</div>';
@@ -730,9 +1053,7 @@
                 try {
                     const decodedConfig = atob(configParam);
                     const parsed = JSON.parse(decodedConfig);
-                    // Apply inference before displaying
-                    const inferredConfig = inferUpstreamPipelines(parsed);
-                    document.getElementById('json-input').value = JSON.stringify(inferredConfig, null, 2);
+                    document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                     loadJson();
                     return;
                 } catch (error) {
@@ -752,9 +1073,7 @@
                     .then(configText => {
                         try {
                             const parsed = JSON.parse(configText);
-                            // Apply inference before displaying
-                            const inferredConfig = inferUpstreamPipelines(parsed);
-                            document.getElementById('json-input').value = JSON.stringify(inferredConfig, null, 2);
+                            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                             loadJson();
                         } catch (error) {
                             document.getElementById('json-input').value = configText;
@@ -808,9 +1127,7 @@
                         reader.onload = function(e) {
                             try {
                                 const parsed = JSON.parse(e.target.result);
-                                // Apply inference before displaying
-                                const inferredConfig = inferUpstreamPipelines(parsed);
-                                textarea.value = JSON.stringify(inferredConfig, null, 2);
+                                textarea.value = JSON.stringify(parsed, null, 2);
                                 loadJson();
                             } catch (error) {
                                 textarea.value = e.target.result;
@@ -833,9 +1150,7 @@
                 reader.onload = function(e) {
                     try {
                         const parsed = JSON.parse(e.target.result);
-                        // Apply inference before displaying
-                        const inferredConfig = inferUpstreamPipelines(parsed);
-                        document.getElementById('json-input').value = JSON.stringify(inferredConfig, null, 2);
+                        document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                         loadJson();
                     } catch (error) {
                         document.getElementById('json-input').value = e.target.result;
@@ -851,94 +1166,26 @@
 
         function setupAutoProcess() {
             const textarea = document.getElementById('json-input');
+            const statusDiv = document.getElementById('json-status');
             let timeout;
 
             textarea.addEventListener('input', function() {
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
                     const content = textarea.value.trim();
-                    if (content && content.startsWith('{') && content.endsWith('}')) {
-                        try {
-                            const parsed = JSON.parse(content);
-                            // Apply inference before prettifying
-                            const inferredConfig = inferUpstreamPipelines(parsed);
-                            const prettified = JSON.stringify(inferredConfig, null, 2);
-                            if (prettified !== content) {
-                                textarea.value = prettified;
-                            }
-                            loadJson();
-                        } catch (e) {
-                            // Invalid JSON, don't process yet
-                        }
+                    if (!content) {
+                        statusDiv.innerHTML = '';
+                        return;
                     }
-                }, 1000);
+                    try {
+                        JSON.parse(content);
+                        statusDiv.innerHTML = '<div class="alert alert-success py-1 px-2" style="font-size: 0.85em;">Valid JSON</div>';
+                        loadJson();
+                    } catch (e) {
+                        statusDiv.innerHTML = `<div class="alert alert-danger py-1 px-2" style="font-size: 0.85em;">Invalid JSON: ${e.message}</div>`;
+                    }
+                }, 500);
             });
-        }
-
-        function inferUpstreamPipelines(config) {
-            if (!config.pipelines) return config;
-            
-            // Build a map of: data source -> pipelines that output to it
-            const dataSourceProducers = new Map();
-            
-            config.pipelines.forEach(pipeline => {
-                if (pipeline.output_sources) {
-                    pipeline.output_sources.forEach(source => {
-                        if (!dataSourceProducers.has(source)) {
-                            dataSourceProducers.set(source, []);
-                        }
-                        dataSourceProducers.get(source).push(pipeline.name);
-                    });
-                }
-            });
-            
-            // For each pipeline, infer upstream pipelines from its input sources
-            config.pipelines.forEach(pipeline => {
-                // If upstream_pipelines is not defined or empty, infer it
-                if (!pipeline.upstream_pipelines || pipeline.upstream_pipelines.length === 0) {
-                    const inferredUpstream = new Set();
-                    
-                    if (pipeline.input_sources) {
-                        pipeline.input_sources.forEach(source => {
-                            // Find pipelines that produce this input
-                            const producers = dataSourceProducers.get(source);
-                            if (producers) {
-                                producers.forEach(producer => {
-                                    // Don't add self as upstream
-                                    if (producer !== pipeline.name) {
-                                        inferredUpstream.add(producer);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                    
-                    // Set the inferred upstream pipelines
-                    if (inferredUpstream.size > 0) {
-                        pipeline.upstream_pipelines = Array.from(inferredUpstream);
-                    }
-                } else {
-                    // If upstream_pipelines exists, still add any missing inferred ones
-                    const existingUpstream = new Set(pipeline.upstream_pipelines);
-                    
-                    if (pipeline.input_sources) {
-                        pipeline.input_sources.forEach(source => {
-                            const producers = dataSourceProducers.get(source);
-                            if (producers) {
-                                producers.forEach(producer => {
-                                    if (producer !== pipeline.name && !existingUpstream.has(producer)) {
-                                        existingUpstream.add(producer);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                    
-                    pipeline.upstream_pipelines = Array.from(existingUpstream);
-                }
-            });
-            
-            return config;
         }
 
         function loadJson() {
@@ -952,10 +1199,6 @@
 
             try {
                 currentConfig = JSON.parse(jsonText);
-                
-                // Auto-infer upstream pipelines from data flow
-                currentConfig = inferUpstreamPipelines(currentConfig);
-                
                 statusDiv.innerHTML = '<div class="alert alert-success">Configuration loaded successfully!</div>';
 
                 renderPipelines();
@@ -974,6 +1217,7 @@
 
             const container = document.getElementById('pipelines-table-container');
             let html = `
+                <div class="table-container">
                 <table class="table table-striped table-hover">
                     <thead>
                         <tr>
@@ -1016,19 +1260,19 @@
                         data-description="${(pipeline.description || '').toLowerCase()}"
                         data-cluster="${(pipeline.cluster || '').toLowerCase()}"
                         data-tags="${(pipeline.tags || []).join(',').toLowerCase()}">
-                        <td><strong>${pipeline.name}</strong></td>
-                        <td>${pipeline.description || ''}</td>
-                        <td><code class="text-success">${pipeline.schedule || ''}</code></td>
-                        <td>${inputSources}</td>
-                        <td>${outputSources}</td>
-                        <td>${cluster}</td>
-                        <td>${tags}</td>
-                        <td>${links}</td>
+                        <td class="col-name"><strong>${pipeline.name}</strong></td>
+                        <td class="col-desc">${pipeline.description || ''}</td>
+                        <td class="col-schedule"><code class="text-success">${pipeline.schedule || ''}</code></td>
+                        <td class="col-sources">${inputSources}</td>
+                        <td class="col-sources">${outputSources}</td>
+                        <td class="col-cluster">${cluster}</td>
+                        <td class="col-tags">${tags}</td>
+                        <td class="col-links">${links}</td>
                     </tr>
                 `;
             });
 
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             container.innerHTML = html;
         }
 
@@ -1078,6 +1322,7 @@
             }
         
             let html = `
+                <div class="table-container">
                 <table class="table table-striped table-hover">
                     <thead>
                         <tr>
@@ -1092,25 +1337,25 @@
                     </thead>
                     <tbody>
             `;
-        
+
             allDataSources.forEach(ds => {
                 const typeBadge = `<span class="badge badge-${ds.type || 'secondary'}">${(ds.type || 'unknown').toUpperCase()}</span>`;
-        
+
                 const metadata = ds.metadata ? Object.entries(ds.metadata).map(([k, v]) =>
                     `<div class="small text-muted mb-1"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
                 ).join('') : '';
-        
+
                 const cluster = ds.cluster ?
                     `<span class="badge badge-cluster me-1 mb-1">${ds.cluster}</span>` : '';
-        
+
                 const tags = ds.tags?.map(t =>
                     `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
                 ).join('') || '';
-        
+
                 const links = ds.links ? Object.entries(ds.links).map(([name, url]) =>
                     `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
                 ).join('') : '';
-        
+
                 html += `
                     <tr class="datasource-row"
                         data-name="${ds.name.toLowerCase()}"
@@ -1118,71 +1363,120 @@
                         data-cluster="${(ds.cluster || '').toLowerCase()}"
                         data-tags="${(ds.tags || []).join(',').toLowerCase()}"
                         data-search="${(ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase()}">
-                        <td>
+                        <td class="col-name">
                             <div><strong>${ds.name}</strong></div>
                             <div>${typeBadge}</div>
                         </td>
-                        <td>${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</td>
-                        <td class="small text-muted">${ds.owner || ''}</td>
-                        <td>${metadata}</td>
-                        <td>${cluster}</td>
-                        <td>${tags}</td>
-                        <td>${links}</td>
+                        <td class="col-desc">${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</td>
+                        <td class="col-owner small text-muted">${ds.owner || ''}</td>
+                        <td class="col-metadata">${metadata}</td>
+                        <td class="col-cluster">${cluster}</td>
+                        <td class="col-tags">${tags}</td>
+                        <td class="col-links">${links}</td>
                     </tr>
                 `;
             });
-        
-            html += '</tbody></table>';
+
+            html += '</tbody></table></div>';
             container.innerHTML = html;
         }
+
+        // Store active filters
+        const activeFilters = {
+            pipelineTags: new Set(),
+            pipelineClusters: new Set(),
+            datasourceTypes: new Set(),
+            datasourceTags: new Set(),
+            datasourceClusters: new Set()
+        };
 
         function updateFilters() {
             if (!currentConfig) return;
 
             // Pipeline filters
             const pipelineTags = [...new Set(currentConfig.pipelines?.flatMap(p => p.tags || []) || [])].sort();
-            const pipelineTagFilter = document.getElementById('pipeline-tag-filter');
-            pipelineTagFilter.innerHTML = '<option value="">All tags</option>' +
-                pipelineTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
-
             const pipelineClusters = [...new Set(currentConfig.pipelines?.map(p => p.cluster).filter(c => c) || [])].sort();
-            const pipelineClusterFilter = document.getElementById('pipeline-cluster-filter');
-            pipelineClusterFilter.innerHTML = '<option value="">All clusters</option>' +
-                pipelineClusters.map(cluster => `<option value="${cluster}">${cluster}</option>`).join('');
+
+            let pipelineHtml = '';
+            if (pipelineClusters.length) {
+                pipelineHtml += '<span class="filter-group"><span class="filter-group-label">cluster:</span>';
+                pipelineHtml += pipelineClusters.map(c =>
+                    `<span class="filter-tag" data-type="pipelineClusters" data-value="${c}">${c}</span>`
+                ).join('');
+                pipelineHtml += '</span>';
+            }
+            if (pipelineTags.length) {
+                pipelineHtml += '<span class="filter-group"><span class="filter-group-label">tag:</span>';
+                pipelineHtml += pipelineTags.map(t =>
+                    `<span class="filter-tag" data-type="pipelineTags" data-value="${t}">${t}</span>`
+                ).join('');
+                pipelineHtml += '</span>';
+            }
+            document.getElementById('pipeline-filters').innerHTML = pipelineHtml;
 
             // Datasource filters
             const datasourceTypes = [...new Set(currentConfig.datasources?.map(ds => ds.type || 'unknown') || [])].sort();
             const datasourceTags = [...new Set(currentConfig.datasources?.flatMap(ds => ds.tags || []) || [])].sort();
             const datasourceClusters = [...new Set(currentConfig.datasources?.map(ds => ds.cluster).filter(c => c) || [])].sort();
 
-            const typeFilter = document.getElementById('datasource-type-filter');
-            typeFilter.innerHTML = '<option value="">All types</option>' +
-                datasourceTypes.map(type => `<option value="${type}">${type}</option>`).join('');
+            let datasourceHtml = '';
+            if (datasourceTypes.length) {
+                datasourceHtml += '<span class="filter-group"><span class="filter-group-label">type:</span>';
+                datasourceHtml += datasourceTypes.map(t =>
+                    `<span class="filter-tag" data-type="datasourceTypes" data-value="${t}">${t}</span>`
+                ).join('');
+                datasourceHtml += '</span>';
+            }
+            if (datasourceClusters.length) {
+                datasourceHtml += '<span class="filter-group"><span class="filter-group-label">cluster:</span>';
+                datasourceHtml += datasourceClusters.map(c =>
+                    `<span class="filter-tag" data-type="datasourceClusters" data-value="${c}">${c}</span>`
+                ).join('');
+                datasourceHtml += '</span>';
+            }
+            if (datasourceTags.length) {
+                datasourceHtml += '<span class="filter-group"><span class="filter-group-label">tag:</span>';
+                datasourceHtml += datasourceTags.map(t =>
+                    `<span class="filter-tag" data-type="datasourceTags" data-value="${t}">${t}</span>`
+                ).join('');
+                datasourceHtml += '</span>';
+            }
+            document.getElementById('datasource-filters').innerHTML = datasourceHtml;
 
-            const dsTagFilter = document.getElementById('datasource-tag-filter');
-            dsTagFilter.innerHTML = '<option value="">All tags</option>' +
-                datasourceTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
-
-            const dsClusterFilter = document.getElementById('datasource-cluster-filter');
-            dsClusterFilter.innerHTML = '<option value="">All clusters</option>' +
-                datasourceClusters.map(cluster => `<option value="${cluster}">${cluster}</option>`).join('');
+            // Add click handlers
+            document.querySelectorAll('.filter-tag').forEach(tag => {
+                tag.addEventListener('click', function() {
+                    const type = this.dataset.type;
+                    const value = this.dataset.value;
+                    if (activeFilters[type].has(value)) {
+                        activeFilters[type].delete(value);
+                        this.classList.remove('active');
+                    } else {
+                        activeFilters[type].add(value);
+                        this.classList.add('active');
+                    }
+                    if (type.startsWith('pipeline')) {
+                        filterPipelines();
+                    } else {
+                        filterDatasources();
+                    }
+                });
+            });
         }
 
         function filterPipelines() {
             const searchTerm = document.getElementById('pipeline-search').value.toLowerCase();
-            const selectedTag = document.getElementById('pipeline-tag-filter').value.toLowerCase();
-            const selectedCluster = document.getElementById('pipeline-cluster-filter').value.toLowerCase();
             const rows = document.querySelectorAll('.pipeline-row');
 
             rows.forEach(row => {
                 const name = row.getAttribute('data-name');
                 const description = row.getAttribute('data-description');
-                const tags = row.getAttribute('data-tags');
+                const tags = row.getAttribute('data-tags').split(',').filter(t => t);
                 const cluster = row.getAttribute('data-cluster');
 
                 const matchesSearch = !searchTerm || name.includes(searchTerm) || description.includes(searchTerm);
-                const matchesTag = !selectedTag || tags.includes(selectedTag);
-                const matchesCluster = !selectedCluster || cluster === selectedCluster;
+                const matchesTag = activeFilters.pipelineTags.size === 0 || tags.some(t => activeFilters.pipelineTags.has(t));
+                const matchesCluster = activeFilters.pipelineClusters.size === 0 || activeFilters.pipelineClusters.has(cluster);
 
                 row.style.display = (matchesSearch && matchesTag && matchesCluster) ? '' : 'none';
             });
@@ -1190,21 +1484,18 @@
 
         function filterDatasources() {
             const searchTerm = document.getElementById('datasource-search').value.toLowerCase();
-            const selectedType = document.getElementById('datasource-type-filter').value.toLowerCase();
-            const selectedTag = document.getElementById('datasource-tag-filter').value.toLowerCase();
-            const selectedCluster = document.getElementById('datasource-cluster-filter').value.toLowerCase();
             const rows = document.querySelectorAll('.datasource-row');
 
             rows.forEach(row => {
                 const searchContent = row.getAttribute('data-search');
                 const type = row.getAttribute('data-type');
-                const tags = row.getAttribute('data-tags');
+                const tags = row.getAttribute('data-tags').split(',').filter(t => t);
                 const cluster = row.getAttribute('data-cluster');
 
                 const matchesSearch = !searchTerm || searchContent.includes(searchTerm);
-                const matchesType = !selectedType || type === selectedType;
-                const matchesTag = !selectedTag || tags.includes(selectedTag);
-                const matchesCluster = !selectedCluster || cluster === selectedCluster;
+                const matchesType = activeFilters.datasourceTypes.size === 0 || activeFilters.datasourceTypes.has(type);
+                const matchesTag = activeFilters.datasourceTags.size === 0 || tags.some(t => activeFilters.datasourceTags.has(t));
+                const matchesCluster = activeFilters.datasourceClusters.size === 0 || activeFilters.datasourceClusters.has(cluster);
 
                 row.style.display = (matchesSearch && matchesType && matchesTag && matchesCluster) ? '' : 'none';
             });
@@ -1608,11 +1899,147 @@
                     d3.select(this).classed("edge-dimmed", true);
                 }
             });
+
+            // Show node details in side panel
+            showNodeDetails(nodeName);
+        }
+
+        function showNodeDetails(nodeName) {
+            const col = document.getElementById('node-details-col');
+            const content = document.getElementById('node-details-content');
+
+            if (!currentConfig) return;
+
+            let html = '';
+            let nodeData = null;
+            let nodeType = '';
+
+            // Check if it's a pipeline
+            const pipeline = currentConfig.pipelines?.find(p => p.name === nodeName);
+            if (pipeline) {
+                nodeData = pipeline;
+                nodeType = 'Pipeline';
+            }
+
+            // Check if it's a datasource
+            const datasource = currentConfig.datasources?.find(ds => ds.name === nodeName);
+            if (datasource) {
+                nodeData = datasource;
+                nodeType = 'Data Source';
+            }
+
+            // Check auto-created datasources
+            if (!nodeData) {
+                const allSources = new Set();
+                currentConfig.pipelines?.forEach(p => {
+                    p.input_sources?.forEach(s => allSources.add(s));
+                    p.output_sources?.forEach(s => allSources.add(s));
+                });
+                if (allSources.has(nodeName)) {
+                    nodeData = { name: nodeName, description: 'Auto-created from pipeline references' };
+                    nodeType = 'Data Source';
+                }
+            }
+
+            if (!nodeData) {
+                col.style.display = 'none';
+                return;
+            }
+
+            html = `<h5>${nodeData.name}</h5>`;
+            html += `<div class="detail-label">Type</div>`;
+            html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`;
+
+            if (nodeData.description) {
+                html += `<div class="detail-label">Description</div>`;
+                html += `<div class="detail-value">${nodeData.description}</div>`;
+            }
+
+            if (nodeData.schedule) {
+                html += `<div class="detail-label">Schedule</div>`;
+                html += `<div class="detail-value"><code class="text-success">${nodeData.schedule}</code></div>`;
+            }
+
+            if (nodeData.type) {
+                html += `<div class="detail-label">Source Type</div>`;
+                html += `<div class="detail-value"><span class="badge badge-${nodeData.type}">${nodeData.type.toUpperCase()}</span></div>`;
+            }
+
+            if (nodeData.owner) {
+                html += `<div class="detail-label">Owner</div>`;
+                html += `<div class="detail-value">${nodeData.owner}</div>`;
+            }
+
+            if (nodeData.cluster) {
+                html += `<div class="detail-label">Cluster</div>`;
+                html += `<div class="detail-value"><span class="badge badge-cluster">${nodeData.cluster}</span></div>`;
+            }
+
+            if (nodeData.input_sources?.length) {
+                html += `<div class="detail-label">Input Sources</div>`;
+                html += `<div class="detail-value">${nodeData.input_sources.map(s =>
+                    `<span class="badge me-1 mb-1" style="background-color: #e3f2fd; color: #1565c0;">${s}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (nodeData.output_sources?.length) {
+                html += `<div class="detail-label">Output Sources</div>`;
+                html += `<div class="detail-value">${nodeData.output_sources.map(s =>
+                    `<span class="badge me-1 mb-1" style="background-color: #e8f5e8; color: #2e7d32;">${s}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (nodeData.upstream_pipelines?.length) {
+                html += `<div class="detail-label">Upstream Pipelines</div>`;
+                html += `<div class="detail-value">${nodeData.upstream_pipelines.map(p =>
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3e0; color: #e65100;">${p}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (nodeData.tags?.length) {
+                html += `<div class="detail-label">Tags</div>`;
+                html += `<div class="detail-value">${nodeData.tags.map(t =>
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404;">${t}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (nodeData.metadata && Object.keys(nodeData.metadata).length) {
+                html += `<div class="detail-label">Metadata</div>`;
+                html += `<div class="detail-value">`;
+                Object.entries(nodeData.metadata).forEach(([key, value]) => {
+                    html += `<div class="small"><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</div>`;
+                });
+                html += `</div>`;
+            }
+
+            if (nodeData.links && Object.keys(nodeData.links).length) {
+                html += `<div class="links-section">`;
+                html += `<div class="detail-label">Links</div>`;
+                Object.entries(nodeData.links).forEach(([name, url]) => {
+                    html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`;
+                });
+                html += `</div>`;
+            }
+
+            // Shrink graph and show panel
+            const graphCol = document.getElementById('graph-col');
+            graphCol.classList.remove('col-md-12');
+            graphCol.classList.add('col-md-8');
+            col.style.display = 'block';
+            content.innerHTML = html;
         }
 
         function clearSelection() {
             selectedNode = null;
             clearHighlights();
+            // Hide details panel and expand graph
+            const col = document.getElementById('node-details-col');
+            const graphCol = document.getElementById('graph-col');
+            if (col) col.style.display = 'none';
+            if (graphCol) {
+                graphCol.classList.remove('col-md-8');
+                graphCol.classList.add('col-md-12');
+            }
         }
 
         function clearHighlights() {
@@ -1621,6 +2048,175 @@
             d3.select("#graph").selectAll(".edge")
                 .classed("edge-highlighted edge-dimmed", false);
         }
+
+        function fuzzyMatch(text, query) {
+            text = text.toLowerCase();
+            query = query.toLowerCase();
+
+            // Direct substring match
+            if (text.includes(query)) {
+                return { match: true, score: query.length / text.length + 0.5 };
+            }
+
+            // Fuzzy match - all query chars must appear in order
+            let queryIdx = 0;
+            let score = 0;
+            let lastMatchIdx = -1;
+
+            for (let i = 0; i < text.length && queryIdx < query.length; i++) {
+                if (text[i] === query[queryIdx]) {
+                    score += 1;
+                    // Bonus for consecutive matches
+                    if (lastMatchIdx === i - 1) score += 0.5;
+                    // Bonus for matching at word boundaries
+                    if (i === 0 || text[i-1] === '_' || text[i-1] === '-' || text[i-1] === ' ') score += 0.3;
+                    lastMatchIdx = i;
+                    queryIdx++;
+                }
+            }
+
+            if (queryIdx === query.length) {
+                return { match: true, score: score / text.length };
+            }
+            return { match: false, score: 0 };
+        }
+
+        function highlightMatch(text, query) {
+            const lowerText = text.toLowerCase();
+            const lowerQuery = query.toLowerCase();
+
+            // Try substring match first
+            const idx = lowerText.indexOf(lowerQuery);
+            if (idx !== -1) {
+                return text.substring(0, idx) +
+                       '<span class="result-match">' + text.substring(idx, idx + query.length) + '</span>' +
+                       text.substring(idx + query.length);
+            }
+
+            // Fuzzy highlight
+            let result = '';
+            let queryIdx = 0;
+            for (let i = 0; i < text.length; i++) {
+                if (queryIdx < query.length && text[i].toLowerCase() === lowerQuery[queryIdx]) {
+                    result += '<span class="result-match">' + text[i] + '</span>';
+                    queryIdx++;
+                } else {
+                    result += text[i];
+                }
+            }
+            return result;
+        }
+
+        function searchNodes(event) {
+            const query = event.target.value.trim();
+            const dropdown = document.getElementById('graph-search-results');
+
+            if (!query || query.length < 1 || !currentConfig) {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            const results = [];
+
+            // Search pipelines
+            currentConfig.pipelines?.forEach(p => {
+                const nameMatch = fuzzyMatch(p.name, query);
+                const descMatch = p.description ? fuzzyMatch(p.description, query) : { match: false, score: 0 };
+                if (nameMatch.match || descMatch.match) {
+                    results.push({
+                        name: p.name,
+                        type: 'pipeline',
+                        score: Math.max(nameMatch.score * 1.5, descMatch.score) // Boost name matches
+                    });
+                }
+            });
+
+            // Search datasources
+            currentConfig.datasources?.forEach(ds => {
+                const nameMatch = fuzzyMatch(ds.name, query);
+                const descMatch = ds.description ? fuzzyMatch(ds.description, query) : { match: false, score: 0 };
+                if (nameMatch.match || descMatch.match) {
+                    results.push({
+                        name: ds.name,
+                        type: 'datasource',
+                        score: Math.max(nameMatch.score * 1.5, descMatch.score)
+                    });
+                }
+            });
+
+            // Search auto-created datasources
+            const autoSources = new Set();
+            currentConfig.pipelines?.forEach(p => {
+                p.input_sources?.forEach(s => autoSources.add(s));
+                p.output_sources?.forEach(s => autoSources.add(s));
+            });
+            autoSources.forEach(name => {
+                if (!currentConfig.datasources?.find(ds => ds.name === name)) {
+                    const nameMatch = fuzzyMatch(name, query);
+                    if (nameMatch.match) {
+                        results.push({
+                            name: name,
+                            type: 'datasource',
+                            score: nameMatch.score * 1.5
+                        });
+                    }
+                }
+            });
+
+            // Sort by score
+            results.sort((a, b) => b.score - a.score);
+
+            // Limit results
+            const topResults = results.slice(0, 8);
+
+            if (topResults.length === 0) {
+                dropdown.innerHTML = '<div class="search-result-item text-muted">No matches found</div>';
+                dropdown.classList.add('show');
+                return;
+            }
+
+            dropdown.innerHTML = topResults.map(r => `
+                <div class="search-result-item" onclick="selectSearchResult('${r.name}')">
+                    <span class="result-type ${r.type}">${r.type === 'pipeline' ? 'Pipeline' : 'Source'}</span>
+                    <span class="result-name">${highlightMatch(r.name, query)}</span>
+                </div>
+            `).join('');
+            dropdown.classList.add('show');
+        }
+
+        function selectSearchResult(nodeName) {
+            // Hide dropdown and clear search
+            const dropdown = document.getElementById('graph-search-results');
+            const searchInput = document.getElementById('graph-search');
+            dropdown.classList.remove('show');
+            searchInput.value = '';
+
+            // Find and click the node in the graph
+            let found = false;
+            d3.select("#graph").selectAll(".node").each(function() {
+                const node = d3.select(this);
+                const nodeTitle = node.select("title").text();
+                if (nodeTitle === nodeName) {
+                    found = true;
+                    selectNode(nodeName, this);
+                }
+            });
+
+            if (!found) {
+                // Node might not be visible, just show details
+                showNodeDetails(nodeName);
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('graph-search-results');
+            const searchInput = document.getElementById('graph-search');
+            if (dropdown && !dropdown.contains(e.target) && e.target !== searchInput) {
+                dropdown.classList.remove('show');
+            }
+        });
 
         function fitGraph() {
             if (graphviz) graphviz.fit(true);
@@ -1667,10 +2263,29 @@
             modal.show();
         }
 
+        function renderSplashGraph() {
+            const dot = `digraph {
+                rankdir=LR
+                node [fontname="Arial" fontsize="10"]
+                edge [color="#999999"]
+                "raw_events" [shape=ellipse style=filled fillcolor="#f3e5f5" color="#7b1fa2"]
+                "etl-job" [shape=box style="filled,rounded" fillcolor="#e3f2fd" color="#1976d2" fontname="Arial Bold"]
+                "cleaned_events" [shape=ellipse style=filled fillcolor="#f3e5f5" color="#7b1fa2"]
+                "raw_events" -> "etl-job"
+                "etl-job" -> "cleaned_events"
+            }`;
+            d3.select("#splash-graph").graphviz()
+                .width(260)
+                .height(110)
+                .fit(true)
+                .renderDot(dot);
+        }
+
         window.addEventListener('load', function() {
             setupDragDrop();
             setupAutoProcess();
             loadFromUrl();
+            renderSplashGraph();
         });
     </script>
 </body>

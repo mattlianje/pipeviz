@@ -49,13 +49,13 @@ Renders this:
 ## Using & Hosting
 Pipeviz is just a single static HTML file (`pipeviz.html`) plus your `.json`.
 
-There’s no backend, no build step, no install, open the file in your browser or serve it from anywhere you can host static content.
+There's no backend, no build step, no install, open the file in your browser or serve it from anywhere you can host static content.
 
 ### Option 1 - Open locally
 - Download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html)
 - Save your .json in the same folder.
 - Open `pipeviz.html` in your browser.
-- Paste your JSON into the “Configuration” tab, or drag-and-drop the file.
+- Paste your JSON into the "Configuration" tab, or drag-and-drop the file.
 
 ### Option 2 - Serve over HTTP
 Any static hosting works:
@@ -78,10 +78,48 @@ https://yourdomain/pipeviz.html?config=BASE64_ENCODED_JSON
 - Drop the HTML into an `<iframe>` in your docs/wiki tool.
 - Preload the JSON via `?url=…` so users see the lineage instantly.
 
+## Merging Team Configs
+
+Each team maintains their own `pipeviz.json`. Merge them with `jq`:
+
+```bash
+# simple merge
+jq -s '{
+  pipelines: map(.pipelines // []) | add,
+  datasources: map(.datasources // []) | add
+}' team-*.json > pipeviz.json
+```
+
+If teams have pipelines or datasources with the same `name`, last one wins. To keep both, prefix with team name:
+
+```bash
+# prefix names with filename to avoid collisions
+for f in team-*.json; do
+  team=$(basename "$f" .json)
+  jq --arg t "$team" '
+    .pipelines[]?.name |= "\($t)/\(.)" |
+    .datasources[]?.name |= "\($t)/\(.)"
+  ' "$f"
+done | jq -s '{
+  pipelines: map(.pipelines // []) | add,
+  datasources: map(.datasources // []) | add
+}' > pipeviz.json
+```
+
+Or dedupe by name, merging properties from all sources:
+
+```bash
+# merge properties for duplicate names
+jq -s '{
+  pipelines: (map(.pipelines // []) | add | group_by(.name) | map(add)),
+  datasources: (map(.datasources // []) | add | group_by(.name) | map(add))
+}' team-*.json > pipeviz.json
+```
+
 ## Motivation
 Lineage and dataflow-visualization in most modern data stacks are an afterthought - bolted on awkwardly.
 
-[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you’ll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
+[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you'll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
 
 [dbt](https://www.getdbt.com/) takes a different (and powerful) approach - but still asks you to bend the knee to a framework.
 You rewrite your pipelines in **their SQL dialect**, commit to **their manifest format**, and structure your project to fit (and be at the mercy) of **their** expectations.
