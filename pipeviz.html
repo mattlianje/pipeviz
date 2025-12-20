@@ -28,15 +28,13 @@
         }
         .nav-tabs .nav-link {
             border: none;
-            color: #666;
+            color: #828282;
             font-weight: 400;
-            padding: 8px 16px;
-            margin-right: 4px;
+            padding: 6px 12px;
+            margin-right: 2px;
             background: transparent;
             border-radius: 0;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 12px;
         }
         .nav-tabs .nav-link:hover {
             color: #000;
@@ -522,40 +520,28 @@
     <div class="container-fluid py-4">
         <div class="hero-section">
             <div class="mb-4">
-                <h1 class="hero-title">🛰️ pipeviz</h1>
-                <p class="lead">data lineage from a <span style="color: #d63384;">.json</span></p>
+                <h1 class="hero-title">🛰️ Pipeviz</h1>
+                <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
             </div>
 
             <ul class="nav nav-tabs" id="dashboardTabs">
                 <li class="nav-item">
-                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-pane">
-                        Home
-                    </button>
+                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-pane">Home</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">
-                        Configuration
-                    </button>
+                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">Config</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="pipelines-tab" data-bs-toggle="tab" data-bs-target="#pipelines-pane">
-                        Pipelines
-                    </button>
+                    <button class="nav-link" id="pipelines-tab" data-bs-toggle="tab" data-bs-target="#pipelines-pane">Pipelines</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="datasources-tab" data-bs-toggle="tab" data-bs-target="#datasources-pane">
-                        Data Sources
-                    </button>
+                    <button class="nav-link" id="datasources-tab" data-bs-toggle="tab" data-bs-target="#datasources-pane">Datasources</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph-pane">
-                        Dependency Graph
-                    </button>
+                    <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph-pane">Graph</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="dot-tab" data-bs-toggle="tab" data-bs-target="#dot-pane">
-                        Raw DOT
-                    </button>
+                    <button class="nav-link" id="dot-tab" data-bs-toggle="tab" data-bs-target="#dot-pane">Dot</button>
                 </li>
             </ul>
 
@@ -571,7 +557,7 @@
                         <div style="margin-bottom: 1.5rem;">
                             <div style="font-size: 11px; color: #828282; margin-bottom: 4px;">example:</div>
                             <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; flex: 1; min-width: 280px;">{
+<pre style="background: #f6f6ef; border: 1px solid #ccc; padding: 12px; font-size: 12px; margin: 0; white-space: pre; min-width: 320px;">{
   "pipelines": [{
     "name": "etl-job",
     "input_sources": ["raw_events"],
@@ -744,10 +730,6 @@
                                     <button class="btn btn-sm btn-outline-info me-2" onclick="updateDotView()">Refresh</button>
                                     <button class="btn btn-sm btn-outline-secondary" onclick="copyDotToClipboard()">Copy to Clipboard</button>
                                 </div>
-                            </div>
-                            <div class="alert alert-info">
-                                <strong>About DOT:</strong> This is the raw Graphviz DOT language representation of your data lineage.
-                                You can copy this and use it with any Graphviz-compatible tool or modify it for custom visualizations.
                             </div>
                             <textarea class="form-control json-editor" id="dot-output" rows="25" readonly
                                       placeholder="Load a configuration to see the generated DOT code..."></textarea>
