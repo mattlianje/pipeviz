@@ -202,20 +202,25 @@
             outline: none;
         }
         .node-highlighted {
-            stroke: #ff6b35 !important;
-            stroke-width: 3px !important;
-            filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.5));
+            stroke: #d32f2f !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 8px rgba(211, 47, 47, 0.6));
+        }
+        .node-highlighted polygon,
+        .node-highlighted ellipse,
+        .node-highlighted path {
+            fill: #ffcdd2 !important;
         }
         .node-highlighted text {
-            font-weight: normal !important;
+            font-weight: bold !important;
             fill: #000 !important;
             stroke: none !important;
             stroke-width: 0 !important;
         }
         .node-connected {
-            stroke: #17a2b8 !important;
+            stroke: #7b1fa2 !important;
             stroke-width: 2px !important;
-            filter: drop-shadow(0 0 3px rgba(23, 162, 184, 0.4));
+            filter: drop-shadow(0 0 3px rgba(123, 31, 162, 0.3));
         }
         .node-connected text {
             font-weight: normal !important;
