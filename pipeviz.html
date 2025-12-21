@@ -923,7 +923,7 @@ jq -s '{
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>■ = Pipeline</div>
-                                            <div style="color: #ef6c00;">■ = Group (click to expand)</div>
+                                            <div style="color: #ef6c00;">■ = Group (double-click to expand)</div>
                                             <div>● = Data Source</div>
                                             <div>□ = Cluster</div>
                                             <div>→ = Data flow</div>
@@ -2366,6 +2366,17 @@ jq -s '{
                     const nodeName = d3.select(this).select("title").text();
                     selectNode(nodeName, this);
                 })
+                .on("dblclick", function(event, d) {
+                    event.stopPropagation();
+                    const nodeName = d3.select(this).select("title").text();
+                    // Check if this is a group node
+                    if (groupedView && currentConfig?.pipelines) {
+                        const isGroupNode = currentConfig.pipelines.some(p => p.group === nodeName);
+                        if (isGroupNode) {
+                            toggleGroup(nodeName);
+                        }
+                    }
+                })
                 .on("mouseover", function(event, d) {
                     const nodeName = d3.select(this).select("title").text();
                     showNodeTooltip(event, nodeName);
@@ -2399,7 +2410,7 @@ jq -s '{
                 const groupMembers = currentConfig.pipelines?.filter(p => p.group === nodeName);
                 if (groupMembers?.length > 0) {
                     content = `${nodeName} (${groupMembers.length} pipelines)`;
-                    content += `\nClick to expand`;
+                    content += `\nDouble-click to expand`;
                     content += `\nMembers: ${groupMembers.map(p => p.name).join(', ')}`;
                     tooltip.textContent = content;
                     tooltip.style.display = 'block';
@@ -2455,15 +2466,6 @@ jq -s '{
         }
 
         function selectNode(nodeName, nodeElement) {
-            // Check if this is a group node - if so, toggle expansion
-            if (groupedView && currentConfig?.pipelines) {
-                const isGroupNode = currentConfig.pipelines.some(p => p.group === nodeName);
-                if (isGroupNode) {
-                    toggleGroup(nodeName);
-                    return;
-                }
-            }
-
             selectedNode = nodeName;
             clearHighlights();
             d3.select(nodeElement).classed("node-highlighted", true);
