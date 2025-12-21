@@ -722,7 +722,7 @@
 
                         <!-- Intro -->
                         <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
-                            Describe your pipelines in JSON, get a dependency graph. Try it now: paste your config in <a href="#config" style="color: var(--text-secondary);">Config</a>.
+                            Describe your pipelines in JSON, get a dependency graph.
                         </p>
 
                         <!-- Demo -->
@@ -757,21 +757,21 @@
                                     <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
                                 </svg>
                                 <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Stack Agnostic</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, scripts. It's just JSON.</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, shell scripts. Not tied to any framework. It's just JSON, so it works with whatever you have.</div>
                             </div>
                             <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                                 </svg>
-                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Single File</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No server required. Host anywhere.</div>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Zero Dependencies</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No backend, no build step, runs offline. Host on GitHub Pages, S3, or just open it locally.</div>
                             </div>
                             <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
                                     <circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
                                 </svg>
                                 <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Federated</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team owns their JSON. Merge when you need the big picture.</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team versions their own JSON. Merge with jq when you need the org-wide picture.</div>
                             </div>
                         </div>
 
@@ -908,6 +908,11 @@ jq -s '{
                                     <div class="graph-container position-relative">
                                         <div class="graph-controls">
                                             <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-secondary" onclick="collapseAllGroups()">
+                                                    Collapse All
+                                                </button>
+                                            </div>
+                                            <div class="btn-group me-2">
                                                 <button class="btn btn-sm btn-outline-warning" onclick="clearSelection()">
                                                     Clear Selection
                                                 </button>
@@ -919,6 +924,7 @@ jq -s '{
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>■ = Pipeline</div>
+                                            <div style="color: #ef6c00;">■ = Group (click to expand)</div>
                                             <div>● = Data Source</div>
                                             <div>□ = Cluster</div>
                                             <div>→ = Data flow</div>
@@ -1034,12 +1040,14 @@ jq -s '{
   "schedule": "Every 2 hours",                  // Optional
   "tags": ["user-data", "ml"],                  // Optional
   "cluster": "user-processing",                 // Optional: single cluster
+  "group": "etl-jobs",                          // Optional: collapse into group
   "upstream_pipelines": ["data-ingestion"],     // Optional
   "links": {                                    // Optional
     "airflow": "https://...",
     "monitoring": "https://..."
   }
 }</pre>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-top: 0.5rem;">Use <code>group</code> to collapse multiple pipelines into a single node. Toggle between grouped and expanded views in the Graph tab.</p>
                         </div>
 
                         <div class="mb-4">
@@ -1084,6 +1092,7 @@ jq -s '{
                                 <li>Clusters and datasources are auto-created when referenced</li>
                                 <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
                                 <li>Create nested clusters using the <code>parent</code> field</li>
+                                <li>Use <code>group</code> to collapse similar pipelines into a single node</li>
                                 <li>Use <code>attributes</code> with <code>::</code> separator for column-level lineage</li>
                             </ul>
                         </div>
@@ -1246,6 +1255,8 @@ jq -s '{
 
         let currentConfig = null;
         let graphviz = null;
+        let groupedView = true;
+        let expandedGroups = new Set();
         let selectedNode = null;
 
         const exampleConfig = {
@@ -1303,7 +1314,7 @@ jq -s '{
                     "name": "analytics-aggregation",
                     "description": "Daily aggregation of user metrics and business KPIs",
                     "input_sources": ["enriched_users", "processed_orders", "user_events"],
-                    "output_sources": ["daily_metrics", "user_cohorts", "executive_summary"],
+                    "output_sources": ["daily_metrics", "user_cohorts"],
                     "schedule": "Daily at 1:00 AM",
                     "tags": ["analytics", "aggregation", "daily"],
                     "cluster": "analytics",
@@ -1312,6 +1323,30 @@ jq -s '{
                         "dashboard": "https://tableau.company.com/analytics-dashboard"
                     },
                     "upstream_pipelines": ["user-enrichment", "order-processing"]
+                },
+                {
+                    "name": "export-to-salesforce",
+                    "description": "Sync user cohorts to Salesforce",
+                    "input_sources": ["user_cohorts"],
+                    "output_sources": ["salesforce_users"],
+                    "group": "data-exports",
+                    "cluster": "analytics"
+                },
+                {
+                    "name": "export-to-hubspot",
+                    "description": "Sync user cohorts to HubSpot",
+                    "input_sources": ["user_cohorts"],
+                    "output_sources": ["hubspot_contacts"],
+                    "group": "data-exports",
+                    "cluster": "analytics"
+                },
+                {
+                    "name": "export-to-amplitude",
+                    "description": "Sync daily metrics to Amplitude",
+                    "input_sources": ["daily_metrics"],
+                    "output_sources": ["amplitude_events"],
+                    "group": "data-exports",
+                    "cluster": "analytics"
                 }
             ],
             "datasources": [
@@ -1443,6 +1478,30 @@ jq -s '{
                         { "name": "weekly_events", "from": "daily_metrics::total_events" },
                         { "name": "user_growth", "from": ["daily_metrics::active_users", "enriched_users::signup_date"] }
                     ]
+                },
+                {
+                    "name": "user_cohorts",
+                    "description": "User segmentation and cohort definitions",
+                    "type": "snowflake",
+                    "cluster": "analytics"
+                },
+                {
+                    "name": "salesforce_users",
+                    "description": "User data synced to Salesforce CRM",
+                    "type": "api",
+                    "cluster": "analytics"
+                },
+                {
+                    "name": "hubspot_contacts",
+                    "description": "Contact data synced to HubSpot",
+                    "type": "api",
+                    "cluster": "analytics"
+                },
+                {
+                    "name": "amplitude_events",
+                    "description": "Product analytics events sent to Amplitude",
+                    "type": "api",
+                    "cluster": "analytics"
                 }
             ]
         };
@@ -1960,10 +2019,48 @@ jq -s '{
 
         function generateGraphvizDot() {
             if (!currentConfig) return '';
-        
-            const pipelines = currentConfig.pipelines || [];
+
+            let pipelines = currentConfig.pipelines || [];
             const datasources = currentConfig.datasources || [];
             const explicitClusters = currentConfig.clusters || [];
+
+            // Handle grouped view - aggregate pipelines by group (unless expanded)
+            if (groupedView) {
+                const groups = new Map();
+                const ungroupedPipelines = [];
+
+                pipelines.forEach(p => {
+                    if (p.group && !expandedGroups.has(p.group)) {
+                        // Only group if not expanded
+                        if (!groups.has(p.group)) {
+                            groups.set(p.group, {
+                                name: p.group,
+                                description: `Grouped pipelines: ${p.group}`,
+                                input_sources: new Set(),
+                                output_sources: new Set(),
+                                cluster: p.cluster,
+                                _isGroup: true,
+                                _members: []
+                            });
+                        }
+                        const group = groups.get(p.group);
+                        p.input_sources?.forEach(s => group.input_sources.add(s));
+                        p.output_sources?.forEach(s => group.output_sources.add(s));
+                        group._members.push(p.name);
+                    } else {
+                        ungroupedPipelines.push(p);
+                    }
+                });
+
+                // Convert groups to pipeline-like objects
+                const groupedPipelines = Array.from(groups.values()).map(g => ({
+                    ...g,
+                    input_sources: Array.from(g.input_sources),
+                    output_sources: Array.from(g.output_sources)
+                }));
+
+                pipelines = [...ungroupedPipelines, ...groupedPipelines];
+            }
         
             // Collect ALL data sources (explicit + auto-created from pipeline references)
             const allDataSources = new Map();
@@ -2102,11 +2199,18 @@ jq -s '{
                 nodesInCluster.forEach(item => {
                     if (item.type === 'pipeline') {
                         const pipeline = item.node;
-                        const label = pipeline.schedule ? 
-                            `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
-                            `"${pipeline.name}"`;
+                        const isGroup = pipeline._isGroup;
+                        const memberCount = pipeline._members?.length || 0;
+                        const label = isGroup ?
+                            `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` :
+                            (pipeline.schedule ?
+                                `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
+                                `"${pipeline.name}"`);
+                        const fillColor = isGroup ? '#fff3e0' : '#e3f2fd';
+                        const borderColor = isGroup ? '#ef6c00' : '#1976d2';
+                        const penWidth = isGroup ? '2' : '1';
                         result += `${'    '.repeat(depth + 2)}"${pipeline.name}" [shape=box, style="filled,rounded",
-        ${'    '.repeat(depth + 3)}fillcolor="#e3f2fd", color="#1976d2",
+        ${'    '.repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
         ${'    '.repeat(depth + 3)}fontname="Arial",
         ${'    '.repeat(depth + 3)}label=${label}];
         `;
@@ -2140,11 +2244,18 @@ jq -s '{
             unclusteredNodes.forEach(item => {
                 if (item.type === 'pipeline') {
                     const pipeline = item.node;
-                    const label = pipeline.schedule ? 
-                        `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
-                        `"${pipeline.name}"`;
+                    const isGroup = pipeline._isGroup;
+                    const memberCount = pipeline._members?.length || 0;
+                    const label = isGroup ?
+                        `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` :
+                        (pipeline.schedule ?
+                            `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
+                            `"${pipeline.name}"`);
+                    const fillColor = isGroup ? '#fff3e0' : '#e3f2fd';
+                    const borderColor = isGroup ? '#ef6c00' : '#1976d2';
+                    const penWidth = isGroup ? '2' : '1';
                     dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
-                fillcolor="#e3f2fd", color="#1976d2",
+                fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
                 fontname="Arial",
                 label=${label}];
         `;
@@ -2273,6 +2384,21 @@ jq -s '{
 
             let content = '';
 
+            // Check if this is a group node
+            if (groupedView) {
+                const groupMembers = currentConfig.pipelines?.filter(p => p.group === nodeName);
+                if (groupMembers?.length > 0) {
+                    content = `${nodeName} (${groupMembers.length} pipelines)`;
+                    content += `\nClick to expand`;
+                    content += `\nMembers: ${groupMembers.map(p => p.name).join(', ')}`;
+                    tooltip.textContent = content;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (event.pageX + 10) + 'px';
+                    tooltip.style.top = (event.pageY - 10) + 'px';
+                    return;
+                }
+            }
+
             const pipeline = currentConfig.pipelines?.find(p => p.name === nodeName);
             if (pipeline) {
                 content = `${pipeline.name}`;
@@ -2319,6 +2445,15 @@ jq -s '{
         }
 
         function selectNode(nodeName, nodeElement) {
+            // Check if this is a group node - if so, toggle expansion
+            if (groupedView && currentConfig?.pipelines) {
+                const isGroupNode = currentConfig.pipelines.some(p => p.group === nodeName);
+                if (isGroupNode) {
+                    toggleGroup(nodeName);
+                    return;
+                }
+            }
+
             selectedNode = nodeName;
             clearHighlights();
             d3.select(nodeElement).classed("node-highlighted", true);
@@ -2408,6 +2543,28 @@ jq -s '{
                 nodeType = 'Pipeline';
             }
 
+            // Check if it's a pipeline group (in grouped view mode)
+            if (!nodeData && groupedView) {
+                const groupMembers = currentConfig.pipelines?.filter(p => p.group === nodeName);
+                if (groupMembers?.length > 0) {
+                    const allInputs = new Set();
+                    const allOutputs = new Set();
+                    groupMembers.forEach(p => {
+                        p.input_sources?.forEach(s => allInputs.add(s));
+                        p.output_sources?.forEach(s => allOutputs.add(s));
+                    });
+                    nodeData = {
+                        name: nodeName,
+                        description: `Group containing ${groupMembers.length} pipelines`,
+                        input_sources: Array.from(allInputs),
+                        output_sources: Array.from(allOutputs),
+                        cluster: groupMembers[0].cluster,
+                        _members: groupMembers.map(p => p.name)
+                    };
+                    nodeType = 'Pipeline Group';
+                }
+            }
+
             // Check if it's a datasource
             const datasource = currentConfig.datasources?.find(ds => ds.name === nodeName);
             if (datasource) {
@@ -2480,6 +2637,13 @@ jq -s '{
                 html += `<div class="detail-label">Upstream Pipelines</div>`;
                 html += `<div class="detail-value">${nodeData.upstream_pipelines.map(p =>
                     `<span class="badge me-1 mb-1" style="background-color: #fff3e0; color: #e65100;">${p}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (nodeData._members?.length) {
+                html += `<div class="detail-label">Member Pipelines</div>`;
+                html += `<div class="detail-value">${nodeData._members.map(p =>
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3e0; color: #ef6c00;">${p}</span>`
                 ).join('')}</div>`;
             }
 
@@ -2711,6 +2875,20 @@ jq -s '{
 
         function resetGraph() {
             if (graphviz) graphviz.resetZoom();
+        }
+
+        function collapseAllGroups() {
+            expandedGroups.clear();
+            updateGraph();
+        }
+
+        function toggleGroup(groupName) {
+            if (expandedGroups.has(groupName)) {
+                expandedGroups.delete(groupName);
+            } else {
+                expandedGroups.add(groupName);
+            }
+            updateGraph();
         }
 
         // Attribute lineage graph
