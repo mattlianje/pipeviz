@@ -29,6 +29,9 @@
             --border-color: #444;
             --border-light: #333;
         }
+        html {
+            overflow-y: scroll;
+        }
         body {
             background-color: var(--bg-primary);
             min-height: 100vh;
@@ -159,6 +162,10 @@
             min-height: 500px;
             position: relative;
             border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .graph-container svg {
+            max-width: 100%;
         }
         .graph-controls {
             position: absolute;
@@ -277,6 +284,17 @@
             margin-bottom: 1rem;
             font-size: 12px;
             color: var(--text-primary);
+        }
+        .lineage-link {
+            margin-bottom: 4px;
+            cursor: pointer;
+            color: #0366d6;
+        }
+        .lineage-link:hover {
+            text-decoration: underline;
+        }
+        [data-theme="dark"] .lineage-link {
+            color: #58a6ff;
         }
         .node-details-panel .detail-value:last-child {
             margin-bottom: 0;
@@ -421,8 +439,9 @@
         .hero-title {
             color: var(--text-primary);
             font-weight: bold;
-            font-size: 1.5rem;
-            margin-bottom: 0.25rem;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
         }
         .link-icon {
             text-decoration: none;
@@ -594,23 +613,29 @@
         }
         /* Dark mode graph text fix */
         [data-theme="dark"] #graph text,
-        [data-theme="dark"] #splash-graph text {
+        [data-theme="dark"] #splash-graph text,
+        [data-theme="dark"] #attribute-graph text {
             fill: #e0e0e0 !important;
         }
         [data-theme="dark"] #graph .node text,
-        [data-theme="dark"] #splash-graph .node text {
+        [data-theme="dark"] #splash-graph .node text,
+        [data-theme="dark"] #attribute-graph .node text {
             fill: #000 !important;
         }
         [data-theme="dark"] #graph .graph > polygon,
-        [data-theme="dark"] #splash-graph .graph > polygon {
+        [data-theme="dark"] #splash-graph .graph > polygon,
+        [data-theme="dark"] #attribute-graph .graph > polygon {
             fill: transparent !important;
         }
         [data-theme="dark"] #graph .cluster > polygon,
-        [data-theme="dark"] #graph .cluster > path {
+        [data-theme="dark"] #graph .cluster > path,
+        [data-theme="dark"] #attribute-graph .cluster > polygon,
+        [data-theme="dark"] #attribute-graph .cluster > path {
             fill: #2a2a2a !important;
             stroke: #555 !important;
         }
-        [data-theme="dark"] #graph .cluster text {
+        [data-theme="dark"] #graph .cluster text,
+        [data-theme="dark"] #attribute-graph .cluster text {
             fill: #e0e0e0 !important;
         }
         /* Dark mode Bootstrap table overrides */
@@ -651,12 +676,10 @@
 <body>
     <div class="container-fluid py-4">
         <div class="hero-section">
-            <div class="mb-4 d-flex justify-content-between align-items-start">
-                <div>
-                    <h1 class="hero-title">🛰️ Pipeviz</h1>
-                    <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
-                </div>
-                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
+            <div class="mb-4 text-center position-relative">
+                <button class="theme-toggle position-absolute" style="top: 0; right: 0;" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
+                <h1 class="hero-title">🛰️ Pipeviz</h1>
+                <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
             </div>
 
             <ul class="nav nav-tabs" id="dashboardTabs">
@@ -671,6 +694,9 @@
                 </li>
                 <li class="nav-item">
                     <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph-pane">Graph</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="attributes-tab" data-bs-toggle="tab" data-bs-target="#attributes-pane">Attributes</button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link" id="pipelines-tab" data-bs-toggle="tab" data-bs-target="#pipelines-pane">Pipelines</button>
@@ -718,12 +744,13 @@
                         <div style="margin-bottom: 1.5rem;">
                             <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Federated Lineage</div>
                             <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
-                                Tools like OpenLineage, Marquez, and dbt instrument your runtime or require you to adopt their framework. Lineage ends up in a central database, parsed from proprietary formats.
+                                Tools like OpenLineage, Marquez, and dbt instrument your runtime or lock you into their framework. Lineage ends up in a central database, parsed from proprietary formats.
                             </p>
                             <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
-                                Pipeviz flips this. Generate your <code>.json</code> at build time from your own code. Each team versions it in their repo, reviews it, reasons about their own slice. When you need the full picture, merge with <code>jq</code>:
+                                Pipeviz flips this. Generate your <code>.json</code> at build time from your own code. Each team versions it in their repo. When you need the org-wide picture, one shell command merges everything:
                             </p>
-<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);">jq -s '{
+<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># combine team-a.json, team-b.json, ... into one pipeviz.json</span>
+jq -s '{
   pipelines: map(.pipelines // []) | add,
   datasources: map(.datasources // []) | add
 }' team-*.json > pipeviz.json</pre>
@@ -733,12 +760,11 @@
                         </div>
 
                         <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Why</div>
+                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Why Pipeviz</div>
                             <ul style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
-                                <li>No vendor, no framework, no runtime agents</li>
-                                <li>Works with any stack. SQL, Spark, Kafka, APIs, scripts</li>
-                                <li>Each team owns their JSON, merge for the full map</li>
-                                <li>One HTML file, host anywhere, runs offline</li>
+                                <li>Works with any stack: SQL, Spark, Kafka, APIs, scripts</li>
+                                <li>No vendor lock-in, no runtime agents</li>
+                                <li>One HTML file, runs offline, host anywhere</li>
                             </ul>
                         </div>
 
@@ -864,6 +890,50 @@
                     </div>
                 </div>
 
+                <!-- Attributes Tab -->
+                <div class="tab-pane fade" id="attributes-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="attribute-search"
+                                               placeholder="Search attributes..." onkeyup="searchAttributes(event)">
+                                        <div id="attribute-search-results" class="search-results-dropdown"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div id="attribute-graph-col" class="col-md-12">
+                                    <div class="graph-container position-relative">
+                                        <div class="graph-controls">
+                                            <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-warning" onclick="clearAttributeSelection()">
+                                                    Clear Selection
+                                                </button>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-primary me-2" onclick="fitAttributeGraph()">Fit</button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="resetAttributeGraph()">Reset</button>
+                                        </div>
+                                        <div id="attribute-graph"></div>
+                                        <div class="legend">
+                                            <div><strong>Legend:</strong></div>
+                                            <div>▢ = Data Source</div>
+                                            <div>· = Attribute</div>
+                                            <div>→ = Derived from</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" id="attribute-details-col" style="display: none;">
+                                    <div class="node-details-panel" id="attribute-details-panel">
+                                        <div id="attribute-details-content"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Raw DOT Tab -->
                 <div class="tab-pane fade" id="dot-pane">
                     <div class="card">
@@ -947,6 +1017,20 @@
 }</pre>
                         </div>
 
+                        <div class="mb-4">
+                            <h6 style="font-weight: bold;">Attribute Lineage (Optional)</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px;">Track column-level lineage by adding an <code>attributes</code> array to datasources. Use <code>::</code> to reference source attributes.</p>
+                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+  "name": "enriched_users",
+  "attributes": [
+    { "name": "user_id", "from": "raw_users::id" },
+    { "name": "full_name", "from": ["raw_users::first_name", "raw_users::last_name"] },
+    { "name": "event_count", "from": "user_events::event_id" }
+  ]
+}</pre>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-top: 0.5rem;">View attribute lineage in the <strong>Attributes</strong> tab.</p>
+                        </div>
+
                         <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1rem;">
                             <strong>Tips</strong>
                             <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 13px;">
@@ -954,7 +1038,7 @@
                                 <li>Clusters and datasources are auto-created when referenced</li>
                                 <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
                                 <li>Create nested clusters using the <code>parent</code> field</li>
-                                <li>Links can point to any external tools (Airflow, monitoring, docs, etc.)</li>
+                                <li>Use <code>attributes</code> with <code>::</code> separator for column-level lineage</li>
                             </ul>
                         </div>
                     </div>
@@ -1145,7 +1229,7 @@
                     "name": "analytics-aggregation",
                     "description": "Daily aggregation of user metrics and business KPIs",
                     "input_sources": ["enriched_users", "processed_orders", "user_events"],
-                    "output_sources": ["daily_metrics", "user_cohorts"],
+                    "output_sources": ["daily_metrics", "user_cohorts", "executive_summary"],
                     "schedule": "Daily at 1:00 AM",
                     "tags": ["analytics", "aggregation", "daily"],
                     "cluster": "analytics",
@@ -1164,6 +1248,13 @@
                     "owner": "data-platform@company.com",
                     "tags": ["pii", "users", "core-data"],
                     "cluster": "user-processing",
+                    "attributes": [
+                        { "name": "id" },
+                        { "name": "first_name" },
+                        { "name": "last_name" },
+                        { "name": "email" },
+                        { "name": "signup_date" }
+                    ],
                     "metadata": {
                         "schema": "RAW_DATA",
                         "table": "USERS",
@@ -1184,6 +1275,13 @@
                     "owner": "analytics-team@company.com",
                     "tags": ["events", "clickstream", "large-dataset"],
                     "cluster": "analytics",
+                    "attributes": [
+                        { "name": "event_id" },
+                        { "name": "user_id", "from": "raw_users::id" },
+                        { "name": "event_type" },
+                        { "name": "page_url" },
+                        { "name": "timestamp" }
+                    ],
                     "metadata": {
                         "bucket": "company-events-prod",
                         "size": "15TB",
@@ -1228,6 +1326,49 @@
                         "snowflake": "https://company.snowflakecomputing.com/console#/data/databases/PROD/schemas/INVENTORY",
                         "tableau": "https://tableau.company.com/views/inventory-dashboard"
                     }
+                },
+                {
+                    "name": "enriched_users",
+                    "description": "Enriched user profiles with behavioral features",
+                    "type": "delta",
+                    "owner": "data-platform@company.com",
+                    "tags": ["users", "enriched", "ml-ready"],
+                    "cluster": "user-processing",
+                    "attributes": [
+                        { "name": "user_id", "from": "raw_users::id" },
+                        { "name": "full_name", "from": ["raw_users::first_name", "raw_users::last_name"] },
+                        { "name": "email", "from": "raw_users::email" },
+                        { "name": "event_count", "from": "user_events::event_id" },
+                        { "name": "last_active", "from": "user_events::timestamp" },
+                        { "name": "signup_date", "from": "raw_users::signup_date" }
+                    ]
+                },
+                {
+                    "name": "daily_metrics",
+                    "description": "Aggregated daily business metrics",
+                    "type": "snowflake",
+                    "owner": "analytics-team@company.com",
+                    "tags": ["metrics", "daily", "kpi"],
+                    "cluster": "analytics",
+                    "attributes": [
+                        { "name": "date" },
+                        { "name": "active_users", "from": "enriched_users::user_id" },
+                        { "name": "total_events", "from": "user_events::event_id" }
+                    ]
+                },
+                {
+                    "name": "executive_summary",
+                    "description": "Weekly executive dashboard metrics",
+                    "type": "snowflake",
+                    "owner": "bi-team@company.com",
+                    "tags": ["executive", "weekly", "summary"],
+                    "cluster": "analytics",
+                    "attributes": [
+                        { "name": "week" },
+                        { "name": "weekly_active_users", "from": "daily_metrics::active_users" },
+                        { "name": "weekly_events", "from": "daily_metrics::total_events" },
+                        { "name": "user_growth", "from": ["daily_metrics::active_users", "enriched_users::signup_date"] }
+                    ]
                 }
             ]
         };
@@ -1884,7 +2025,7 @@
                             `"${pipeline.name}"`;
                         result += `${'    '.repeat(depth + 2)}"${pipeline.name}" [shape=box, style="filled,rounded",
         ${'    '.repeat(depth + 3)}fillcolor="#e3f2fd", color="#1976d2",
-        ${'    '.repeat(depth + 3)}fontname="Arial Bold",
+        ${'    '.repeat(depth + 3)}fontname="Arial",
         ${'    '.repeat(depth + 3)}label=${label}];
         `;
                     } else if (item.type === 'datasource') {
@@ -1922,7 +2063,7 @@
                         `"${pipeline.name}"`;
                     dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
                 fillcolor="#e3f2fd", color="#1976d2",
-                fontname="Arial Bold",
+                fontname="Arial",
                 label=${label}];
         `;
                 } else if (item.type === 'datasource') {
@@ -2460,6 +2601,371 @@
             if (graphviz) graphviz.resetZoom();
         }
 
+        // Attribute lineage graph
+        let attributeGraphviz = null;
+
+        function generateAttributeDot() {
+            if (!currentConfig) return '';
+
+            const datasources = currentConfig.datasources || [];
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const textColor = isDark ? '#e0e0e0' : '#000000';
+            const clusterBg = isDark ? '#2d2d2d' : '#f3e5f5';
+            const attrFill = isDark ? '#3d3d3d' : '#ffffff';
+            const attrBorder = isDark ? '#9c27b0' : '#7b1fa2';
+
+            let dot = `digraph AttributeLineage {
+            rankdir=LR;
+            bgcolor="transparent";
+            node [fontname="Arial" fontsize="10"];
+            edge [fontsize="9" color="#7b1fa2" arrowsize="0.6"];
+
+`;
+
+            // Create subgraphs for each datasource with attributes
+            datasources.forEach(ds => {
+                if (!ds.attributes || ds.attributes.length === 0) return;
+
+                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+                dot += `    subgraph cluster_${dsId} {
+                label="${ds.name}";
+                style=filled;
+                fillcolor="${clusterBg}";
+                fontcolor="${textColor}";
+                color="${attrBorder}";
+                fontname="Arial";
+                fontsize="11";
+
+`;
+                ds.attributes.forEach(attr => {
+                    const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const hasLineage = attr.from ? true : false;
+                    const fill = hasLineage ? (isDark ? '#4a3d4f' : '#e1bee7') : attrFill;
+                    dot += `        "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`;
+                });
+                dot += `    }\n\n`;
+            });
+
+            // Create edges for attribute lineage
+            datasources.forEach(ds => {
+                if (!ds.attributes) return;
+                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+
+                ds.attributes.forEach(attr => {
+                    if (!attr.from) return;
+
+                    const targetId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
+
+                    sources.forEach(source => {
+                        // Parse source::attribute format
+                        const parts = source.split('::');
+                        if (parts.length === 2) {
+                            const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
+                            const sourceAttr = parts[1].replace(/[^a-zA-Z0-9]/g, '_');
+                            const sourceId = `${sourceDs}__${sourceAttr}`;
+                            dot += `    "${sourceId}" -> "${targetId}" [color="#7b1fa2"];\n`;
+                        }
+                    });
+                });
+            });
+
+            dot += `}`;
+            return dot;
+        }
+
+        function renderAttributeGraph() {
+            if (!currentConfig) return;
+
+            const dot = generateAttributeDot();
+            if (!dot) return;
+
+            if (!attributeGraphviz) {
+                attributeGraphviz = d3.select("#attribute-graph").graphviz()
+                    .width(document.getElementById('attribute-graph').offsetWidth || 800)
+                    .height(500)
+                    .fit(true)
+                    .zoom(true);
+            }
+
+            attributeGraphviz.renderDot(dot).on('end', function() {
+                // Add click handlers to nodes
+                d3.select('#attribute-graph').selectAll('.node').on('click', function(event) {
+                    event.stopPropagation();
+                    const title = d3.select(this).select('title').text();
+                    if (title && attributeLineageMap[title]) {
+                        selectAttribute(title);
+                    }
+                });
+
+                // Click on graph background to clear selection
+                d3.select('#attribute-graph svg').on('click', function(event) {
+                    if (event.target.tagName === 'svg' || event.target.classList.contains('graph')) {
+                        clearAttributeSelection();
+                    }
+                });
+            });
+        }
+
+        function fitAttributeGraph() {
+            if (attributeGraphviz) attributeGraphviz.fit(true);
+        }
+
+        function resetAttributeGraph() {
+            if (attributeGraphviz) attributeGraphviz.resetZoom();
+        }
+
+        // Attribute lineage data structures
+        let attributeLineageMap = {}; // attrId -> { upstream: [], downstream: [] }
+        let selectedAttribute = null;
+
+        function buildAttributeLineageMap() {
+            attributeLineageMap = {};
+            if (!currentConfig) return;
+
+            const datasources = currentConfig.datasources || [];
+
+            // First pass: create entries for all attributes
+            datasources.forEach(ds => {
+                if (!ds.attributes) return;
+                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+                ds.attributes.forEach(attr => {
+                    const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    attributeLineageMap[attrId] = {
+                        id: attrId,
+                        name: attr.name,
+                        datasource: ds.name,
+                        fullName: `${ds.name}::${attr.name}`,
+                        upstream: [],
+                        downstream: []
+                    };
+                });
+            });
+
+            // Second pass: build lineage relationships
+            datasources.forEach(ds => {
+                if (!ds.attributes) return;
+                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+
+                ds.attributes.forEach(attr => {
+                    if (!attr.from) return;
+                    const targetId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
+
+                    sources.forEach(source => {
+                        const parts = source.split('::');
+                        if (parts.length === 2) {
+                            const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
+                            const sourceAttr = parts[1].replace(/[^a-zA-Z0-9]/g, '_');
+                            const sourceId = `${sourceDs}__${sourceAttr}`;
+
+                            if (attributeLineageMap[targetId]) {
+                                attributeLineageMap[targetId].upstream.push(sourceId);
+                            }
+                            if (attributeLineageMap[sourceId]) {
+                                attributeLineageMap[sourceId].downstream.push(targetId);
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        function getFullProvenance(attrId, direction, visited = new Set()) {
+            if (visited.has(attrId)) return [];
+            visited.add(attrId);
+
+            const attr = attributeLineageMap[attrId];
+            if (!attr) return [];
+
+            const next = direction === 'upstream' ? attr.upstream : attr.downstream;
+            let result = [];
+
+            next.forEach(nextId => {
+                result.push(nextId);
+                result.push(...getFullProvenance(nextId, direction, visited));
+            });
+
+            return result;
+        }
+
+        function selectAttribute(attrId) {
+            selectedAttribute = attrId;
+            const attr = attributeLineageMap[attrId];
+            if (!attr) return;
+
+            // Get full provenance chain
+            const upstream = getFullProvenance(attrId, 'upstream', new Set());
+            const downstream = getFullProvenance(attrId, 'downstream', new Set());
+            const allConnected = new Set([attrId, ...upstream, ...downstream]);
+
+            // Highlight nodes
+            d3.select('#attribute-graph').selectAll('.node').each(function() {
+                const node = d3.select(this);
+                const title = node.select('title').text();
+                if (title === attrId) {
+                    node.classed('node-highlighted', true).classed('node-dimmed', false);
+                } else if (allConnected.has(title)) {
+                    node.classed('node-connected', true).classed('node-dimmed', false);
+                } else {
+                    node.classed('node-dimmed', true);
+                }
+            });
+
+            // Highlight edges
+            d3.select('#attribute-graph').selectAll('.edge').each(function() {
+                const edge = d3.select(this);
+                const title = edge.select('title').text();
+                const [from, to] = title.split('->').map(s => s.trim());
+                if (allConnected.has(from) && allConnected.has(to)) {
+                    edge.classed('edge-highlighted', true).classed('edge-dimmed', false);
+                } else {
+                    edge.classed('edge-dimmed', true);
+                }
+            });
+
+            // Show details panel
+            showAttributeDetails(attrId, upstream, downstream);
+        }
+
+        function showAttributeDetails(attrId, upstream, downstream) {
+            const attr = attributeLineageMap[attrId];
+            if (!attr) return;
+
+            const col = document.getElementById('attribute-details-col');
+            const graphCol = document.getElementById('attribute-graph-col');
+            const content = document.getElementById('attribute-details-content');
+
+            graphCol.classList.remove('col-md-12');
+            graphCol.classList.add('col-md-8');
+            col.style.display = 'block';
+
+            // Refit graph after layout change
+            setTimeout(() => {
+                if (attributeGraphviz) attributeGraphviz.fit(true);
+            }, 50);
+
+            let html = `<h5>${attr.name}</h5>`;
+            html += `<div class="detail-label">DATASOURCE</div>`;
+            html += `<div class="detail-value">${attr.datasource}</div>`;
+
+            if (upstream.length > 0) {
+                html += `<div class="detail-label">UPSTREAM (${upstream.length})</div>`;
+                html += `<div class="detail-value">`;
+                upstream.forEach(id => {
+                    const upAttr = attributeLineageMap[id];
+                    if (upAttr) {
+                        html += `<div class="lineage-link" data-attr-id="${id}">${upAttr.fullName}</div>`;
+                    }
+                });
+                html += `</div>`;
+            }
+
+            if (downstream.length > 0) {
+                html += `<div class="detail-label">DOWNSTREAM (${downstream.length})</div>`;
+                html += `<div class="detail-value">`;
+                downstream.forEach(id => {
+                    const downAttr = attributeLineageMap[id];
+                    if (downAttr) {
+                        html += `<div class="lineage-link" data-attr-id="${id}">${downAttr.fullName}</div>`;
+                    }
+                });
+                html += `</div>`;
+            }
+
+            if (upstream.length === 0 && downstream.length === 0) {
+                html += `<div class="detail-value text-muted">No lineage connections</div>`;
+            }
+
+            content.innerHTML = html;
+
+            // Add click handlers via delegation
+            content.querySelectorAll('.lineage-link').forEach(el => {
+                el.addEventListener('click', function() {
+                    const attrId = this.getAttribute('data-attr-id');
+                    if (attrId) selectAttribute(attrId);
+                });
+            });
+        }
+
+        function clearAttributeSelection() {
+            selectedAttribute = null;
+
+            d3.select('#attribute-graph').selectAll('.node')
+                .classed('node-highlighted', false)
+                .classed('node-connected', false)
+                .classed('node-dimmed', false);
+
+            d3.select('#attribute-graph').selectAll('.edge')
+                .classed('edge-highlighted', false)
+                .classed('edge-dimmed', false);
+
+            const col = document.getElementById('attribute-details-col');
+            const graphCol = document.getElementById('attribute-graph-col');
+            col.style.display = 'none';
+            graphCol.classList.remove('col-md-8');
+            graphCol.classList.add('col-md-12');
+
+            // Refit graph after layout change
+            setTimeout(() => {
+                if (attributeGraphviz) attributeGraphviz.fit(true);
+            }, 50);
+        }
+
+        function searchAttributes(event) {
+            const query = event.target.value.toLowerCase().trim();
+            const resultsDiv = document.getElementById('attribute-search-results');
+
+            if (query.length < 2) {
+                resultsDiv.classList.remove('show');
+                return;
+            }
+
+            const matches = [];
+            Object.values(attributeLineageMap).forEach(attr => {
+                if (attr.fullName.toLowerCase().includes(query) || attr.name.toLowerCase().includes(query)) {
+                    matches.push(attr);
+                }
+            });
+
+            if (matches.length === 0) {
+                resultsDiv.classList.remove('show');
+                return;
+            }
+
+            let html = '';
+            matches.slice(0, 10).forEach(attr => {
+                html += `<div class="search-result-item" onclick="selectAttributeFromSearch('${attr.id}')">
+                    <span class="result-type datasource">${attr.datasource}</span>
+                    <span class="result-name">${attr.name}</span>
+                </div>`;
+            });
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('show');
+        }
+
+        function selectAttributeFromSearch(attrId) {
+            document.getElementById('attribute-search-results').classList.remove('show');
+            document.getElementById('attribute-search').value = '';
+            selectAttribute(attrId);
+        }
+
+        // Close search dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#attribute-search') && !e.target.closest('#attribute-search-results')) {
+                document.getElementById('attribute-search-results')?.classList.remove('show');
+            }
+        });
+
+        // Set up attributes tab listener
+        document.getElementById('attributes-tab')?.addEventListener('shown.bs.tab', function() {
+            setTimeout(() => {
+                buildAttributeLineageMap();
+                renderAttributeGraph();
+            }, 100);
+        });
+
         function updateDotView() {
             const dotOutput = document.getElementById('dot-output');
             if (currentConfig) {
@@ -2506,7 +3012,7 @@
                 node [fontname="Arial" fontsize="10" fontcolor="${textColor}"]
                 edge [color="#999999"]
                 "raw_events" [shape=ellipse style=filled fillcolor="#f3e5f5" color="#7b1fa2"]
-                "etl-job" [shape=box style="filled,rounded" fillcolor="#e3f2fd" color="#1976d2" fontname="Arial Bold"]
+                "etl-job" [shape=box style="filled,rounded" fillcolor="#e3f2fd" color="#1976d2" fontname="Arial"]
                 "cleaned_events" [shape=ellipse style=filled fillcolor="#f3e5f5" color="#7b1fa2"]
                 "raw_events" -> "etl-job"
                 "etl-job" -> "cleaned_events"
