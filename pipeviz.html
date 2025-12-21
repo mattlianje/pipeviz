@@ -1207,9 +1207,12 @@ jq -s '{
                 btn.textContent = '🌙';
                 localStorage.setItem('pipeviz-theme', 'dark');
             }
-            // Re-render splash graph for theme
+            // Re-render graphs for theme
             if (typeof renderSplashGraph === 'function') {
-                setTimeout(renderSplashGraph, 50);
+                renderSplashGraph();
+            }
+            if (typeof updateGraph === 'function') {
+                updateGraph();
             }
         }
         // Initialize theme from localStorage
@@ -2024,6 +2027,9 @@ jq -s '{
         function generateGraphvizDot() {
             if (!currentConfig) return '';
 
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const edgeColor = isDark ? '#b0b0b0' : '#555';
+
             let pipelines = currentConfig.pipelines || [];
             const datasources = currentConfig.datasources || [];
             const explicitClusters = currentConfig.clusters || [];
@@ -2276,10 +2282,10 @@ jq -s '{
             dot += '\n';
             pipelines.forEach(pipeline => {
                 pipeline.input_sources?.forEach(source => {
-                    dot += `    "${source}" -> "${pipeline.name}" [color="#666", arrowsize=0.8];\n`;
+                    dot += `    "${source}" -> "${pipeline.name}" [color="${edgeColor}", arrowsize=0.8];\n`;
                 });
                 pipeline.output_sources?.forEach(source => {
-                    dot += `    "${pipeline.name}" -> "${source}" [color="#666", arrowsize=0.8];\n`;
+                    dot += `    "${pipeline.name}" -> "${source}" [color="${edgeColor}", arrowsize=0.8];\n`;
                 });
             });
         
