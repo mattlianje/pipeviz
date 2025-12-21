@@ -2614,10 +2614,10 @@ jq -s '{
 
             const datasources = currentConfig.datasources || [];
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            const textColor = isDark ? '#e0e0e0' : '#000000';
-            const clusterBg = isDark ? '#2d2d2d' : '#f3e5f5';
-            const attrFill = isDark ? '#3d3d3d' : '#ffffff';
-            const attrBorder = isDark ? '#9c27b0' : '#7b1fa2';
+            const textColor = '#000000';
+            const clusterBg = '#f3e5f5';
+            const attrFill = '#ffffff';
+            const attrBorder = '#7b1fa2';
 
             let dot = `digraph AttributeLineage {
             rankdir=LR;
@@ -2645,7 +2645,7 @@ jq -s '{
                 ds.attributes.forEach(attr => {
                     const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const hasLineage = attr.from ? true : false;
-                    const fill = hasLineage ? (isDark ? '#4a3d4f' : '#e1bee7') : attrFill;
+                    const fill = hasLineage ? '#e1bee7' : attrFill;
                     dot += `        "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`;
                 });
                 dot += `    }\n\n`;
@@ -2798,6 +2798,15 @@ jq -s '{
             selectedAttribute = attrId;
             const attr = attributeLineageMap[attrId];
             if (!attr) return;
+
+            // Clear all previous highlighting first
+            d3.select('#attribute-graph').selectAll('.node')
+                .classed('node-highlighted', false)
+                .classed('node-connected', false)
+                .classed('node-dimmed', false);
+            d3.select('#attribute-graph').selectAll('.edge')
+                .classed('edge-highlighted', false)
+                .classed('edge-dimmed', false);
 
             // Get full provenance chain
             const upstream = getFullProvenance(attrId, 'upstream', new Set());
