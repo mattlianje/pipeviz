@@ -1345,6 +1345,14 @@ jq -s '{
                     "output_sources": ["amplitude_events"],
                     "group": "data-exports",
                     "cluster": "analytics"
+                },
+                {
+                    "name": "weekly-rollup",
+                    "description": "Aggregate daily metrics into weekly executive summary",
+                    "input_sources": ["daily_metrics", "enriched_users"],
+                    "output_sources": ["executive_summary"],
+                    "schedule": "0 6 * * MON",
+                    "cluster": "analytics"
                 }
             ],
             "datasources": [
@@ -1461,6 +1469,18 @@ jq -s '{
                         { "name": "date" },
                         { "name": "active_users", "from": "enriched_users::user_id" },
                         { "name": "total_events", "from": "user_events::event_id" }
+                    ]
+                },
+                {
+                    "name": "executive_summary",
+                    "description": "Weekly executive dashboard metrics",
+                    "type": "snowflake",
+                    "cluster": "analytics",
+                    "attributes": [
+                        { "name": "week" },
+                        { "name": "weekly_active_users", "from": "daily_metrics::active_users" },
+                        { "name": "weekly_events", "from": "daily_metrics::total_events" },
+                        { "name": "user_growth", "from": ["daily_metrics::active_users", "enriched_users::signup_date"] }
                     ]
                 },
                 {
