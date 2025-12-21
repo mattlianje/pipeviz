@@ -1464,20 +1464,6 @@ jq -s '{
                     ]
                 },
                 {
-                    "name": "executive_summary",
-                    "description": "Weekly executive dashboard metrics",
-                    "type": "snowflake",
-                    "owner": "bi-team@company.com",
-                    "tags": ["executive", "weekly", "summary"],
-                    "cluster": "analytics",
-                    "attributes": [
-                        { "name": "week" },
-                        { "name": "weekly_active_users", "from": "daily_metrics::active_users" },
-                        { "name": "weekly_events", "from": "daily_metrics::total_events" },
-                        { "name": "user_growth", "from": ["daily_metrics::active_users", "enriched_users::signup_date"] }
-                    ]
-                },
-                {
                     "name": "user_cohorts",
                     "description": "User segmentation and cohort definitions",
                     "type": "snowflake",
