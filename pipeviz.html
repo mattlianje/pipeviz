@@ -72,7 +72,9 @@
             background-color: var(--bg-primary);
             color: var(--text-primary);
             border-bottom: 2px solid var(--text-primary);
-            font-weight: 600;
+        }
+        .nav-tabs.hidden-on-home {
+            display: none;
         }
         .card {
             border: none;
@@ -218,9 +220,9 @@
             stroke-width: 0 !important;
         }
         .node-connected {
-            stroke: #7b1fa2 !important;
+            stroke: #64748b !important;
             stroke-width: 2px !important;
-            filter: drop-shadow(0 0 3px rgba(123, 31, 162, 0.3));
+            filter: drop-shadow(0 0 3px rgba(100, 116, 139, 0.3));
         }
         .node-connected text {
             font-weight: normal !important;
@@ -232,9 +234,8 @@
             opacity: 0.3 !important;
         }
         .edge-highlighted {
-            stroke: #ff6b35 !important;
-            stroke-width: 3px !important;
-            filter: drop-shadow(0 0 4px rgba(255, 107, 53, 0.6));
+            stroke: #555555 !important;
+            stroke-width: 2px !important;
         }
         .edge-dimmed {
             opacity: 0.2 !important;
@@ -687,7 +688,7 @@
                 <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
             </div>
 
-            <ul class="nav nav-tabs" id="dashboardTabs">
+            <ul class="nav nav-tabs hidden-on-home" id="dashboardTabs">
                 <li class="nav-item">
                     <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-pane">Home</button>
                 </li>
@@ -717,63 +718,103 @@
             <div class="tab-content">
                 <!-- Home Tab -->
                 <div class="tab-pane fade show active" id="home-pane">
-                    <div style="max-width: 620px; padding: 1rem 0;">
-                        <p style="font-size: 14px; line-height: 1.7; margin-bottom: 1.5rem;">
-                            Describe your pipelines and data sources in JSON.<br>
-                            Get a dependency graph. No install, no backend, no agents.
+                    <div style="max-width: 750px; margin: 0 auto; padding: 2rem 1rem;">
+
+                        <!-- Intro -->
+                        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
+                            Describe your pipelines in JSON, get a dependency graph. Try it now: paste your config in <a href="#config" style="color: var(--text-secondary);">Config</a>.
                         </p>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Example</div>
-                            <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; white-space: pre; min-width: 320px; color: var(--text-primary);">{
+                        <!-- Demo -->
+                        <div style="display: flex; gap: 1.5rem; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem;">
+<pre style="padding: 1rem; font-size: 13px; margin: 0; color: var(--text-primary);">{
   "pipelines": [{
     "name": "etl-job",
     "input_sources": ["raw_events"],
     "output_sources": ["cleaned_events"]
   }]
 }</pre>
-                                <div id="splash-graph" style="flex: 1; min-width: 200px; min-height: 120px; background: var(--bg-primary); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;"></div>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); flex-shrink: 0;">
+                                <path d="M5 12h14M13 5l7 7-7 7"/>
+                            </svg>
+                            <div id="splash-graph" style="min-width: 240px; min-height: 120px; display: flex; align-items: center; justify-content: center;"></div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div style="display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 2.5rem;">
+                            <button class="btn btn-dark" onclick="loadExample(); document.getElementById('graph-tab').click();">
+                                Try the demo
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="document.getElementById('spec-tab').click();">
+                                Read the spec
+                            </button>
+                        </div>
+
+                        <!-- Feature tiles -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Stack Agnostic</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, scripts. It's just JSON.</div>
+                            </div>
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Single File</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No server required. Host anywhere.</div>
+                            </div>
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Federated</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team owns their JSON. Merge when you need the big picture.</div>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">How</div>
-                            <ol style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
-                                <li>Write a <code>pipeviz.json</code> (see the <a href="#" onclick="document.getElementById('spec-tab').click(); return false;" style="color: #0366d6;">Spec</a>)</li>
-                                <li>Put it next to this file, or paste in <strong>Config</strong></li>
-                                <li>See your lineage in <strong>Graph</strong></li>
-                            </ol>
+                        <!-- How it works -->
+                        <div style="margin-bottom: 2.5rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">How it works</div>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.25rem;">
+                                Most lineage tools instrument your runtime or lock you into a framework. Pipeviz is different: you already know your pipelines, so just declare them. Generate JSON at compile time from your build system, or write it by hand.
+                            </p>
+                            <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">1</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Define</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                                </div>
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">2</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Load</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Drop your file here, or host both files together on any static server</div>
+                                </div>
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">3</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Explore</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Click through the graph, trace dependencies, export DOT for other tools</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Federated Lineage</div>
-                            <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
-                                Tools like OpenLineage, Marquez, and dbt instrument your runtime or lock you into their framework. Lineage ends up in a central database, parsed from proprietary formats.
+                        <!-- Federated lineage -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Federated lineage</div>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0;">
+                                Each team versions their own <code>pipeviz.json</code> alongside their code. Generate it at compile time from your build, tests, or annotations. When you need the org-wide view, merge with <a href="https://jqlang.github.io/jq/" target="_blank" style="color: var(--text-secondary);">jq</a> (probably already on your machine) or any JSON tool:
                             </p>
-                            <p style="font-size: 13px; margin: 0 0 0.75rem 0; line-height: 1.7;">
-                                Pipeviz flips this. Generate your <code>.json</code> at build time from your own code. Each team versions it in their repo. When you need the org-wide picture, one shell command merges everything:
-                            </p>
-<pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># combine team-a.json, team-b.json, ... into one pipeviz.json</span>
+<pre style="background: var(--bg-code); padding: 0.75rem; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># merge all team configs into one</span>
 jq -s '{
   pipelines: map(.pipelines // []) | add,
   datasources: map(.datasources // []) | add
 }' team-*.json > pipeviz.json</pre>
-                            <p style="font-size: 12px; color: var(--text-muted); margin: 0.5rem 0 0 0;">
-                                No central database, no custom parsers. JSON in, JSON out.
-                            </p>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 6px; font-weight: bold;">Why Pipeviz</div>
-                            <ul style="font-size: 13px; margin: 0; padding-left: 1.25rem; line-height: 1.8;">
-                                <li>Works with any stack: SQL, Spark, Kafka, APIs, scripts</li>
-                                <li>No vendor lock-in, no runtime agents</li>
-                                <li>One HTML file, runs offline, host anywhere</li>
-                            </ul>
-                        </div>
-
-                        <div style="font-size: 12px;">
+                        <!-- Footer -->
+                        <div style="font-size: 12px; padding-top: 1rem; border-top: 1px solid var(--border-light);">
                             <a href="#" onclick="document.getElementById('spec-tab').click(); return false;" style="color: var(--text-muted);">spec</a>
                             <span style="color: var(--border-color); margin: 0 6px;">·</span>
                             <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: var(--text-muted);">github</a>
@@ -1175,6 +1216,34 @@ jq -s '{
             }
         })();
 
+        // Show/hide tabs based on home tab + URL hash linking
+        document.querySelectorAll('#dashboardTabs button').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(e) {
+                const tabs = document.getElementById('dashboardTabs');
+                const tabName = e.target.id.replace('-tab', '');
+                if (e.target.id === 'home-tab') {
+                    tabs.classList.add('hidden-on-home');
+                    history.replaceState(null, '', window.location.pathname + window.location.search);
+                } else {
+                    tabs.classList.remove('hidden-on-home');
+                    history.replaceState(null, '', '#' + tabName);
+                }
+            });
+        });
+
+        // Handle initial hash or hash changes
+        function activateTabFromHash() {
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                const tab = document.getElementById(hash + '-tab');
+                if (tab) {
+                    tab.click();
+                }
+            }
+        }
+        window.addEventListener('hashchange', activateTabFromHash);
+        document.addEventListener('DOMContentLoaded', activateTabFromHash);
+
         let currentConfig = null;
         let graphviz = null;
         let selectedNode = null;
@@ -1429,12 +1498,15 @@ jq -s '{
             const urlParams = new URLSearchParams(window.location.search);
 
             const configParam = urlParams.get('config');
+            const viewParam = urlParams.get('view');
             if (configParam) {
                 try {
                     const decodedConfig = atob(configParam);
                     const parsed = JSON.parse(decodedConfig);
                     document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                     loadJson();
+                    const targetView = viewParam || 'graph';
+                    document.getElementById(targetView + '-tab')?.click();
                     return;
                 } catch (error) {
                     console.error('Error decoding config parameter:', error);
@@ -1442,6 +1514,8 @@ jq -s '{
             }
 
             const urlParam = urlParams.get('url');
+            const autoView = urlParams.get('view') || (urlParam ? 'graph' : null);
+
             if (urlParam) {
                 fetch(urlParam)
                     .then(response => {
@@ -1455,6 +1529,9 @@ jq -s '{
                             const parsed = JSON.parse(configText);
                             document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
                             loadJson();
+                            if (autoView) {
+                                document.getElementById(autoView + '-tab')?.click();
+                            }
                         } catch (error) {
                             document.getElementById('json-input').value = configText;
                             loadJson();
@@ -2246,8 +2323,9 @@ jq -s '{
             clearHighlights();
             d3.select(nodeElement).classed("node-highlighted", true);
 
-            const connectedNodes = new Set();
-            const connectedEdges = new Set();
+            // Build edge graph for traversal
+            const upstreamMap = {};  // node -> nodes that feed into it
+            const downstreamMap = {};  // node -> nodes it feeds into
 
             d3.select("#graph").selectAll(".edge").each(function() {
                 const edge = d3.select(this);
@@ -2256,27 +2334,56 @@ jq -s '{
                 if (match) {
                     const source = match[1];
                     const target = match[2];
-                    if (source === nodeName || target === nodeName) {
-                        connectedEdges.add(this);
-                        connectedNodes.add(source === nodeName ? target : source);
-                        edge.classed("edge-highlighted", true);
-                    }
+                    if (!downstreamMap[source]) downstreamMap[source] = [];
+                    if (!upstreamMap[target]) upstreamMap[target] = [];
+                    downstreamMap[source].push(target);
+                    upstreamMap[target].push(source);
                 }
             });
 
+            // Traverse full chain
+            function getFullChain(node, map, visited = new Set()) {
+                if (visited.has(node)) return [];
+                visited.add(node);
+                const neighbors = map[node] || [];
+                let result = [];
+                neighbors.forEach(n => {
+                    result.push(n);
+                    result.push(...getFullChain(n, map, visited));
+                });
+                return result;
+            }
+
+            const upstream = getFullChain(nodeName, upstreamMap, new Set());
+            const downstream = getFullChain(nodeName, downstreamMap, new Set());
+            const allConnected = new Set([...upstream, ...downstream]);
+
+            // Highlight connected nodes
             d3.select("#graph").selectAll(".node").each(function() {
                 const node = d3.select(this);
                 const nodeTitle = node.select("title").text();
-                if (connectedNodes.has(nodeTitle)) {
+                if (allConnected.has(nodeTitle)) {
                     node.classed("node-connected", true);
                 } else if (nodeTitle !== nodeName) {
                     node.classed("node-dimmed", true);
                 }
             });
 
+            // Highlight edges in the chain
             d3.select("#graph").selectAll(".edge").each(function() {
-                if (!connectedEdges.has(this)) {
-                    d3.select(this).classed("edge-dimmed", true);
+                const edge = d3.select(this);
+                const title = edge.select("title").text();
+                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
+                if (match) {
+                    const source = match[1];
+                    const target = match[2];
+                    const sourceInChain = source === nodeName || allConnected.has(source);
+                    const targetInChain = target === nodeName || allConnected.has(target);
+                    if (sourceInChain && targetInChain) {
+                        edge.classed("edge-highlighted", true);
+                    } else {
+                        edge.classed("edge-dimmed", true);
+                    }
                 }
             });
 
@@ -2614,16 +2721,16 @@ jq -s '{
 
             const datasources = currentConfig.datasources || [];
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            const textColor = '#000000';
-            const clusterBg = '#f3e5f5';
+            const textColor = '#334155';
+            const clusterBg = '#f1f5f9';
             const attrFill = '#ffffff';
-            const attrBorder = '#7b1fa2';
+            const attrBorder = '#94a3b8';
 
             let dot = `digraph AttributeLineage {
             rankdir=LR;
             bgcolor="transparent";
             node [fontname="Arial" fontsize="10"];
-            edge [fontsize="9" color="#7b1fa2" arrowsize="0.6"];
+            edge [fontsize="9" color="#94a3b8" arrowsize="0.6"];
 
 `;
 
@@ -2645,7 +2752,7 @@ jq -s '{
                 ds.attributes.forEach(attr => {
                     const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const hasLineage = attr.from ? true : false;
-                    const fill = hasLineage ? '#e1bee7' : attrFill;
+                    const fill = hasLineage ? '#e2e8f0' : attrFill;
                     dot += `        "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`;
                 });
                 dot += `    }\n\n`;
