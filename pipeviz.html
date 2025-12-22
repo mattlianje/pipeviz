@@ -919,7 +919,12 @@ jq -s '{
                                             </div>
                                             <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">Reset</button>
                                         </div>
-                                        <div id="graph"></div>
+                                        <div id="graph">
+                                            <div class="graph-loading text-center py-5 text-muted">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                                Loading graph...
+                                            </div>
+                                        </div>
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>■ = Pipeline</div>
@@ -965,7 +970,12 @@ jq -s '{
                                             </div>
                                             <button class="btn btn-sm btn-outline-secondary" onclick="resetAttributeGraph()">Reset</button>
                                         </div>
-                                        <div id="attribute-graph"></div>
+                                        <div id="attribute-graph">
+                                            <div class="graph-loading text-center py-5 text-muted">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                                Loading graph...
+                                            </div>
+                                        </div>
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>▢ = Data Source</div>
@@ -1259,6 +1269,11 @@ jq -s '{
         let groupedView = true;
         let expandedGroups = new Set();
         let selectedNode = null;
+
+        // Cached lineage maps for performance
+        let cachedUpstreamMap = {};
+        let cachedDownstreamMap = {};
+        let cachedLineage = {}; // node -> {upstream: [], downstream: []}
 
         const exampleConfig = {
             "clusters": [
@@ -2322,6 +2337,8 @@ jq -s '{
 
         function initializeGraph() {
             try {
+                // Clear loading indicator
+                document.getElementById('graph').innerHTML = '';
                 graphviz = d3.select("#graph").graphviz()
                     .width(document.getElementById('graph').clientWidth)
                     .height(500)
@@ -2350,6 +2367,46 @@ jq -s '{
         }
 
         function setupGraphInteractivity() {
+            // Build and cache lineage maps once on render
+            cachedUpstreamMap = {};
+            cachedDownstreamMap = {};
+            cachedLineage = {};
+
+            d3.select("#graph").selectAll(".edge").each(function() {
+                const edge = d3.select(this);
+                const title = edge.select("title").text();
+                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
+                if (match) {
+                    const source = match[1];
+                    const target = match[2];
+                    if (!cachedDownstreamMap[source]) cachedDownstreamMap[source] = [];
+                    if (!cachedUpstreamMap[target]) cachedUpstreamMap[target] = [];
+                    cachedDownstreamMap[source].push(target);
+                    cachedUpstreamMap[target].push(source);
+                }
+            });
+
+            // Pre-compute full lineage for all nodes with distance
+            function getFullChain(node, map, visited = new Set(), depth = 1) {
+                if (visited.has(node)) return [];
+                visited.add(node);
+                const neighbors = map[node] || [];
+                let result = [];
+                neighbors.forEach(n => {
+                    result.push({ name: n, depth: depth });
+                    result.push(...getFullChain(n, map, visited, depth + 1));
+                });
+                return result;
+            }
+
+            d3.select("#graph").selectAll(".node").each(function() {
+                const nodeName = d3.select(this).select("title").text();
+                cachedLineage[nodeName] = {
+                    upstream: getFullChain(nodeName, cachedUpstreamMap, new Set()),
+                    downstream: getFullChain(nodeName, cachedDownstreamMap, new Set())
+                };
+            });
+
             if (document.getElementById('node-tooltip')) {
                 document.getElementById('node-tooltip').remove();
             }
@@ -2470,40 +2527,11 @@ jq -s '{
             clearHighlights();
             d3.select(nodeElement).classed("node-highlighted", true);
 
-            // Build edge graph for traversal
-            const upstreamMap = {};  // node -> nodes that feed into it
-            const downstreamMap = {};  // node -> nodes it feeds into
-
-            d3.select("#graph").selectAll(".edge").each(function() {
-                const edge = d3.select(this);
-                const title = edge.select("title").text();
-                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
-                if (match) {
-                    const source = match[1];
-                    const target = match[2];
-                    if (!downstreamMap[source]) downstreamMap[source] = [];
-                    if (!upstreamMap[target]) upstreamMap[target] = [];
-                    downstreamMap[source].push(target);
-                    upstreamMap[target].push(source);
-                }
-            });
-
-            // Traverse full chain
-            function getFullChain(node, map, visited = new Set()) {
-                if (visited.has(node)) return [];
-                visited.add(node);
-                const neighbors = map[node] || [];
-                let result = [];
-                neighbors.forEach(n => {
-                    result.push(n);
-                    result.push(...getFullChain(n, map, visited));
-                });
-                return result;
-            }
-
-            const upstream = getFullChain(nodeName, upstreamMap, new Set());
-            const downstream = getFullChain(nodeName, downstreamMap, new Set());
-            const allConnected = new Set([...upstream, ...downstream]);
+            // Use cached lineage for performance
+            const lineage = cachedLineage[nodeName] || { upstream: [], downstream: [] };
+            const upstream = lineage.upstream;
+            const downstream = lineage.downstream;
+            const allConnected = new Set([...upstream.map(x => x.name), ...downstream.map(x => x.name)]);
 
             // Highlight connected nodes
             d3.select("#graph").selectAll(".node").each(function() {
@@ -2535,10 +2563,10 @@ jq -s '{
             });
 
             // Show node details in side panel
-            showNodeDetails(nodeName);
+            showNodeDetails(nodeName, upstream, downstream);
         }
 
-        function showNodeDetails(nodeName) {
+        function showNodeDetails(nodeName, upstream = [], downstream = []) {
             const col = document.getElementById('node-details-col');
             const content = document.getElementById('node-details-content');
 
@@ -2684,12 +2712,70 @@ jq -s '{
                 html += `</div>`;
             }
 
+            // Categorize upstream/downstream by type, deduplicate, sort by depth
+            const pipelineNames = new Set((currentConfig.pipelines || []).map(p => p.name));
+            if (groupedView) {
+                (currentConfig.pipelines || []).forEach(p => {
+                    if (p.group) pipelineNames.add(p.group);
+                });
+            }
+
+            // Deduplicate keeping lowest depth, then sort by depth
+            function dedupeAndSort(items, filterFn) {
+                const seen = new Map();
+                items.filter(x => filterFn(x.name)).forEach(x => {
+                    if (!seen.has(x.name) || seen.get(x.name).depth > x.depth) {
+                        seen.set(x.name, x);
+                    }
+                });
+                return [...seen.values()].sort((a, b) => a.depth - b.depth);
+            }
+
+            const upstreamPipelines = dedupeAndSort(upstream, n => pipelineNames.has(n));
+            const upstreamSources = dedupeAndSort(upstream, n => !pipelineNames.has(n));
+            const downstreamPipelines = dedupeAndSort(downstream, n => pipelineNames.has(n));
+            const downstreamSources = dedupeAndSort(downstream, n => !pipelineNames.has(n));
+
+            // Render with depth indication
+            function renderLineageList(items, label) {
+                if (items.length === 0) return '';
+                let out = `<div class="detail-label">${label} (${items.length})</div><div class="detail-value">`;
+                items.forEach(x => {
+                    const indent = (x.depth - 1) * 12;
+                    const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
+                    out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${x.name}</div>`;
+                });
+                out += `</div>`;
+                return out;
+            }
+
+            html += renderLineageList(upstreamPipelines, 'UPSTREAM PIPELINES');
+            html += renderLineageList(upstreamSources, 'UPSTREAM SOURCES');
+            html += renderLineageList(downstreamPipelines, 'DOWNSTREAM PIPELINES');
+            html += renderLineageList(downstreamSources, 'DOWNSTREAM SOURCES');
+
             // Shrink graph and show panel
             const graphCol = document.getElementById('graph-col');
             graphCol.classList.remove('col-md-12');
             graphCol.classList.add('col-md-8');
             col.style.display = 'block';
             content.innerHTML = html;
+
+            // Add click handlers for lineage links
+            content.querySelectorAll('.lineage-link').forEach(el => {
+                el.addEventListener('click', function() {
+                    const targetName = this.getAttribute('data-node-name');
+                    if (targetName) {
+                        // Find and click the node in the graph
+                        d3.select("#graph").selectAll(".node").each(function() {
+                            const nodeTitle = d3.select(this).select("title").text();
+                            if (nodeTitle === targetName) {
+                                selectNode(targetName, this);
+                            }
+                        });
+                    }
+                });
+            });
         }
 
         function clearSelection() {
@@ -2919,6 +3005,7 @@ jq -s '{
             let dot = `digraph AttributeLineage {
             rankdir=LR;
             bgcolor="transparent";
+            nodesep=0.15;
             node [fontname="Arial" fontsize="10"];
             edge [fontsize="9" color="#94a3b8" arrowsize="0.6"];
 
@@ -2983,6 +3070,8 @@ jq -s '{
             if (!dot) return;
 
             if (!attributeGraphviz) {
+                // Clear loading indicator
+                document.getElementById('attribute-graph').innerHTML = '';
                 attributeGraphviz = d3.select("#attribute-graph").graphviz()
                     .width(document.getElementById('attribute-graph').offsetWidth || 800)
                     .height(500)
@@ -3071,6 +3160,26 @@ jq -s '{
                     });
                 });
             });
+
+            // Third pass: pre-compute full provenance chains with depth for each attribute
+            function computeFullChain(attrId, direction, visited = new Set(), depth = 1) {
+                if (visited.has(attrId)) return [];
+                visited.add(attrId);
+                const attr = attributeLineageMap[attrId];
+                if (!attr) return [];
+                const next = direction === 'upstream' ? attr.upstream : attr.downstream;
+                let result = [];
+                next.forEach(nextId => {
+                    result.push({ id: nextId, depth: depth });
+                    result.push(...computeFullChain(nextId, direction, visited, depth + 1));
+                });
+                return result;
+            }
+
+            Object.keys(attributeLineageMap).forEach(attrId => {
+                attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, 'upstream', new Set());
+                attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, 'downstream', new Set());
+            });
         }
 
         function getFullProvenance(attrId, direction, visited = new Set()) {
@@ -3105,10 +3214,10 @@ jq -s '{
                 .classed('edge-highlighted', false)
                 .classed('edge-dimmed', false);
 
-            // Get full provenance chain
-            const upstream = getFullProvenance(attrId, 'upstream', new Set());
-            const downstream = getFullProvenance(attrId, 'downstream', new Set());
-            const allConnected = new Set([attrId, ...upstream, ...downstream]);
+            // Use cached full provenance chains for performance
+            const upstream = attr.fullUpstream || [];
+            const downstream = attr.fullDownstream || [];
+            const allConnected = new Set([attrId, ...upstream.map(x => x.id), ...downstream.map(x => x.id)]);
 
             // Highlight nodes
             d3.select('#attribute-graph').selectAll('.node').each(function() {
@@ -3160,31 +3269,49 @@ jq -s '{
             html += `<div class="detail-label">DATASOURCE</div>`;
             html += `<div class="detail-value">${attr.datasource}</div>`;
 
-            if (upstream.length > 0) {
-                html += `<div class="detail-label">UPSTREAM (${upstream.length})</div>`;
+            // Deduplicate and sort by depth
+            function dedupeAndSort(items) {
+                const seen = new Map();
+                items.forEach(x => {
+                    if (!seen.has(x.id) || seen.get(x.id).depth > x.depth) {
+                        seen.set(x.id, x);
+                    }
+                });
+                return [...seen.values()].sort((a, b) => a.depth - b.depth);
+            }
+
+            const sortedUpstream = dedupeAndSort(upstream);
+            const sortedDownstream = dedupeAndSort(downstream);
+
+            if (sortedUpstream.length > 0) {
+                html += `<div class="detail-label">UPSTREAM (${sortedUpstream.length})</div>`;
                 html += `<div class="detail-value">`;
-                upstream.forEach(id => {
-                    const upAttr = attributeLineageMap[id];
+                sortedUpstream.forEach(x => {
+                    const upAttr = attributeLineageMap[x.id];
                     if (upAttr) {
-                        html += `<div class="lineage-link" data-attr-id="${id}">${upAttr.fullName}</div>`;
+                        const indent = (x.depth - 1) * 12;
+                        const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
+                        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${upAttr.fullName}</div>`;
                     }
                 });
                 html += `</div>`;
             }
 
-            if (downstream.length > 0) {
-                html += `<div class="detail-label">DOWNSTREAM (${downstream.length})</div>`;
+            if (sortedDownstream.length > 0) {
+                html += `<div class="detail-label">DOWNSTREAM (${sortedDownstream.length})</div>`;
                 html += `<div class="detail-value">`;
-                downstream.forEach(id => {
-                    const downAttr = attributeLineageMap[id];
+                sortedDownstream.forEach(x => {
+                    const downAttr = attributeLineageMap[x.id];
                     if (downAttr) {
-                        html += `<div class="lineage-link" data-attr-id="${id}">${downAttr.fullName}</div>`;
+                        const indent = (x.depth - 1) * 12;
+                        const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
+                        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${downAttr.fullName}</div>`;
                     }
                 });
                 html += `</div>`;
             }
 
-            if (upstream.length === 0 && downstream.length === 0) {
+            if (sortedUpstream.length === 0 && sortedDownstream.length === 0) {
                 html += `<div class="detail-value text-muted">No lineage connections</div>`;
             }
 
