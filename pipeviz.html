@@ -779,7 +779,7 @@
                         <div style="margin-bottom: 2.5rem;">
                             <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">How it works</div>
                             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.25rem;">
-                                Most lineage tools instrument your runtime or lock you into a framework. Pipeviz is different: you already know your pipelines, so just declare them. Generate JSON at compile time from your build system, or write it by hand.
+                                You know your pipelines. Declare them as JSON, generate it from your build, or write it by hand.
                             </p>
                             <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
                                 <div style="flex: 1; min-width: 140px; text-align: center;">
@@ -811,6 +811,17 @@ jq -s '{
   pipelines: map(.pipelines // []) | add,
   datasources: map(.datasources // []) | add
 }' team-*.json > pipeviz.json</pre>
+                        </div>
+
+                        <!-- Philosophy -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Philosophy</div>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
+                                <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a>, <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a>, and <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> instrument your runtime, buffer events into a central orchestrator, and extract whatever graph their agents can infer. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> takes a different approach but still asks you to rewrite pipelines in their SQL dialect and structure your project around their manifest.
+                            </p>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0.75rem 0 0 0;">
+                                Pipeviz is just a JSON file and one HTML page. Nothing to install, nothing running in your cluster.
+                            </p>
                         </div>
 
                         <!-- Footer -->
