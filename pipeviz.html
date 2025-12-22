@@ -928,7 +928,7 @@ jq -s '{
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>■ = Pipeline</div>
-                                            <div style="color: #ef6c00;">■ = Group (double-click to expand)</div>
+                                            <div style="color: #ef6c00;">■ = Group</div>
                                             <div>● = Data Source</div>
                                             <div>□ = Cluster</div>
                                             <div>→ = Data flow</div>
@@ -2467,7 +2467,7 @@ jq -s '{
                 const groupMembers = currentConfig.pipelines?.filter(p => p.group === nodeName);
                 if (groupMembers?.length > 0) {
                     content = `${nodeName} (${groupMembers.length} pipelines)`;
-                    content += `\nDouble-click to expand`;
+                    content += `\nClick for details`;
                     content += `\nMembers: ${groupMembers.map(p => p.name).join(', ')}`;
                     tooltip.textContent = content;
                     tooltip.style.display = 'block';
@@ -2633,6 +2633,25 @@ jq -s '{
             html = `<h5>${nodeData.name}</h5>`;
             html += `<div class="detail-label">Type</div>`;
             html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`;
+
+            // Add expand/collapse button for pipeline groups
+            if (nodeType === 'Pipeline Group') {
+                const isExpanded = expandedGroups.has(nodeName);
+                html += `<div class="mt-2 mb-2">
+                    <button class="btn btn-sm btn-outline-warning" onclick="toggleGroup('${nodeName}')">
+                        ${isExpanded ? 'Collapse Group' : 'Expand Group'}
+                    </button>
+                </div>`;
+            }
+
+            // Add collapse button for pipelines that belong to an expanded group
+            if (nodeType === 'Pipeline' && nodeData.group && expandedGroups.has(nodeData.group)) {
+                html += `<div class="mt-2 mb-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleGroup('${nodeData.group}')">
+                        Collapse Group (${nodeData.group})
+                    </button>
+                </div>`;
+            }
 
             if (nodeData.description) {
                 html += `<div class="detail-label">Description</div>`;
@@ -2987,6 +3006,8 @@ jq -s '{
                 expandedGroups.add(groupName);
             }
             updateGraph();
+            // Refresh the details panel to update the button state
+            showNodeDetails(groupName);
         }
 
         // Attribute lineage graph
