@@ -13,8 +13,6 @@ Give it a `.json` and you instantly get:
 - A clear, unified map of your data system
 - Attribute-level lineage
 
-You define what exists. **Pipeviz** draws the lines ✏️✨
-
 
 ## Features
 - Declarative, data-as-code lineage
