@@ -684,8 +684,10 @@
     <div class="container-fluid py-4">
         <div class="hero-section">
             <div class="mb-4 text-center position-relative">
-                <a href="https://github.com/mattlianje/pipeviz" target="_blank" class="position-absolute" style="top: 0; left: 0; color: var(--text-muted); font-size: 13px; text-decoration: none;" title="GitHub">github</a>
-                <button class="theme-toggle position-absolute" style="top: 0; right: 0;" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
+                <div class="position-absolute" style="top: 0; right: 0; display: flex; align-items: center; gap: 12px;">
+                    <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: var(--text-muted); font-size: 13px; text-decoration: none;" title="GitHub">github</a>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
+                </div>
                 <h1 class="hero-title">🛰️ Pipeviz</h1>
                 <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
             </div>
