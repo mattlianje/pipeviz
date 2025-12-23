@@ -726,7 +726,7 @@
 
                         <!-- Intro -->
                         <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
-                            Describe your pipelines in JSON, get a dependency graph.
+                            An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
                         </p>
 
                         <!-- Demo -->
@@ -817,9 +817,9 @@ jq -s '{
 }' team-*.json > pipeviz.json</pre>
                         </div>
 
-                        <!-- Philosophy -->
+                        <!-- Motivation -->
                         <div style="margin-bottom: 2rem;">
-                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Philosophy</div>
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Motivation</div>
                             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
                                 <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a>, <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a>, and <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> instrument your runtime, buffer events into a central orchestrator, and extract whatever graph their agents can infer. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> takes a different approach but still asks you to rewrite pipelines in their SQL dialect and structure your project around their manifest.
                             </p>
@@ -1023,96 +1023,174 @@ jq -s '{
                 <!-- Spec Tab -->
                 <div class="tab-pane fade" id="spec-pane">
                     <div style="max-width: 800px; padding: 1rem 0;">
-                        <div class="mb-4">
-                            <h5 style="font-weight: bold; margin-bottom: 1rem;">JSON Spec</h5>
-                            <p style="color: var(--text-secondary);">Pipeviz uses a simple JSON configuration to define your data lineage. Only pipelines are required. Clusters and datasources are auto-created when referenced, but you can add rich descriptors for better documentation.</p>
+                        <style>
+                            .spec-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 0.75rem 0 1rem 0; }
+                            .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
+                            .spec-table th { background: var(--bg-secondary); }
+                            .spec-section { margin-bottom: 2rem; }
+                            .spec-section h6 { font-weight: 600; margin-bottom: 0.5rem; }
+                            .spec-pre { background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary); margin: 0; }
+                        </style>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <h5 style="font-weight: 600; margin-bottom: 0.25rem;">Pipeviz JSON Spec</h5>
+                            <p style="color: var(--text-secondary); font-size: 13px;">Only <code>pipelines</code> is required. Clusters and datasources are auto-created when referenced.</p>
                         </div>
 
-                        <div class="mb-4">
-                            <h6 style="font-weight: bold;">Root Structure</h6>
-                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
-  "clusters": [ ... ],     // Optional: cluster definitions
-  "pipelines": [ ... ],    // Required: pipeline definitions
-  "datasources": [ ... ]   // Optional: rich data source definitions
+                        <div class="spec-section">
+                            <h6>Root</h6>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th></tr>
+                                <tr><td><code>pipelines</code></td><td>array</td><td>Yes</td></tr>
+                                <tr><td><code>datasources</code></td><td>array</td><td>No</td></tr>
+                                <tr><td><code>clusters</code></td><td>array</td><td>No</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "clusters": [...],
+  "pipelines": [...],
+  "datasources": [...]
 }</pre>
                         </div>
 
-                        <div class="mb-4">
-                            <h6 style="font-weight: bold;">Clusters (Optional)</h6>
-                            <p style="color: var(--text-secondary); font-size: 12px;">Clusters can be declared upfront or referenced on-the-fly. Support nested hierarchies with parent relationships.</p>
-                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
-  "name": "real-time",
-  "description": "Real-time processing cluster",  // Optional
-  "parent": "order-management"                    // Optional: creates nested cluster
-}</pre>
-                        </div>
-
-                        <div class="mb-4">
-                            <h6 style="font-weight: bold;">Pipelines</h6>
-                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+                        <div class="spec-section">
+                            <h6>Pipeline</h6>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>input_sources</code></td><td>array</td><td>No</td><td>Datasources read from</td></tr>
+                                <tr><td><code>output_sources</code></td><td>array</td><td>No</td><td>Datasources written to</td></tr>
+                                <tr><td><code>upstream_pipelines</code></td><td>array</td><td>No</td><td>Pipeline dependencies</td></tr>
+                                <tr><td><code>cluster</code></td><td>string</td><td>No</td><td>Cluster name</td></tr>
+                                <tr><td><code>group</code></td><td>string</td><td>No</td><td>Collapse into group node</td></tr>
+                                <tr><td><code>schedule</code></td><td>string</td><td>No</td><td>Free text</td></tr>
+                                <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                                <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                            </table>
+<pre class="spec-pre">{
   "name": "user-enrichment",
-  "description": "Enriches user data...",       // Optional
-  "input_sources": ["raw_users", "events"],     // Optional
-  "output_sources": ["enriched_users"],         // Optional
-  "schedule": "Every 2 hours",                  // Optional
-  "tags": ["user-data", "ml"],                  // Optional
-  "cluster": "user-processing",                 // Optional: single cluster
-  "group": "etl-jobs",                          // Optional: collapse into group
-  "upstream_pipelines": ["data-ingestion"],     // Optional
-  "links": {                                    // Optional
+  "description": "Enriches user data with events",
+  "input_sources": ["raw_users", "events"],
+  "output_sources": ["enriched_users"],
+  "upstream_pipelines": ["data-ingestion"],
+  "cluster": "user-processing",
+  "group": "etl-jobs",
+  "schedule": "Every 2 hours",
+  "tags": ["user-data", "ml"],
+  "links": {
     "airflow": "https://...",
-    "monitoring": "https://..."
+    "docs": "https://..."
   }
 }</pre>
-                            <p style="color: var(--text-secondary); font-size: 12px; margin-top: 0.5rem;">Use <code>group</code> to collapse multiple pipelines into a single node. Toggle between grouped and expanded views in the Graph tab.</p>
                         </div>
 
-                        <div class="mb-4">
-                            <h6 style="font-weight: bold;">Data Sources (Optional)</h6>
-                            <p style="color: var(--text-secondary); font-size: 12px;">Data sources are auto-created when referenced in pipelines. Define them explicitly to add rich metadata, ownership, and documentation.</p>
-                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+                        <div class="spec-section">
+                            <h6>Datasource</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Auto-created when referenced. Define explicitly to add metadata.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>type</code></td><td>string</td><td>No</td><td>snowflake, postgres, kafka, s3...</td></tr>
+                                <tr><td><code>owner</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>cluster</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                                <tr><td><code>metadata</code></td><td>object</td><td>No</td><td>Arbitrary key-value</td></tr>
+                                <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                                <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Column-level lineage</td></tr>
+                            </table>
+<pre class="spec-pre">{
   "name": "raw_users",
-  "description": "Raw user data...",            // Optional
-  "type": "snowflake",                          // Optional
-  "owner": "data-team@company.com",             // Optional
-  "tags": ["pii", "users"],                     // Optional
-  "cluster": "user-processing",                 // Optional
-  "metadata": {                                 // Optional
+  "description": "Raw user data from prod",
+  "type": "snowflake",
+  "owner": "data-team@company.com",
+  "cluster": "user-processing",
+  "tags": ["pii", "users"],
+  "metadata": {
     "size": "2.1TB",
     "record_count": "45M"
   },
-  "links": {                                    // Optional
+  "links": {
     "snowflake": "https://...",
     "docs": "https://..."
   }
 }</pre>
                         </div>
 
-                        <div class="mb-4">
-                            <h6 style="font-weight: bold;">Attribute Lineage (Optional)</h6>
-                            <p style="color: var(--text-secondary); font-size: 12px;">Track column-level lineage by adding an <code>attributes</code> array to datasources. Use <code>::</code> to reference source attributes.</p>
-                            <pre style="background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary);">{
+                        <div class="spec-section">
+                            <h6>Cluster</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Auto-created when referenced. Define explicitly for nesting.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>parent</code></td><td>string</td><td>No</td><td>Parent cluster for nesting</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "name": "realtime",
+  "description": "Real-time processing cluster",
+  "parent": "order-processing"
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Attribute Lineage</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Add <code>attributes</code> to a datasource. Reference upstream with <code>source::attr</code>.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Column name</td></tr>
+                                <tr><td><code>from</code></td><td>string or array</td><td>No</td><td>Upstream refs</td></tr>
+                            </table>
+<pre class="spec-pre">{
   "name": "enriched_users",
   "attributes": [
     { "name": "user_id", "from": "raw_users::id" },
-    { "name": "full_name", "from": ["raw_users::first_name", "raw_users::last_name"] },
-    { "name": "event_count", "from": "user_events::event_id" }
+    { "name": "full_name", "from": ["raw_users::first", "raw_users::last"] }
   ]
 }</pre>
-                            <p style="color: var(--text-secondary); font-size: 12px; margin-top: 0.5rem;">View attribute lineage in the <strong>Attributes</strong> tab.</p>
                         </div>
 
-                        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1rem;">
-                            <strong>Tips</strong>
-                            <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 13px;">
-                                <li>Only <code>pipelines</code> array with pipeline <code>name</code> fields is required</li>
-                                <li>Clusters and datasources are auto-created when referenced</li>
-                                <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
-                                <li>Create nested clusters using the <code>parent</code> field</li>
-                                <li>Use <code>group</code> to collapse similar pipelines into a single node</li>
-                                <li>Use <code>attributes</code> with <code>::</code> separator for column-level lineage</li>
-                            </ul>
+                        <div class="spec-section">
+                            <h6>Full Example</h6>
+<pre class="spec-pre">{
+  "clusters": [
+    { "name": "etl", "description": "ETL pipelines" }
+  ],
+  "pipelines": [
+    {
+      "name": "user-enrichment",
+      "description": "Enriches user data with events",
+      "input_sources": ["raw_users", "events"],
+      "output_sources": ["enriched_users"],
+      "cluster": "etl",
+      "schedule": "Every 2 hours",
+      "tags": ["user-data"],
+      "links": { "airflow": "https://..." }
+    }
+  ],
+  "datasources": [
+    {
+      "name": "raw_users",
+      "type": "snowflake",
+      "owner": "data-team@company.com",
+      "attributes": [
+        { "name": "id" },
+        { "name": "first" },
+        { "name": "last" }
+      ]
+    },
+    {
+      "name": "enriched_users",
+      "type": "snowflake",
+      "attributes": [
+        { "name": "user_id", "from": "raw_users::id" },
+        { "name": "full_name", "from": ["raw_users::first", "raw_users::last"] }
+      ]
+    }
+  ]
+}</pre>
                         </div>
+
                     </div>
                 </div>
             </div>
