@@ -205,14 +205,14 @@
             outline: none;
         }
         .node-highlighted {
-            stroke: #d32f2f !important;
-            stroke-width: 4px !important;
-            filter: drop-shadow(0 0 8px rgba(211, 47, 47, 0.6));
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(230, 81, 0, 0.4));
         }
         .node-highlighted polygon,
         .node-highlighted ellipse,
         .node-highlighted path {
-            fill: #ffcdd2 !important;
+            fill: #fff3e0 !important;
         }
         .node-highlighted text {
             font-weight: normal !important;
@@ -221,9 +221,13 @@
             stroke-width: 0 !important;
         }
         .node-connected {
-            stroke: #64748b !important;
-            stroke-width: 2px !important;
-            filter: drop-shadow(0 0 3px rgba(100, 116, 139, 0.3));
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .node-connected polygon,
+        .node-connected ellipse,
+        .node-connected path {
+            fill: #f3e5f5 !important;
         }
         .node-connected text {
             font-weight: normal !important;
@@ -235,11 +239,26 @@
             opacity: 0.3 !important;
         }
         .edge-highlighted {
-            stroke: #555555 !important;
-            stroke-width: 2px !important;
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
         }
         .edge-dimmed {
             opacity: 0.2 !important;
+        }
+        .cluster-highlighted > polygon,
+        .cluster-highlighted > path {
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(230, 81, 0, 0.4));
+            fill: #fff3e0 !important;
+        }
+        .cluster-connected > polygon,
+        .cluster-connected > path {
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .cluster-dimmed {
+            opacity: 0.3 !important;
         }
         .node-tooltip {
             position: absolute;
@@ -797,9 +816,6 @@
                         <!-- How it works -->
                         <div style="margin-bottom: 2.5rem;">
                             <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">How it works</div>
-                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.25rem;">
-                                You know your pipelines. Declare them as JSON, generate it from your build, or write it by hand.
-                            </p>
                             <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
                                 <div style="flex: 1; min-width: 140px; text-align: center;">
                                     <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">1</div>
@@ -1132,17 +1148,25 @@ jq -s '{
 
                         <div class="spec-section">
                             <h6>Attribute Lineage</h6>
-                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Add <code>attributes</code> to a datasource. Reference upstream with <code>source::attr</code>.</p>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Add <code>attributes</code> to a datasource. Supports nesting for structs/objects. Reference upstream with <code>source::attr</code> or <code>source::parent::child</code>.</p>
                             <table class="spec-table">
                                 <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Column name</td></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Column/field name</td></tr>
                                 <tr><td><code>from</code></td><td>string or array</td><td>No</td><td>Upstream refs</td></tr>
+                                <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Nested child attributes</td></tr>
                             </table>
 <pre class="spec-pre">{
   "name": "enriched_users",
   "attributes": [
     { "name": "user_id", "from": "raw_users::id" },
-    { "name": "full_name", "from": ["raw_users::first", "raw_users::last"] }
+    {
+      "name": "location",
+      "from": "raw_users::address",
+      "attributes": [
+        { "name": "city", "from": "raw_users::address::city" },
+        { "name": "zip", "from": "raw_users::address::zip" }
+      ]
+    }
   ]
 }</pre>
                         </div>
@@ -1470,7 +1494,21 @@ jq -s '{
                         { "name": "first_name" },
                         { "name": "last_name" },
                         { "name": "email" },
-                        { "name": "signup_date" }
+                        { "name": "signup_date" },
+                        {
+                            "name": "address",
+                            "attributes": [
+                                { "name": "city" },
+                                { "name": "zip" },
+                                {
+                                    "name": "geo",
+                                    "attributes": [
+                                        { "name": "lat" },
+                                        { "name": "lng" }
+                                    ]
+                                }
+                            ]
+                        }
                     ],
                     "metadata": {
                         "schema": "RAW_DATA",
@@ -1557,7 +1595,16 @@ jq -s '{
                         { "name": "email", "from": "raw_users::email" },
                         { "name": "event_count", "from": "user_events::event_id" },
                         { "name": "last_active", "from": "user_events::timestamp" },
-                        { "name": "signup_date", "from": "raw_users::signup_date" }
+                        { "name": "signup_date", "from": "raw_users::signup_date" },
+                        {
+                            "name": "location",
+                            "from": "raw_users::address",
+                            "attributes": [
+                                { "name": "city", "from": "raw_users::address::city" },
+                                { "name": "zip", "from": "raw_users::address::zip" },
+                                { "name": "coords", "from": "raw_users::address::geo" }
+                            ]
+                        }
                     ]
                 },
                 {
@@ -3096,6 +3143,7 @@ jq -s '{
 
         // Attribute lineage graph
         let attributeGraphviz = null;
+        let nestedClusterCount = 0;
 
         function generateAttributeDot() {
             if (!currentConfig) return '';
@@ -3110,11 +3158,121 @@ jq -s '{
             let dot = `digraph AttributeLineage {
             rankdir=LR;
             bgcolor="transparent";
+            compound=true;
             nodesep=0.15;
             node [fontname="Arial" fontsize="10"];
             edge [fontsize="9" color="#94a3b8" arrowsize="0.6"];
 
 `;
+
+            // First, collect all source references to know which attrs have downstream connections
+            const sourceRefs = new Set();
+            function collectSourceRefs(attrs) {
+                attrs.forEach(attr => {
+                    if (attr.from) {
+                        const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
+                        sources.forEach(s => sourceRefs.add(s));
+                    }
+                    if (attr.attributes) collectSourceRefs(attr.attributes);
+                });
+            }
+            datasources.forEach(ds => {
+                if (ds.attributes) collectSourceRefs(ds.attributes);
+            });
+
+            // Helper to check if an attribute is referenced as a source
+            function isSourceRef(dsName, attrPath) {
+                // Check both formats: ds::attr and ds::parent::child
+                const ref = `${dsName}::${attrPath.replace(/__/g, '::')}`;
+                return sourceRefs.has(ref);
+            }
+
+            // Track which attributes are structs (have children) for edge routing
+            const structAttrs = new Set();
+
+            // Helper to render attributes recursively with nested clusters
+            nestedClusterCount = 0;
+            function renderAttributes(attrs, dsName, dsId, prefix = '', depth = 0) {
+                let result = '';
+                attrs.forEach(attr => {
+                    const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name;
+                    const attrId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+                    const hasUpstream = attr.from ? true : false;
+                    const hasDownstream = isSourceRef(dsName, attrPath);
+                    const hasLineage = hasUpstream || hasDownstream;
+                    const hasChildren = attr.attributes && attr.attributes.length > 0;
+
+                    if (hasChildren) {
+                        // Mark this as a struct for edge routing
+                        structAttrs.add(attrId);
+                        // Create a nested cluster for this struct
+                        nestedClusterCount++;
+                        const clusterId = `cluster_${attrId}`;
+                        const nestedBg = hasLineage ? '#dde5ed' : (depth === 0 ? '#e8eef4' : '#dce4ec');
+                        result += `        subgraph ${clusterId} {
+                            label="${attr.name}";
+                            labelloc="t";
+                            style=filled;
+                            fillcolor="${nestedBg}";
+                            fontcolor="${hasLineage ? '#7b1fa2' : textColor}";
+                            color="${hasLineage ? '#7b1fa2' : attrBorder}";
+                            fontname="Arial";
+                            fontsize="9";
+                            margin="8";
+`;
+                        // Invisible anchor node for edge connections (clickable via cluster)
+                        result += `            "${attrId}" [label="" shape=point width=0.01 height=0.01 style=invis];\n`;
+                        result += renderAttributes(attr.attributes, dsName, dsId, attrPath, depth + 1);
+                        result += `                        }\n`;
+                    } else {
+                        const fill = hasLineage ? '#e2e8f0' : attrFill;
+                        result += `            "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`;
+                    }
+                });
+                return result;
+            }
+
+            // Helper to collect all lineage edges (handles nested paths)
+            function collectLineage(attrs, dsId, prefix = '') {
+                let edges = [];
+                attrs.forEach(attr => {
+                    const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name;
+                    const targetId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+                    const targetIsStruct = structAttrs.has(targetId);
+
+                    if (attr.from) {
+                        const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
+                        sources.forEach(source => {
+                            // Parse source::attr or source::parent::child format
+                            const parts = source.split('::');
+                            if (parts.length >= 2) {
+                                const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
+                                const sourcePath = parts.slice(1).join('__').replace(/[^a-zA-Z0-9_]/g, '_');
+                                const sourceId = `${sourceDs}__${sourcePath}`;
+                                const sourceIsStruct = structAttrs.has(sourceId);
+
+                                // Build edge with lhead/ltail for struct-to-struct connections
+                                let edgeAttrs = ['color="#7b1fa2"'];
+
+                                if (sourceIsStruct) {
+                                    edgeAttrs.push(`ltail="cluster_${sourceId}"`);
+                                }
+                                if (targetIsStruct) {
+                                    edgeAttrs.push(`lhead="cluster_${targetId}"`);
+                                }
+
+                                edges.push(`    "${sourceId}" -> "${targetId}" [${edgeAttrs.join(' ')}];\n`);
+                            }
+                        });
+                    }
+
+                    // Recursively collect from nested attributes
+                    if (attr.attributes && attr.attributes.length > 0) {
+                        edges = edges.concat(collectLineage(attr.attributes, dsId, attrPath));
+                    }
+                });
+                return edges;
+            }
 
             // Create subgraphs for each datasource with attributes
             datasources.forEach(ds => {
@@ -3131,12 +3289,7 @@ jq -s '{
                 fontsize="11";
 
 `;
-                ds.attributes.forEach(attr => {
-                    const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    const hasLineage = attr.from ? true : false;
-                    const fill = hasLineage ? '#e2e8f0' : attrFill;
-                    dot += `        "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`;
-                });
+                dot += renderAttributes(ds.attributes, ds.name, dsId);
                 dot += `    }\n\n`;
             });
 
@@ -3144,24 +3297,8 @@ jq -s '{
             datasources.forEach(ds => {
                 if (!ds.attributes) return;
                 const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
-
-                ds.attributes.forEach(attr => {
-                    if (!attr.from) return;
-
-                    const targetId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
-
-                    sources.forEach(source => {
-                        // Parse source::attribute format
-                        const parts = source.split('::');
-                        if (parts.length === 2) {
-                            const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
-                            const sourceAttr = parts[1].replace(/[^a-zA-Z0-9]/g, '_');
-                            const sourceId = `${sourceDs}__${sourceAttr}`;
-                            dot += `    "${sourceId}" -> "${targetId}" [color="#7b1fa2"];\n`;
-                        }
-                    });
-                });
+                const edges = collectLineage(ds.attributes, dsId);
+                edges.forEach(edge => { dot += edge; });
             });
 
             dot += `}`;
@@ -3194,6 +3331,19 @@ jq -s '{
                     }
                 });
 
+                // Add click handlers to clusters (for struct attributes)
+                d3.select('#attribute-graph').selectAll('.cluster').on('click', function(event) {
+                    event.stopPropagation();
+                    const title = d3.select(this).select('title').text();
+                    // Cluster titles are "cluster_attrId", extract attrId
+                    if (title && title.startsWith('cluster_')) {
+                        const attrId = title.substring(8);
+                        if (attributeLineageMap[attrId]) {
+                            selectAttribute(attrId);
+                        }
+                    }
+                });
+
                 // Click on graph background to clear selection
                 d3.select('#attribute-graph svg').on('click', function(event) {
                     if (event.target.tagName === 'svg' || event.target.classList.contains('graph')) {
@@ -3221,49 +3371,73 @@ jq -s '{
 
             const datasources = currentConfig.datasources || [];
 
-            // First pass: create entries for all attributes
-            datasources.forEach(ds => {
-                if (!ds.attributes) return;
-                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
-                ds.attributes.forEach(attr => {
-                    const attrId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            // Helper to recursively register all attributes (including nested)
+            function registerAttributes(attrs, dsName, dsId, prefix = '') {
+                attrs.forEach(attr => {
+                    const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name;
+                    const attrId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+                    const fullName = prefix ? `${dsName}::${prefix.replace(/__/g, '::')}::${attr.name}` : `${dsName}::${attr.name}`;
+
                     attributeLineageMap[attrId] = {
                         id: attrId,
                         name: attr.name,
-                        datasource: ds.name,
-                        fullName: `${ds.name}::${attr.name}`,
+                        datasource: dsName,
+                        fullName: fullName,
                         upstream: [],
                         downstream: []
                     };
+
+                    // Recursively register nested attributes
+                    if (attr.attributes && attr.attributes.length > 0) {
+                        registerAttributes(attr.attributes, dsName, dsId, attrPath);
+                    }
                 });
+            }
+
+            // Helper to recursively collect lineage from attributes
+            function collectAttributeLineage(attrs, dsId, prefix = '') {
+                attrs.forEach(attr => {
+                    const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name;
+                    const targetId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+
+                    if (attr.from) {
+                        const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
+                        sources.forEach(source => {
+                            const parts = source.split('::');
+                            if (parts.length >= 2) {
+                                const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
+                                const sourcePath = parts.slice(1).join('__').replace(/[^a-zA-Z0-9_]/g, '_');
+                                const sourceId = `${sourceDs}__${sourcePath}`;
+
+                                if (attributeLineageMap[targetId]) {
+                                    attributeLineageMap[targetId].upstream.push(sourceId);
+                                }
+                                if (attributeLineageMap[sourceId]) {
+                                    attributeLineageMap[sourceId].downstream.push(targetId);
+                                }
+                            }
+                        });
+                    }
+
+                    // Recursively collect from nested attributes
+                    if (attr.attributes && attr.attributes.length > 0) {
+                        collectAttributeLineage(attr.attributes, dsId, attrPath);
+                    }
+                });
+            }
+
+            // First pass: create entries for all attributes (including nested)
+            datasources.forEach(ds => {
+                if (!ds.attributes) return;
+                const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+                registerAttributes(ds.attributes, ds.name, dsId);
             });
 
             // Second pass: build lineage relationships
             datasources.forEach(ds => {
                 if (!ds.attributes) return;
                 const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
-
-                ds.attributes.forEach(attr => {
-                    if (!attr.from) return;
-                    const targetId = `${dsId}__${attr.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    const sources = Array.isArray(attr.from) ? attr.from : [attr.from];
-
-                    sources.forEach(source => {
-                        const parts = source.split('::');
-                        if (parts.length === 2) {
-                            const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_');
-                            const sourceAttr = parts[1].replace(/[^a-zA-Z0-9]/g, '_');
-                            const sourceId = `${sourceDs}__${sourceAttr}`;
-
-                            if (attributeLineageMap[targetId]) {
-                                attributeLineageMap[targetId].upstream.push(sourceId);
-                            }
-                            if (attributeLineageMap[sourceId]) {
-                                attributeLineageMap[sourceId].downstream.push(targetId);
-                            }
-                        }
-                    });
-                });
+                collectAttributeLineage(ds.attributes, dsId);
             });
 
             // Third pass: pre-compute full provenance chains with depth for each attribute
@@ -3315,6 +3489,10 @@ jq -s '{
                 .classed('node-highlighted', false)
                 .classed('node-connected', false)
                 .classed('node-dimmed', false);
+            d3.select('#attribute-graph').selectAll('.cluster')
+                .classed('cluster-highlighted', false)
+                .classed('cluster-connected', false)
+                .classed('cluster-dimmed', false);
             d3.select('#attribute-graph').selectAll('.edge')
                 .classed('edge-highlighted', false)
                 .classed('edge-dimmed', false);
@@ -3334,6 +3512,22 @@ jq -s '{
                     node.classed('node-connected', true).classed('node-dimmed', false);
                 } else {
                     node.classed('node-dimmed', true);
+                }
+            });
+
+            // Highlight clusters (struct attributes)
+            d3.select('#attribute-graph').selectAll('.cluster').each(function() {
+                const cluster = d3.select(this);
+                const title = cluster.select('title').text();
+                if (title && title.startsWith('cluster_')) {
+                    const clusterId = title.substring(8);
+                    if (clusterId === attrId) {
+                        cluster.classed('cluster-highlighted', true).classed('cluster-dimmed', false);
+                    } else if (allConnected.has(clusterId)) {
+                        cluster.classed('cluster-connected', true).classed('cluster-dimmed', false);
+                    } else {
+                        cluster.classed('cluster-dimmed', true);
+                    }
                 }
             });
 
@@ -3373,6 +3567,28 @@ jq -s '{
             let html = `<h5>${attr.name}</h5>`;
             html += `<div class="detail-label">DATASOURCE</div>`;
             html += `<div class="detail-value">${attr.datasource}</div>`;
+
+            // Find children of this attribute (for structs)
+            const childPrefix = attrId + '__';
+            const children = Object.keys(attributeLineageMap)
+                .filter(id => id.startsWith(childPrefix))
+                .map(id => {
+                    const child = attributeLineageMap[id];
+                    const relativePath = id.substring(childPrefix.length);
+                    const depth = (relativePath.match(/__/g) || []).length;
+                    return { id, name: child.name, relativePath, depth };
+                })
+                .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
+            if (children.length > 0) {
+                html += `<div class="detail-label">CONTAINS (${children.length})</div>`;
+                html += `<div class="detail-value">`;
+                children.forEach(child => {
+                    const indent = child.depth * 12;
+                    html += `<div class="lineage-link" data-attr-id="${child.id}" style="padding-left: ${indent}px;">${child.relativePath.replace(/__/g, '.')}</div>`;
+                });
+                html += `</div>`;
+            }
 
             // Deduplicate and sort by depth
             function dedupeAndSort(items) {
@@ -3438,6 +3654,11 @@ jq -s '{
                 .classed('node-highlighted', false)
                 .classed('node-connected', false)
                 .classed('node-dimmed', false);
+
+            d3.select('#attribute-graph').selectAll('.cluster')
+                .classed('cluster-highlighted', false)
+                .classed('cluster-connected', false)
+                .classed('cluster-dimmed', false);
 
             d3.select('#attribute-graph').selectAll('.edge')
                 .classed('edge-highlighted', false)
