@@ -224,11 +224,6 @@
             stroke: #7b1fa2 !important;
             stroke-width: 1.5px !important;
         }
-        .node-connected polygon,
-        .node-connected ellipse,
-        .node-connected path {
-            fill: #f3e5f5 !important;
-        }
         .node-connected text {
             font-weight: normal !important;
             fill: #000 !important;
@@ -3155,6 +3150,13 @@ jq -s '{
             const attrFill = '#ffffff';
             const attrBorder = '#94a3b8';
 
+            // Truncate long names to keep graph clean
+            const maxLen = 20;
+            function truncate(name) {
+                if (name.length <= maxLen) return name;
+                return name.substring(0, maxLen - 1) + '…';
+            }
+
             let dot = `digraph AttributeLineage {
             rankdir=LR;
             bgcolor="transparent";
@@ -3221,7 +3223,7 @@ jq -s '{
                             margin="8";
 `;
                         // Invisible anchor node for edge connections (clickable via cluster)
-                        result += `            "${attrId}" [label="" shape=point width=0.01 height=0.01 style=invis];\n`;
+                        result += `            "${attrId}" [label="" shape=point width=0 height=0 fixedsize=true style=invis];\n`;
                         result += renderAttributes(attr.attributes, dsName, dsId, attrPath, depth + 1);
                         result += `                        }\n`;
                     } else {
@@ -3331,15 +3333,23 @@ jq -s '{
                     }
                 });
 
-                // Add click handlers to clusters (for struct attributes)
+                // Add click handlers to clusters (for struct attributes and datasources)
                 d3.select('#attribute-graph').selectAll('.cluster').on('click', function(event) {
                     event.stopPropagation();
                     const title = d3.select(this).select('title').text();
-                    // Cluster titles are "cluster_attrId", extract attrId
+                    // Cluster titles are "cluster_id", extract id
                     if (title && title.startsWith('cluster_')) {
-                        const attrId = title.substring(8);
-                        if (attributeLineageMap[attrId]) {
-                            selectAttribute(attrId);
+                        const id = title.substring(8);
+                        // If id contains __, it's an attribute struct; otherwise it's a datasource
+                        if (id.includes('__') && attributeLineageMap[id]) {
+                            selectAttribute(id);
+                        } else {
+                            // It's a datasource - find and show its info
+                            const dsName = id.replace(/_/g, '-').replace(/--/g, '_'); // rough reverse
+                            const ds = (currentConfig.datasources || []).find(d =>
+                                d.name.replace(/[^a-zA-Z0-9]/g, '_') === id
+                            );
+                            if (ds) showDatasourceInAttributePanel(ds);
                         }
                     }
                 });
@@ -3645,6 +3655,116 @@ jq -s '{
                     if (attrId) selectAttribute(attrId);
                 });
             });
+        }
+
+        function showDatasourceInAttributePanel(ds) {
+            selectedAttribute = null;
+
+            // Clear highlighting
+            d3.select('#attribute-graph').selectAll('.node')
+                .classed('node-highlighted', false)
+                .classed('node-connected', false)
+                .classed('node-dimmed', false);
+            d3.select('#attribute-graph').selectAll('.cluster')
+                .classed('cluster-highlighted', false)
+                .classed('cluster-connected', false)
+                .classed('cluster-dimmed', false);
+
+            // Highlight this datasource cluster
+            const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+            d3.select('#attribute-graph').selectAll('.cluster').each(function() {
+                const cluster = d3.select(this);
+                const title = cluster.select('title').text();
+                if (title === `cluster_${dsId}`) {
+                    cluster.classed('cluster-highlighted', true);
+                }
+            });
+
+            const col = document.getElementById('attribute-details-col');
+            const graphCol = document.getElementById('attribute-graph-col');
+            const content = document.getElementById('attribute-details-content');
+
+            graphCol.classList.remove('col-md-12');
+            graphCol.classList.add('col-md-8');
+            col.style.display = 'block';
+
+            setTimeout(() => {
+                if (attributeGraphviz) attributeGraphviz.fit(true);
+            }, 50);
+
+            let html = `<h5>${ds.name}</h5>`;
+            html += `<div class="detail-label">Type</div>`;
+            html += `<div class="detail-value"><span class="badge bg-secondary">Data Source</span></div>`;
+
+            if (ds.type) {
+                html += `<div class="detail-label">Source Type</div>`;
+                html += `<div class="detail-value"><span class="badge badge-${ds.type}">${ds.type.toUpperCase()}</span></div>`;
+            }
+
+            if (ds.description) {
+                html += `<div class="detail-label">Description</div>`;
+                html += `<div class="detail-value">${ds.description}</div>`;
+            }
+
+            if (ds.owner) {
+                html += `<div class="detail-label">Owner</div>`;
+                html += `<div class="detail-value">${ds.owner}</div>`;
+            }
+
+            if (ds.cluster) {
+                html += `<div class="detail-label">Cluster</div>`;
+                html += `<div class="detail-value"><span class="badge badge-cluster">${ds.cluster}</span></div>`;
+            }
+
+            if (ds.tags && ds.tags.length > 0) {
+                html += `<div class="detail-label">Tags</div>`;
+                html += `<div class="detail-value">${ds.tags.map(t =>
+                    `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404;">${t}</span>`
+                ).join('')}</div>`;
+            }
+
+            if (ds.attributes && ds.attributes.length > 0) {
+                let attrCount = 0;
+                function countAttrs(attrs) {
+                    attrs.forEach(attr => {
+                        attrCount++;
+                        if (attr.attributes) countAttrs(attr.attributes);
+                    });
+                }
+                countAttrs(ds.attributes);
+
+                html += `<div class="detail-label">Attributes (${attrCount})</div>`;
+                html += `<div class="detail-value">`;
+                function listAttrs(attrs, indent = 0) {
+                    attrs.forEach(attr => {
+                        const hasChildren = attr.attributes && attr.attributes.length > 0;
+                        html += `<div class="small" style="padding-left: ${indent * 12}px;">${hasChildren ? '▸ ' : ''}${attr.name}</div>`;
+                        if (attr.attributes) listAttrs(attr.attributes, indent + 1);
+                    });
+                }
+                listAttrs(ds.attributes);
+                html += `</div>`;
+            }
+
+            if (ds.metadata && Object.keys(ds.metadata).length) {
+                html += `<div class="detail-label">Metadata</div>`;
+                html += `<div class="detail-value">`;
+                Object.entries(ds.metadata).forEach(([key, value]) => {
+                    html += `<div class="small"><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</div>`;
+                });
+                html += `</div>`;
+            }
+
+            if (ds.links && Object.keys(ds.links).length) {
+                html += `<div class="links-section">`;
+                html += `<div class="detail-label">Links</div>`;
+                Object.entries(ds.links).forEach(([name, url]) => {
+                    html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`;
+                });
+                html += `</div>`;
+            }
+
+            content.innerHTML = html;
         }
 
         function clearAttributeSelection() {
