@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeviz</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
+    <script src="https://unpkg.com/d3-graphviz@5.0.2/build/d3-graphviz.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #fff;
+            --bg-secondary: #f5f5f5;
+            --bg-code: #f5f5f5;
+            --text-primary: #000;
+            --text-secondary: #666;
+            --text-muted: #828282;
+            --border-color: #ccc;
+            --border-light: #eee;
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252525;
+            --bg-code: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #888;
+            --border-color: #444;
+            --border-light: #333;
+        }
+        html {
+            overflow-y: scroll;
+        }
+        body {
+            background-color: var(--bg-primary);
+            min-height: 100vh;
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        .hero-section {
+            background: var(--bg-primary);
+            margin: 1rem auto;
+            padding: 1.5rem 4rem;
+            max-width: 1600px;
+        }
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 1.5rem 1.5rem;
+            }
+        }
+        .nav-tabs {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--text-muted);
+            font-weight: 400;
+            padding: 6px 12px;
+            margin-right: 2px;
+            background: transparent;
+            border-radius: 0;
+            font-size: 12px;
+        }
+        .nav-tabs .nav-link:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-secondary);
+        }
+        .nav-tabs .nav-link.active {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--text-primary);
+        }
+        .nav-tabs.hidden-on-home {
+            display: none;
+        }
+        .card {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table {
+            background: var(--bg-primary);
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+        .table th {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            color: var(--text-primary);
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .table td {
+            border-bottom: 1px solid var(--border-light);
+            vertical-align: top;
+            color: var(--text-primary);
+        }
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+        .table .col-name {
+            min-width: 140px;
+            white-space: nowrap;
+        }
+        .table .col-desc {
+            min-width: 200px;
+            max-width: 400px;
+        }
+        .table .col-schedule {
+            min-width: 100px;
+            white-space: nowrap;
+        }
+        .table .col-sources {
+            min-width: 140px;
+            max-width: 300px;
+        }
+        .table .col-cluster {
+            min-width: 80px;
+        }
+        .table .col-tags {
+            min-width: 120px;
+            max-width: 280px;
+        }
+        .table .col-links {
+            min-width: 100px;
+        }
+        .table .col-owner {
+            min-width: 140px;
+            max-width: 250px;
+        }
+        .table .col-metadata {
+            min-width: 160px;
+            max-width: 320px;
+        }
+        .badge {
+            font-weight: normal;
+            font-size: 11px;
+            padding: 2px 5px;
+            border-radius: 2px;
+            display: inline-block;
+            margin-bottom: 2px;
+        }
+        .badge-snowflake { background-color: #e8f4fd; color: #0366d6; border: 1px solid #0366d6; }
+        .badge-delta { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; }
+        .badge-s3 { background-color: #fff8e1; color: #f57c00; border: 1px solid #f57c00; }
+        .badge-api { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
+        .badge-database { background-color: #f3e5f5; color: #7b1fa2; border: 1px solid #7b1fa2; }
+        .badge-tag { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; }
+        .badge-cluster { background-color: #e3f2fd; color: #1565c0; border: 1px solid #1565c0; }
+        .graph-container {
+            background: var(--bg-primary);
+            min-height: 500px;
+            position: relative;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .graph-container svg {
+            max-width: 100%;
+        }
+        .graph-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        #graph svg {
+            width: 100%;
+            height: 500px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: var(--bg-primary);
+            padding: 8px 12px;
+            font-size: 11px;
+            max-width: 160px;
+            opacity: 0.9;
+            color: var(--text-primary);
+        }
+        .json-editor {
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .json-editor:focus {
+            border-color: var(--text-muted);
+            box-shadow: none;
+            outline: none;
+        }
+        .node-highlighted {
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(230, 81, 0, 0.4));
+        }
+        .node-highlighted polygon,
+        .node-highlighted ellipse,
+        .node-highlighted path {
+            fill: #fff3e0 !important;
+        }
+        .node-highlighted text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .node-connected {
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .node-connected text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .node-dimmed {
+            opacity: 0.3 !important;
+        }
+        .edge-highlighted {
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .edge-dimmed {
+            opacity: 0.2 !important;
+        }
+        .cluster-highlighted > polygon,
+        .cluster-highlighted > path {
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(230, 81, 0, 0.4));
+            fill: #fff3e0 !important;
+        }
+        .cluster-connected > polygon,
+        .cluster-connected > path {
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .cluster-dimmed {
+            opacity: 0.3 !important;
+        }
+        .node-tooltip {
+            position: absolute;
+            background: #000;
+            color: #fff;
+            padding: 6px 8px;
+            font-size: 11px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 280px;
+            white-space: pre-line;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .node:hover {
+            stroke-width: 2px !important;
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
+        }
+        .node:hover text {
+            font-weight: normal !important;
+            fill: #000 !important;
+            stroke: none !important;
+            stroke-width: 0 !important;
+        }
+        .node-details-panel {
+            background: var(--bg-primary);
+            padding: 1rem;
+            min-height: 500px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .node-details-panel h5 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .node-details-panel .detail-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        .node-details-panel .detail-value {
+            margin-bottom: 1rem;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .lineage-link {
+            margin-bottom: 4px;
+            cursor: pointer;
+            color: #0366d6;
+        }
+        .lineage-link:hover {
+            text-decoration: underline;
+        }
+        [data-theme="dark"] .lineage-link {
+            color: #58a6ff;
+        }
+        .node-details-panel .detail-value:last-child {
+            margin-bottom: 0;
+        }
+        .node-details-panel .links-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+        .node-details-panel .link-btn {
+            display: inline-block;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+        }
+        .node-details-panel .link-btn:hover {
+            background-color: var(--text-secondary);
+            border-color: var(--text-secondary);
+            color: var(--bg-primary);
+        }
+        [data-theme="dark"] .node-details-panel .link-btn {
+            border-color: #666;
+            color: #ccc;
+            background: #333;
+        }
+        [data-theme="dark"] .node-details-panel .link-btn:hover {
+            background-color: #888;
+            border-color: #888;
+            color: #fff;
+        }
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        .search-results-dropdown.show {
+            display: block;
+        }
+        .search-result-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-item:hover {
+            background-color: var(--bg-secondary);
+        }
+        .search-result-item .result-type {
+            font-size: 9px;
+            padding: 2px 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .search-result-item .result-type.pipeline {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #1565c0;
+        }
+        .search-result-item .result-type.datasource {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #7b1fa2;
+        }
+        .search-result-item .result-name {
+            font-weight: 400;
+        }
+        .search-result-item .result-match {
+            color: #d84315;
+            font-weight: 600;
+        }
+        .btn {
+            border-radius: 0;
+            font-size: 12px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn-primary {
+            background-color: #333;
+            border-color: #333;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background-color: #000;
+            border-color: #000;
+            color: #fff;
+        }
+        .btn-outline-primary {
+            color: #333;
+            border-color: #333;
+        }
+        .btn-outline-primary:hover {
+            background-color: #333;
+            border-color: #333;
+            color: #fff;
+        }
+        .btn-outline-secondary {
+            color: #666;
+            border-color: #999;
+        }
+        .btn-outline-secondary:hover {
+            background-color: #666;
+            border-color: #666;
+            color: #fff;
+        }
+        .btn-outline-warning {
+            color: #b45309;
+            border-color: #b45309;
+        }
+        .btn-outline-warning:hover {
+            background-color: #b45309;
+            border-color: #b45309;
+            color: #fff;
+        }
+        .btn-outline-info {
+            color: #0369a1;
+            border-color: #0369a1;
+        }
+        .btn-outline-info:hover {
+            background-color: #0369a1;
+            border-color: #0369a1;
+            color: #fff;
+        }
+        .hero-title {
+            color: var(--text-primary);
+            font-weight: bold;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+        .header-controls {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        @media (max-width: 480px) {
+            .header-controls {
+                position: static;
+                justify-content: center;
+                margin-bottom: 0.5rem;
+            }
+        }
+        .link-icon {
+            text-decoration: none;
+            padding: 4px 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin: 2px;
+            display: inline-block;
+        }
+        .link-icon:hover {
+            background: #555;
+            border-color: #555;
+            color: #fff;
+        }
+        [data-theme="dark"] .link-icon {
+            background: #333;
+            border-color: #555;
+            color: #ccc;
+        }
+        [data-theme="dark"] .link-icon:hover {
+            background: #666;
+            border-color: #666;
+            color: #fff;
+        }
+        .form-control, .form-select {
+            border-radius: 0;
+            border: 1px solid var(--border-color);
+            font-size: 13px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--text-muted);
+            box-shadow: none;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+        .alert {
+            border-radius: 0;
+            font-size: 13px;
+        }
+        .alert-info {
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            color: #333;
+        }
+        .alert-success {
+            background-color: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .alert-danger {
+            background-color: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        .alert-warning {
+            background-color: #fff8e1;
+            border: 1px solid #ff9800;
+            color: #e65100;
+        }
+        .text-muted {
+            color: var(--text-secondary) !important;
+        }
+        .lead {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 4px 8px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 0;
+        }
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+        }
+        .drop-zone {
+            position: relative;
+            border: 1px dashed #999;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .drop-zone:hover {
+            border-color: #333;
+            background-color: #fafafa;
+        }
+        .drop-zone.dragover {
+            border-color: #333;
+            background-color: #f0f0f0;
+            border-style: solid;
+        }
+        .modal-content {
+            border-radius: 0;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .modal-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+        }
+        .modal-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .modal-body {
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        .modal-body pre {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            padding: 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 0;
+        }
+        .modal-body code {
+            color: #d63384;
+            background: var(--bg-code);
+            padding: 1px 4px;
+            font-size: 11px;
+        }
+        .modal-footer {
+            border-top: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+        }
+        code {
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .filter-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            font-size: 11px;
+            cursor: pointer;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .filter-tag:hover {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+        .filter-tag.active {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg-primary);
+        }
+        .filter-group {
+            display: inline-block;
+            margin-right: 1rem;
+        }
+        .filter-group-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+        /* Dark mode graph text fix */
+        [data-theme="dark"] #graph text,
+        [data-theme="dark"] #splash-graph text,
+        [data-theme="dark"] #attribute-graph text {
+            fill: #e0e0e0 !important;
+        }
+        [data-theme="dark"] #graph .node text,
+        [data-theme="dark"] #splash-graph .node text,
+        [data-theme="dark"] #attribute-graph .node text {
+            fill: #000 !important;
+        }
+        [data-theme="dark"] #graph .graph > polygon,
+        [data-theme="dark"] #splash-graph .graph > polygon,
+        [data-theme="dark"] #attribute-graph .graph > polygon {
+            fill: transparent !important;
+        }
+        [data-theme="dark"] #graph .cluster > polygon,
+        [data-theme="dark"] #graph .cluster > path,
+        [data-theme="dark"] #attribute-graph .cluster > polygon,
+        [data-theme="dark"] #attribute-graph .cluster > path {
+            fill: #2a2a2a !important;
+            stroke: #555 !important;
+        }
+        [data-theme="dark"] #graph .cluster text,
+        [data-theme="dark"] #attribute-graph .cluster text {
+            fill: #e0e0e0 !important;
+        }
+        /* Dark mode Bootstrap table overrides */
+        [data-theme="dark"] .table {
+            --bs-table-bg: var(--bg-primary);
+            --bs-table-striped-bg: var(--bg-secondary);
+            --bs-table-hover-bg: #333;
+            --bs-table-color: var(--text-primary);
+            --bs-table-striped-color: var(--text-primary);
+            --bs-table-hover-color: var(--text-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        [data-theme="dark"] .table > :not(caption) > * > * {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-bottom-color: var(--border-light);
+        }
+        [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: var(--bg-secondary);
+        }
+        [data-theme="dark"] .table th {
+            background-color: #252525 !important;
+            color: #e0e0e0 !important;
+        }
+        /* Dark mode for table link buttons */
+        [data-theme="dark"] .table .btn-outline-primary {
+            border-color: #666;
+            color: #aaa;
+        }
+        [data-theme="dark"] .table .btn-outline-primary:hover {
+            background-color: #555;
+            border-color: #555;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="hero-section">
+            <div class="mb-4 text-center position-relative">
+                <div class="header-controls">
+                    <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="color: var(--text-muted); font-size: 13px; text-decoration: none;" title="GitHub">github</a>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">☀️</button>
+                </div>
+                <h1 class="hero-title">🛰️ Pipeviz</h1>
+                <p class="lead">Easy, elegant lineage from a single <span style="color: #d63384;">.json</span></p>
+            </div>
+
+            <ul class="nav nav-tabs hidden-on-home" id="dashboardTabs">
+                <li class="nav-item">
+                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-pane">Home</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="spec-tab" data-bs-toggle="tab" data-bs-target="#spec-pane">Spec</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane">Config</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="graph-tab" data-bs-toggle="tab" data-bs-target="#graph-pane">Graph</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="attributes-tab" data-bs-toggle="tab" data-bs-target="#attributes-pane">Attributes</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="pipelines-tab" data-bs-toggle="tab" data-bs-target="#pipelines-pane">Pipelines</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="datasources-tab" data-bs-toggle="tab" data-bs-target="#datasources-pane">Datasources</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="dot-tab" data-bs-toggle="tab" data-bs-target="#dot-pane">Dot</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Home Tab -->
+                <div class="tab-pane fade show active" id="home-pane">
+                    <div style="max-width: 750px; margin: 0 auto; padding: 2rem 1rem;">
+
+                        <!-- Intro -->
+                        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
+                            An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
+                        </p>
+
+                        <!-- Demo -->
+                        <div style="display: flex; gap: 1.5rem; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem;">
+<pre style="padding: 1rem; font-size: 13px; margin: 0; color: var(--text-primary);">{
+  "pipelines": [{
+    "name": "etl-job",
+    "input_sources": ["raw_events"],
+    "output_sources": ["cleaned_events"]
+  }]
+}</pre>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); flex-shrink: 0;">
+                                <path d="M5 12h14M13 5l7 7-7 7"/>
+                            </svg>
+                            <div id="splash-graph" style="min-width: 240px; min-height: 120px; display: flex; align-items: center; justify-content: center;"></div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div style="display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 2.5rem;">
+                            <button class="btn btn-dark" onclick="loadExample(); document.getElementById('graph-tab').click();">
+                                Try the demo
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="document.getElementById('spec-tab').click();">
+                                Read the spec
+                            </button>
+                        </div>
+
+                        <!-- Feature tiles -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Stack Agnostic</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, shell scripts. Just JSON.</div>
+                            </div>
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Zero Dependencies</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No backend, no build step. Open locally or host anywhere.</div>
+                            </div>
+                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                                    <circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Federated</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team owns their JSON. Merge with jq for the org-wide view.</div>
+                            </div>
+                        </div>
+
+                        <!-- How it works -->
+                        <div style="margin-bottom: 2.5rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">How it works</div>
+                            <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">1</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Define</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                                </div>
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">2</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Load</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Drop your file here, or host both files together on any static server</div>
+                                </div>
+                                <div style="flex: 1; min-width: 140px; text-align: center;">
+                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">3</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Explore</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Click through the graph, trace dependencies, export DOT for other tools</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Federated lineage -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Federated lineage</div>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0;">
+                                Each team versions their own <code>pipeviz.json</code> alongside their code. Generate it at compile time from your build, tests, or annotations. When you need the org-wide view, merge with <a href="https://jqlang.github.io/jq/" target="_blank" style="color: var(--text-secondary);">jq</a> (probably already on your machine) or any JSON tool:
+                            </p>
+<pre style="background: var(--bg-code); padding: 0.75rem; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># merge all team configs into one</span>
+jq -s '{
+  pipelines: map(.pipelines // []) | add,
+  datasources: map(.datasources // []) | add
+}' team-*.json > pipeviz.json</pre>
+                        </div>
+
+                        <!-- Motivation -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Motivation</div>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
+                                <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a>, <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a>, and <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> instrument your runtime, buffer events into a central orchestrator, and extract whatever graph their agents can infer. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> takes a different approach but still asks you to rewrite pipelines in their SQL dialect and structure your project around their manifest.
+                            </p>
+                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0.75rem 0 0 0;">
+                                Pipeviz is just a JSON file and one HTML page. Nothing to install, nothing running in your cluster.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Configuration Tab -->
+                <div class="tab-pane fade" id="config-pane">
+                    <div style="max-width: 900px; padding: 1rem 0;">
+                        <div class="drop-zone" id="drop-zone">
+                            <textarea class="form-control json-editor" id="json-input" rows="22"
+                                      placeholder="Paste JSON here or drag & drop a file"></textarea>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.75rem;">
+                            <input type="file" id="file-input" accept=".json" style="display: none;" onchange="loadFromFile(event)">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('file-input').click()">Browse</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadExample()">Load Example</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="generateShareableUrl()">Share URL</button>
+                            <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">Auto-load: <code style="font-size: 11px;">?url=your-json-url</code></span>
+                        </div>
+                        <div id="json-status" style="margin-top: 0.5rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Pipelines Tab -->
+                <div class="tab-pane fade" id="pipelines-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="pipeline-search"
+                                       placeholder="Search pipelines..." onkeyup="filterPipelines()" style="max-width: 300px;">
+                            </div>
+                            <div class="mb-3" id="pipeline-filters"></div>
+                            <div id="pipelines-table-container">
+                                <p class="text-muted text-center">Load a configuration to see your pipelines</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Sources Tab -->
+                <div class="tab-pane fade" id="datasources-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="datasource-search"
+                                       placeholder="Search data sources..." onkeyup="filterDatasources()" style="max-width: 300px;">
+                            </div>
+                            <div class="mb-3" id="datasource-filters"></div>
+                            <div id="datasources-table-container">
+                                <p class="text-muted text-center">Load a configuration to see your data sources</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Tab -->
+                <div class="tab-pane fade" id="graph-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="graph-search"
+                                               placeholder="Search nodes..." onkeyup="searchNodes(event)">
+                                        <div id="graph-search-results" class="search-results-dropdown"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div id="graph-col" class="col-md-12">
+                                    <div class="graph-container position-relative">
+                                        <div class="graph-controls">
+                                            <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-secondary" onclick="collapseAllGroups()">
+                                                    Collapse All
+                                                </button>
+                                            </div>
+                                            <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-warning" onclick="clearSelection()">
+                                                    Clear Selection
+                                                </button>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">Reset</button>
+                                        </div>
+                                        <div id="graph">
+                                            <div class="graph-loading text-center py-5 text-muted">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                                Loading graph...
+                                            </div>
+                                        </div>
+                                        <div class="legend">
+                                            <div><strong>Legend:</strong></div>
+                                            <div>■ = Pipeline</div>
+                                            <div style="color: #ef6c00;">■ = Group</div>
+                                            <div>● = Data Source</div>
+                                            <div>□ = Cluster</div>
+                                            <div>→ = Data flow</div>
+                                            <div style="color: #ff6b35;">→ = Dependency</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" id="node-details-col" style="display: none;">
+                                    <div class="node-details-panel" id="node-details-panel">
+                                        <div id="node-details-content"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attributes Tab -->
+                <div class="tab-pane fade" id="attributes-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control" id="attribute-search"
+                                               placeholder="Search attributes..." onkeyup="searchAttributes(event)">
+                                        <div id="attribute-search-results" class="search-results-dropdown"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div id="attribute-graph-col" class="col-md-12">
+                                    <div class="graph-container position-relative">
+                                        <div class="graph-controls">
+                                            <div class="btn-group me-2">
+                                                <button class="btn btn-sm btn-outline-warning" onclick="clearAttributeSelection()">
+                                                    Clear Selection
+                                                </button>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="resetAttributeGraph()">Reset</button>
+                                        </div>
+                                        <div id="attribute-graph">
+                                            <div class="graph-loading text-center py-5 text-muted">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                                Loading graph...
+                                            </div>
+                                        </div>
+                                        <div class="legend">
+                                            <div><strong>Legend:</strong></div>
+                                            <div>▢ = Data Source</div>
+                                            <div>· = Attribute</div>
+                                            <div>→ = Derived from</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" id="attribute-details-col" style="display: none;">
+                                    <div class="node-details-panel" id="attribute-details-panel">
+                                        <div id="attribute-details-content"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Raw DOT Tab -->
+                <div class="tab-pane fade" id="dot-pane">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">Generated Graphviz DOT</h5>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-info me-2" onclick="updateDotView()">Refresh</button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="copyDotToClipboard(event)">Copy to Clipboard</button>
+                                </div>
+                            </div>
+                            <textarea class="form-control json-editor" id="dot-output" rows="25" readonly
+                                      placeholder="Load a configuration to see the generated DOT code..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spec Tab -->
+                <div class="tab-pane fade" id="spec-pane">
+                    <div style="max-width: 800px; padding: 1rem 0;">
+                        <style>
+                            .spec-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 0.75rem 0 1rem 0; }
+                            .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
+                            .spec-table th { background: var(--bg-secondary); }
+                            .spec-section { margin-bottom: 2rem; }
+                            .spec-section h6 { font-weight: 600; margin-bottom: 0.5rem; }
+                            .spec-pre { background: var(--bg-code); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; color: var(--text-primary); margin: 0; }
+                        </style>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <h5 style="font-weight: 600; margin-bottom: 0.25rem;">Pipeviz JSON Spec</h5>
+                            <p style="color: var(--text-secondary); font-size: 13px;">Only <code>pipelines</code> is required. Clusters and datasources are auto-created when referenced.</p>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Root</h6>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>pipelines</code></td><td>array</td><td>Yes</td><td>Jobs that transform or move data</td></tr>
+                                <tr><td><code>datasources</code></td><td>array</td><td>No</td><td>Tables, files, streams, APIs</td></tr>
+                                <tr><td><code>clusters</code></td><td>array</td><td>No</td><td>Groups for visual organization</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "clusters": [...],
+  "pipelines": [...],
+  "datasources": [...]
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Pipeline</h6>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>input_sources</code></td><td>array</td><td>No</td><td>Datasources read from</td></tr>
+                                <tr><td><code>output_sources</code></td><td>array</td><td>No</td><td>Datasources written to</td></tr>
+                                <tr><td><code>upstream_pipelines</code></td><td>array</td><td>No</td><td>Pipeline dependencies</td></tr>
+                                <tr><td><code>cluster</code></td><td>string</td><td>No</td><td>Cluster name</td></tr>
+                                <tr><td><code>group</code></td><td>string</td><td>No</td><td>Collapse into group node</td></tr>
+                                <tr><td><code>schedule</code></td><td>string</td><td>No</td><td>Free text</td></tr>
+                                <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                                <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "name": "user-enrichment",
+  "description": "Enriches user data with events",
+  "input_sources": ["raw_users", "events"],
+  "output_sources": ["enriched_users"],
+  "upstream_pipelines": ["data-ingestion"],
+  "cluster": "user-processing",
+  "group": "etl-jobs",
+  "schedule": "Every 2 hours",
+  "tags": ["user-data", "ml"],
+  "links": {
+    "airflow": "https://...",
+    "docs": "https://..."
+  }
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Datasource</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Auto-created when referenced. Define explicitly to add metadata.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>type</code></td><td>string</td><td>No</td><td>snowflake, postgres, kafka, s3...</td></tr>
+                                <tr><td><code>owner</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>cluster</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                                <tr><td><code>metadata</code></td><td>object</td><td>No</td><td>Arbitrary key-value</td></tr>
+                                <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                                <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Column-level lineage</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "name": "raw_users",
+  "description": "Raw user data from prod",
+  "type": "snowflake",
+  "owner": "data-team@company.com",
+  "cluster": "user-processing",
+  "tags": ["pii", "users"],
+  "metadata": {
+    "size": "2.1TB",
+    "record_count": "45M"
+  },
+  "links": {
+    "snowflake": "https://...",
+    "docs": "https://..."
+  }
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Cluster</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Auto-created when referenced. Define explicitly for nesting.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                                <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                                <tr><td><code>parent</code></td><td>string</td><td>No</td><td>Parent cluster for nesting</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "name": "realtime",
+  "description": "Real-time processing cluster",
+  "parent": "order-processing"
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Attribute Lineage</h6>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem;">Add <code>attributes</code> to a datasource. Supports nesting for structs/objects. Reference upstream with <code>source::attr</code> or <code>source::parent::child</code>.</p>
+                            <table class="spec-table">
+                                <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Column/field name</td></tr>
+                                <tr><td><code>from</code></td><td>string or array</td><td>No</td><td>Upstream refs</td></tr>
+                                <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Nested child attributes</td></tr>
+                            </table>
+<pre class="spec-pre">{
+  "name": "enriched_users",
+  "attributes": [
+    { "name": "user_id", "from": "raw_users::id" },
+    {
+      "name": "location",
+      "from": "raw_users::address",
+      "attributes": [
+        { "name": "city", "from": "raw_users::address::city" },
+        { "name": "zip", "from": "raw_users::address::zip" }
+      ]
+    }
+  ]
+}</pre>
+                        </div>
+
+                        <div class="spec-section">
+                            <h6>Full Example</h6>
+<pre class="spec-pre">{
+  "clusters": [
+    { "name": "etl", "description": "ETL pipelines" }
+  ],
+  "pipelines": [
+    {
+      "name": "user-enrichment",
+      "description": "Enriches user data with events",
+      "input_sources": ["raw_users", "events"],
+      "output_sources": ["enriched_users"],
+      "cluster": "etl",
+      "schedule": "Every 2 hours",
+      "tags": ["user-data"],
+      "links": { "airflow": "https://..." }
+    }
+  ],
+  "datasources": [
+    {
+      "name": "raw_users",
+      "type": "snowflake",
+      "owner": "data-team@company.com",
+      "attributes": [
+        { "name": "id" },
+        { "name": "first" },
+        { "name": "last" }
+      ]
+    },
+    {
+      "name": "enriched_users",
+      "type": "snowflake",
+      "attributes": [
+        { "name": "user_id", "from": "raw_users::id" },
+        { "name": "full_name", "from": ["raw_users::first", "raw_users::last"] }
+      ]
+    }
+  ]
+}</pre>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spec Modal -->
+    <div class="modal fade" id="specModal" tabindex="-1" aria-labelledby="specModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="specModalLabel">json spec</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6>Overview</h6>
+                        <p class="text-muted">Pipeviz uses a simple JSON configuration to define your data lineage. Only pipelines are required. Clusters and datasources are auto-created when referenced, but you can add rich descriptors for better documentation.</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Root Structure</h6>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "clusters": [ ... ],     // Optional: cluster definitions
+  "pipelines": [ ... ],    // Required: pipeline definitions
+  "datasources": [ ... ]   // Optional: rich data source definitions
+}</code></pre>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Clusters (Optional)</h6>
+                        <p class="text-muted small">Clusters can be optionally declared upfront or referenced on-the-fly. Support nested hierarchies with parent relationships.</p>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "name": "real-time",
+  "description": "Real-time processing cluster",  // Optional
+  "parent": "order-management"                    // Optional: creates nested cluster
+}</code></pre>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Pipelines</h6>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "name": "user-enrichment",
+  "description": "Enriches user data...",       // Optional
+  "input_sources": ["raw_users", "events"],     // Optional
+  "output_sources": ["enriched_users"],         // Optional
+  "schedule": "Every 2 hours",                  // Optional
+  "tags": ["user-data", "ml"],                  // Optional
+  "cluster": "user-processing",                 // Optional: single cluster
+  "upstream_pipelines": ["data-ingestion"],     // Optional
+  "links": {                                    // Optional
+    "airflow": "https://...",
+    "monitoring": "https://..."
+  }
+}</code></pre>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Data Sources (Optional)</h6>
+                        <p class="text-muted small">Data sources are auto-created when referenced in pipelines. Define them explicitly to add rich metadata, ownership, and documentation.</p>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "name": "raw_users",
+  "description": "Raw user data...",            // Optional
+  "type": "snowflake",                          // Optional
+  "owner": "data-team@company.com",             // Optional
+  "tags": ["pii", "users"],                     // Optional
+  "cluster": "user-processing",                 // Optional: single cluster
+  "metadata": {                                 // Optional
+    "size": "2.1TB",
+    "record_count": "45M"
+  },
+  "links": {                                    // Optional
+    "snowflake": "https://...",
+    "docs": "https://..."
+  }
+}</code></pre>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>Tips:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Only <code>pipelines</code> array with pipeline <code>name</code> fields is required</li>
+                            <li>Clusters and datasources are auto-created when referenced in pipelines</li>
+                            <li>Define datasources explicitly to add rich metadata, ownership, and links</li>
+                            <li>Use <code>cluster</code> (singular) to assign nodes to one cluster each</li>
+                            <li>Create nested clusters using the <code>parent</code> field in cluster definitions</li>
+                            <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
+                            <li>Links can point to any external tools (Airflow, monitoring, docs, etc.)</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
