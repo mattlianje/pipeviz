@@ -377,7 +377,8 @@
         .search-result-item:last-child {
             border-bottom: none;
         }
-        .search-result-item:hover {
+        .search-result-item:hover,
+        .search-result-item.selected {
             background-color: var(--bg-secondary);
         }
         .search-result-item .result-type {
@@ -463,6 +464,14 @@
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
             letter-spacing: -0.5px;
+        }
+        .feature-tile {
+            padding: 1.25rem;
+            background: var(--bg-secondary);
+        }
+        .feature-icon {
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
         }
         .header-controls {
             position: absolute;
@@ -784,27 +793,36 @@
                         </div>
 
                         <!-- Feature tiles -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
-                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                            <div class="feature-tile">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
                                 </svg>
                                 <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Stack Agnostic</div>
                                 <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, shell scripts. Just JSON.</div>
                             </div>
-                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                            <div class="feature-tile">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                                 </svg>
                                 <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Zero Dependencies</div>
                                 <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No backend, no build step. Open locally or host anywhere.</div>
                             </div>
-                            <div style="padding: 1.25rem; border: 1px solid var(--border-color); background: var(--bg-secondary);">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.75rem;">
+                            <div class="feature-tile">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
                                 </svg>
                                 <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Federated</div>
                                 <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team owns their JSON. Merge with jq for the org-wide view.</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: center; margin-bottom: 2.5rem;">
+                            <div class="feature-tile" style="width: calc(33.333% - 0.333rem);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                                    <path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/>
+                                </svg>
+                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Column-Level Lineage</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Track field-level provenance. See exactly where each attribute comes from.</div>
                             </div>
                         </div>
 
@@ -847,10 +865,10 @@ jq -s '{
                         <div style="margin-bottom: 2rem;">
                             <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Motivation</div>
                             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
-                                <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a>, <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a>, and <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> instrument your runtime, buffer events into a central orchestrator, and extract whatever graph their agents can infer. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> takes a different approach but still asks you to rewrite pipelines in their SQL dialect and structure your project around their manifest.
+                                Lineage tools ask for a lot. <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a> and <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a> need agents in your cluster, a metadata store, and careful integration with every scheduler. <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> wants a full governance platform. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> gives you lineage, but couples you to their manifest and framework.
                             </p>
                             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0.75rem 0 0 0;">
-                                Pipeviz is just a JSON file and one HTML page. Nothing to install, nothing running in your cluster.
+                                Pipeviz asks for one JSON file.
                             </p>
                         </div>
 
@@ -915,7 +933,7 @@ jq -s '{
                                 <div class="col-md-4">
                                     <div class="position-relative">
                                         <input type="text" class="form-control" id="graph-search"
-                                               placeholder="Search nodes..." onkeyup="searchNodes(event)">
+                                               placeholder="Search nodes..." onkeydown="searchNodes(event)">
                                         <div id="graph-search-results" class="search-results-dropdown"></div>
                                     </div>
                                 </div>
@@ -971,7 +989,7 @@ jq -s '{
                                 <div class="col-md-4">
                                     <div class="position-relative">
                                         <input type="text" class="form-control" id="attribute-search"
-                                               placeholder="Search attributes..." onkeyup="searchAttributes(event)">
+                                               placeholder="Search attributes..." onkeydown="searchAttributes(event)">
                                         <div id="attribute-search-results" class="search-results-dropdown"></div>
                                     </div>
                                 </div>

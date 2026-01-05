@@ -838,8 +838,46 @@ export function highlightMatch(text, query) {
 }
 
 export function searchNodes(event) {
-    const query = event.target.value.trim();
     const dropdown = document.getElementById('graph-search-results');
+    const items = dropdown.querySelectorAll('.search-result-item[data-name]');
+
+    // Handle arrow key navigation
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (items.length === 0) return;
+
+        const current = dropdown.querySelector('.search-result-item.selected');
+        let index = current ? Array.from(items).indexOf(current) : -1;
+
+        if (event.key === 'ArrowDown') {
+            index = index < items.length - 1 ? index + 1 : 0;
+        } else {
+            index = index > 0 ? index - 1 : items.length - 1;
+        }
+
+        items.forEach(item => item.classList.remove('selected'));
+        items[index].classList.add('selected');
+        items[index].scrollIntoView({ block: 'nearest' });
+        return;
+    }
+
+    // Handle Enter key
+    if (event.key === 'Enter') {
+        const selected = dropdown.querySelector('.search-result-item.selected');
+        if (selected && selected.dataset.name) {
+            selectSearchResult(selected.dataset.name);
+        }
+        return;
+    }
+
+    // Handle Escape key
+    if (event.key === 'Escape') {
+        dropdown.classList.remove('show');
+        dropdown.innerHTML = '';
+        return;
+    }
+
+    const query = event.target.value.trim();
 
     if (!query || query.length < 1 || !state.currentConfig) {
         dropdown.classList.remove('show');
@@ -906,8 +944,8 @@ export function searchNodes(event) {
         return;
     }
 
-    dropdown.innerHTML = topResults.map(r => `
-        <div class="search-result-item" onclick="selectSearchResult('${r.name}')">
+    dropdown.innerHTML = topResults.map((r, i) => `
+        <div class="search-result-item${i === 0 ? ' selected' : ''}" data-name="${r.name}" onclick="selectSearchResult('${r.name}')">
             <span class="result-type ${r.type}">${r.type === 'pipeline' ? 'Pipeline' : 'Source'}</span>
             <span class="result-name">${highlightMatch(r.name, query)}</span>
         </div>
