@@ -1,0 +1,27 @@
+{
+  "name": "pipeviz",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Easy, elegant lineage from a single JSON",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattlianje/pipeviz.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mattlianje/pipeviz/issues"
+  },
+  "homepage": "https://github.com/mattlianje/pipeviz#readme",
+  "devDependencies": {
+    "vite": "^7.3.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}
