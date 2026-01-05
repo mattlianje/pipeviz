@@ -5,7 +5,7 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a minimal, declarative [JSON spec](spec.md) for describing your data systems.
+Pipeviz is a minimal, declarative JSON spec for describing your data systems (see the Spec tab in the [live demo](https://mattlianje.github.io/pipeviz/pipeviz.html)).
 
 Give it a `.json` and you instantly get:
 - A dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
