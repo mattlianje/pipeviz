@@ -5,26 +5,15 @@
 # Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
-Pipeviz is a minimal, declarative JSON spec for describing your data systems (see the Spec tab in the [live demo](https://mattlianje.github.io/pipeviz/pipeviz.html)).
+A JSON spec for lineage. Declare your pipelines, get a graph.
 
-Give it a `.json` and you instantly get:
-- A dependency graph ([DOT](https://graphviz.org/doc/info/lang.html))
-- A full microfrontend UI
-- A clear, unified map of your data system
-- Attribute-level lineage
-
-
-## Features
-- Declarative, data-as-code lineage
-- One file UI (`pipeviz.html`) - no installs, no backend
-- Framework-agnostic - not tied to Airflow, dbt, Spark, or vendor tools
-- Works across SQL, Delta, Kafka, S3, APIs… **_any_** stack, any language (just JSON)
-- Merge `.json` files from multiple teams for the big picture
-- No runtime hooks, agents, or daemons
-- Separate visualization for column-level lineage
+- One HTML file, no backend, no build step
+- Works with any stack: SQL, Spark, Kafka, S3, APIs, shell scripts
+- Each team owns their JSON, merge with `jq` for the org-wide view
+- Column-level lineage built in
 
 ## Quickstart
-Try it live 👉 [HERE](https://mattlianje.github.io/pipeviz/pipeviz.html)
+[Live demo](https://mattlianje.github.io/pipeviz/pipeviz.html)
 
 This pipeviz:
 ```json
@@ -115,21 +104,11 @@ jq -s '{
 ```
 
 ## Motivation
-Lineage and dataflow-visualization in most modern data stacks are an afterthought - bolted on awkwardly.
+Large polyglot codebases are hard to map. DAGs in Scala, SQL, Python, shell scripts. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. The central problem: engineers know their pipelines but have no format to declare them.
 
-[OpenLineage](https://openlineage.io/), [Marquez](https://marquezproject.ai/), and [Atlas](https://atlas.apache.org/#/) generally assume you'll instrument the runtime behaviour of your OS processes, buffer everything into the sockets of a central orchestrator, and accept whatever graph their agents extract.
+Lineage tools ask for a lot. [OpenLineage](https://openlineage.io/) and [Marquez](https://marquezproject.ai/) need agents in your cluster, a metadata store, and careful integration with every scheduler. [Atlas](https://atlas.apache.org/#/) wants a full governance platform. [dbt](https://www.getdbt.com/) gives you lineage, but couples you to their manifest and framework.
 
-[dbt](https://www.getdbt.com/) takes a different (and powerful) approach - but still asks you to bend the knee to a framework.
-You rewrite your pipelines in **their SQL dialect**, commit to **their manifest format**, and structure your project to fit (and be at the mercy) of **their** expectations.
-
-That might work in theory - but not (easily) in large, polyglot OLAP codebases where:
-- DAGs live in Scala, SQL, Python, shell scripts
-- Data moves between different databases, warehouses, messages brokers, RPC services and API's
-- Teams own pipelines independently, with no shared runtime
-
-Pipeviz is a simple reorientation. It says: **_"You already know your pipelines and tables. Just declare them"_**
-
-Each team owns a `pipeviz.json` that they generate how best they see fit (preferably at compile time) ... you merge them, you get the map.
+Pipeviz asks for one JSON file.
 
 ## Inspiration
 - [Data-Oriented Programming](https://www.manning.com/books/data-oriented-programming) by Yehonathan Sharvit
