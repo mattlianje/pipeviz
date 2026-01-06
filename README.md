@@ -34,7 +34,7 @@ Renders this:
 </p>
 
 ## Using & Hosting
-Pipeviz is just a single static HTML file (`pipeviz.html`) plus your `.json`.
+Pipeviz is just a single static HTML file (`pipeviz.html`) that gives you an interactive map with complete lineage of your data system you describe in a `.json`.
 
 There's no backend, no build step, no install, open the file in your browser or serve it from anywhere you can host static content.
 
