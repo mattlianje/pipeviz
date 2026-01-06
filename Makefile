@@ -1,4 +1,4 @@
-.PHONY: dev build clean install
+.PHONY: dev build clean install publish
 
 NVM_DIR := $(HOME)/.nvm
 SHELL := /bin/bash
@@ -23,3 +23,6 @@ install:
 
 clean:
 	rm -rf dist node_modules
+
+publish: build
+	rsync -avz --delete dist/ root@nargothrond.xyz:/var/www/pipeviz.org/
