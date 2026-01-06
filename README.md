@@ -14,14 +14,14 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 
 ## Why
 When a data org doesn't have a trusted dependency graph:
-- **Impact analysis is hard.** What depends on this job? Where is bad data coming from?
-- **Onboarding is slow.** New hires can't see the big picture.
-- **Operational work is error-prone.** What to backfill? What to re-run? Backiflls get quite Byzantine.
+- Impact analysis is hard. You can't trace where bad data came from or what downstream jobs will break.
+- Onboarding is slow. New hires have no way to see the big picture.
+- Backfills get Byzantine. No clear order of operations when things need to be re-run.
 
 Current tools have gaps:
-- **Runtime instrumentation** (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
-- **Frameworks** (dbt) couple you to their dialect, manifest, and world view.
-- **Manual docs** (Confluence diagrams) rot immediately.
+- Runtime instrumentation (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
+- Frameworks (dbt) couple you to their dialect, manifest, and world view.
+- Manual docs (Confluence diagrams) rot immediately.
 
 With Pipeviz, declare your immediate dependencies at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage. Since it is plain JSON, you can throw it into any LLM and get results.
 
@@ -46,6 +46,12 @@ Renders this:
   <img src="pix/pipeviz-example-2.png" width="600">
 </p>
 
+Attribute-level lineage (from the full demo):
+
+<p align="center">
+  <img src="pix/pipeviz-attributes.png" width="600">
+</p>
+
 ## Using
 Go to [pipeviz.org](https://pipeviz.org) and paste your JSON, or drag-and-drop a file.
 
@@ -66,6 +72,84 @@ To self-host, download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob
   python3 -m http.server 8000 -d /tmp 2>/dev/null & PID=$!; \
   sleep 0.3; open "http://localhost:8000/pipeviz.html?url=http://localhost:8000/pipeviz.json"; \
   read -p "Press enter to stop..."; kill $PID 2>/dev/null; echo "✓ Stopped")
+```
+</details>
+
+## Attribute Lineage
+Track column-level provenance with `::` notation. Supports infinitely nested complex data-types.
+
+- `user_id` derives from a single upstream column
+- `full_name` derives from multiple columns (array syntax)
+- `city` accesses a nested field via `::` (`address.city` becomes `address::city`)
+
+<p align="center">
+  <img src="pix/pipeviz-attributes-example-2.png" width="600">
+</p>
+
+<details>
+<summary>Full example JSON</summary>
+
+```json
+{
+   "pipelines": [
+      {
+         "name": "user-etl",
+         "input_sources": [
+            "raw_users"
+         ],
+         "output_sources": [
+            "enriched_users"
+         ]
+      }
+   ],
+   "datasources": [
+      {
+         "name": "raw_users",
+         "attributes": [
+            {
+               "name": "id"
+            },
+            {
+               "name": "first"
+            },
+            {
+               "name": "last"
+            },
+            {
+               "name": "address",
+               "attributes": [
+                  {
+                     "name": "city"
+                  },
+                  {
+                     "name": "zip"
+                  }
+               ]
+            }
+         ]
+      },
+      {
+         "name": "enriched_users",
+         "attributes": [
+            {
+               "name": "user_id",
+               "from": "raw_users::id"
+            },
+            {
+               "name": "full_name",
+               "from": [
+                  "raw_users::first",
+                  "raw_users::last"
+               ]
+            },
+            {
+               "name": "city",
+               "from": "raw_users::address::city"
+            }
+         ]
+      }
+   ]
+}
 ```
 </details>
 
