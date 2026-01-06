@@ -30,7 +30,7 @@ This pipeviz:
 Renders this:
 
 <p align="center">
-  <img src="pix/pipeviz-example.png" width="600">
+  <img src="pix/pipeviz-example-2.png" width="600">
 </p>
 
 ## Using & Hosting
