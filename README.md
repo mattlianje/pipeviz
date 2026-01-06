@@ -3,7 +3,7 @@
 </p>
 
 # <img src="https://raw.githubusercontent.com/mattlianje/d4/refs/heads/master/pix/pipeviz.png" width="60"> Pipeviz
-**Easy, elegant lineage with a single `.json` 🛰️**
+**Easy, elegant lineage from a single `.json` 🛰️**
 
 A JSON spec for lineage. Declare your pipelines, get a graph.
 
@@ -13,7 +13,7 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 - Column-level lineage built in
 
 ## Quickstart
-[Live demo](https://mattlianje.github.io/pipeviz/pipeviz.html)
+[Live demo](https://pipeviz.org)
 
 This pipeviz:
 ```json
@@ -33,37 +33,15 @@ Renders this:
   <img src="pix/pipeviz-example-2.png" width="600">
 </p>
 
-## Using & Hosting
-Pipeviz is just a single static HTML file (`pipeviz.html`) plus your `.json`.
+## Using
+Go to [pipeviz.org](https://pipeviz.org) and paste your JSON, or drag-and-drop a file.
 
-There's no backend, no build step, no install, open the file in your browser or serve it from anywhere you can host static content.
-
-### Option 1 - Open locally
-- Download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html)
-- Save your .json in the same folder.
-- Open `pipeviz.html` in your browser.
-- Paste your JSON into the "Configuration" tab, or drag-and-drop the file.
-
-### Option 2 - Serve over HTTP
-Any static hosting works:
-- GitHub Pages, commit pipeviz.html + your pipeviz.json and enable Pages.
-- S3 + CloudFront, Netlify, Vercel ... upload both files.
-- Your own webserver - put them in `/var/www` or equivalent.
-
-To auto-load your JSON:
-
-```bash
-https://yourdomain/pipeviz.html?url=https://yourdomain/pipeviz.json
+To auto-load a config, use `?url=`:
 ```
-Or inline it in the URL:
-
-```bash
-https://yourdomain/pipeviz.html?config=BASE64_ENCODED_JSON
+https://pipeviz.org?url=https://yoursite.com/pipeviz.json
 ```
 
-### Option 3 - Embed in an internal portal
-- Drop the HTML into an `<iframe>` in your docs/wiki tool.
-- Preload the JSON via `?url=…` so users see the lineage instantly.
+To self-host, download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html) and serve it from anywhere.
 
 ## Merging Team Configs
 
