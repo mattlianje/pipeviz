@@ -53,6 +53,9 @@
             .feature-grid {
                 grid-template-columns: 1fr !important;
             }
+            .feature-tile-centered {
+                width: 100% !important;
+            }
         }
         .nav-tabs {
             border-bottom: 1px solid var(--border-color);
@@ -788,7 +791,7 @@
                         </div>
 
                         <!-- Features -->
-                        <div class="feature-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 2rem; max-width: 540px; margin-left: auto; margin-right: auto;">
+                        <div class="feature-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 0.75rem;">
                             <div style="padding: 0.875rem; background: var(--bg-secondary);">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.5rem;">
                                     <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
@@ -810,7 +813,9 @@
                                 <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem;">Federated</div>
                                 <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Each team owns their JSON. Merge with jq for the org-wide view.</div>
                             </div>
-                            <div style="padding: 0.875rem; background: var(--bg-secondary);">
+                        </div>
+                        <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
+                            <div class="feature-tile-centered" style="padding: 0.875rem; background: var(--bg-secondary); width: calc(33.333% - 0.5rem);">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.5rem;">
                                     <path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/>
                                 </svg>
