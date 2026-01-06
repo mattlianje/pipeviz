@@ -2,7 +2,7 @@
   <img src="pix/pipeviz.png" width="700">
 </p>
 
-# <img src="https://raw.githubusercontent.com/mattlianje/d4/refs/heads/master/pix/pipeviz.png" width="60"> pipeviz
+# <img src="https://raw.githubusercontent.com/mattlianje/d4/refs/heads/master/pix/pipeviz.png" width="60"> Pipeviz
 **Easy, elegant lineage with a single `.json` 🛰️**
 
 A JSON spec for lineage. Declare your pipelines, get a graph.
