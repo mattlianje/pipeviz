@@ -23,7 +23,7 @@ Current tools have gaps:
 - **Frameworks** (dbt) couple you to their dialect, manifest, and world view.
 - **Manual docs** (Confluence diagrams) rot immediately.
 
-With Pipeviz, declare your immediate dependencies at compile time: "this reads A, writes B". Pipeviz stitches them into complete end-to-end lineage. Since it is plain JSON, you can throw it into any LLM and get results.
+With Pipeviz, declare your immediate dependencies at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage. Since it is plain JSON, you can throw it into any LLM and get results.
 
 ## Quickstart
 [Live demo](https://pipeviz.org)
