@@ -12,7 +12,7 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 - Each team owns their JSON, merge with `jq` for the org-wide view
 - Column-level lineage built in
 
-## Why
+## Why?
 When a data org doesn't have a trusted dependency graph:
 - **Impact analysis is hard.** You can't trace where bad data came from or what downstream jobs will break.
 - **Onboarding is slow.** New hires have no way to see the big picture.
