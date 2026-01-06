@@ -50,6 +50,12 @@
             .hero-section {
                 padding: 1.5rem 1.5rem;
             }
+            .feature-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .feature-tile-centered {
+                width: 100% !important;
+            }
         }
         .nav-tabs {
             border-bottom: 1px solid var(--border-color);
@@ -465,14 +471,6 @@
             margin-bottom: 0.5rem;
             letter-spacing: -0.5px;
         }
-        .feature-tile {
-            padding: 1.25rem;
-            background: var(--bg-secondary);
-        }
-        .feature-icon {
-            color: var(--text-muted);
-            margin-bottom: 0.75rem;
-        }
         .header-controls {
             position: absolute;
             top: 0;
@@ -754,6 +752,15 @@
             .feature-tile {
                 padding: 1rem 1.25rem;
             }
+        }
+        /* Feature tiles */
+        .feature-tile {
+            padding: 0.875rem;
+            background: var(--bg-secondary);
+        }
+        .feature-icon {
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
         }
     </style>
   <script type="module" crossorigin>(function polyfill() {
@@ -3146,7 +3153,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                     <div style="max-width: 750px; margin: 0 auto; padding: 2rem 1rem;">
 
                         <!-- Intro -->
-                        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
+                        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
                             An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
                         </p>
 
@@ -3178,64 +3185,62 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                         <!-- Feature tiles -->
                         <div class="feature-grid">
                             <div class="feature-tile">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
                                 </svg>
-                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Stack Agnostic</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">SQL, Spark, Kafka, APIs, shell scripts. Just JSON.</div>
+                                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem;">Stack Agnostic</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">SQL, Spark, Kafka, APIs, shell scripts. Just JSON.</div>
                             </div>
                             <div class="feature-tile">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                                 </svg>
-                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Zero Dependencies</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">One HTML file. No backend, no build step. Open locally or host anywhere.</div>
+                                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem;">Zero Dependencies</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">One HTML file. No backend, no build step. Host anywhere.</div>
                             </div>
                             <div class="feature-tile">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
                                 </svg>
-                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Federated</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Each team owns their JSON. Merge with jq for the org-wide view.</div>
+                                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem;">Federated</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Each team owns their JSON. Merge with jq for the org-wide view.</div>
                             </div>
                             <div class="feature-tile">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
                                     <path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/>
                                 </svg>
-                                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Column-Level Lineage</div>
-                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Track field-level provenance. See exactly where each attribute comes from.</div>
+                                <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem;">Column-Level Lineage</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Track field-level provenance. See where each attribute comes from.</div>
                             </div>
                         </div>
 
                         <!-- How it works -->
-                        <div style="margin-bottom: 2.5rem;">
-                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">How it works</div>
+                        <div style="margin-bottom: 2rem;">
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">How it works</div>
                             <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
                                 <div style="flex: 1; min-width: 140px; text-align: center;">
-                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">1</div>
-                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Define</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                                    <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem;">1</div>
+                                    <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Define</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
                                 </div>
                                 <div style="flex: 1; min-width: 140px; text-align: center;">
-                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">2</div>
-                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Load</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Drop your file here, or host both files together on any static server</div>
+                                    <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem;">2</div>
+                                    <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Load</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Drop your file here, or host both files together on any static server</div>
                                 </div>
                                 <div style="flex: 1; min-width: 140px; text-align: center;">
-                                    <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 0.25rem;">3</div>
-                                    <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 0.25rem;">Explore</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Click through the graph, trace dependencies, export DOT for other tools</div>
+                                    <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem;">3</div>
+                                    <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Explore</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Click through the graph, trace dependencies, export DOT for other tools</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Federated lineage -->
+                        <!-- Merging configs -->
                         <div style="margin-bottom: 2rem;">
-                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Federated lineage</div>
-                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0;">
-                                Each team versions their own <code>pipeviz.json</code> alongside their code. Generate it at compile time from your build, tests, or annotations. When you need the org-wide view, merge with <a href="https://jqlang.github.io/jq/" target="_blank" style="color: var(--text-secondary);">jq</a> (probably already on your machine) or any JSON tool:
-                            </p>
-<pre style="background: var(--bg-code); padding: 0.75rem; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># merge all team configs into one</span>
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Merging configs</div>
+<pre style="background: var(--bg-code); padding: 0.75rem; font-size: 12px; margin: 0; overflow-x: auto; color: var(--text-primary);"><span style="color: var(--text-muted);"># each team versions their own pipeviz.json</span>
+<span style="color: var(--text-muted);"># merge for org-wide view</span>
 jq -s '{
   pipelines: map(.pipelines // []) | add,
   datasources: map(.datasources // []) | add
@@ -3244,12 +3249,9 @@ jq -s '{
 
                         <!-- Motivation -->
                         <div style="margin-bottom: 2rem;">
-                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Motivation</div>
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Why</div>
                             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0;">
-                                Lineage tools ask for a lot. <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a> and <a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a> need agents in your cluster, a metadata store, and careful integration with every scheduler. <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> wants a full governance platform. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> gives you lineage, but couples you to their manifest and framework.
-                            </p>
-                            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0.75rem 0 0 0;">
-                                Pipeviz asks for one JSON file.
+                                <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary);">OpenLineage</a>/<a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary);">Marquez</a> need agents, a metadata store, scheduler integration. <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary);">Atlas</a> wants a governance platform. <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary);">dbt</a> couples you to their framework. Pipeviz needs one JSON file.
                             </p>
                         </div>
 
