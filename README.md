@@ -54,7 +54,7 @@ Attribute-level lineage (from the full demo):
   <img src="pix/pipeviz-attributes.png" width="600">
 </p>
 
-## Using
+## Usage
 Go to [pipeviz.org](https://pipeviz.org) and paste your JSON, or drag-and-drop a file.
 
 To auto-load a config, use `?url=`:
