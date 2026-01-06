@@ -53,6 +53,9 @@
             .feature-grid {
                 grid-template-columns: 1fr !important;
             }
+            .feature-tile-centered {
+                width: 100% !important;
+            }
         }
         .nav-tabs {
             border-bottom: 1px solid var(--border-color);
@@ -3156,7 +3159,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                             </div>
                         </div>
                         <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
-                            <div style="padding: 0.875rem; background: var(--bg-secondary); width: calc(33.333% - 0.5rem);">
+                            <div class="feature-tile-centered" style="padding: 0.875rem; background: var(--bg-secondary); width: calc(33.333% - 0.5rem);">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.5rem;">
                                     <path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/>
                                 </svg>
