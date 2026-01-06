@@ -13,8 +13,17 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 - Column-level lineage built in
 
 ## Why
-Declare your immediate dependencies at compile time - the tactical stuff you already know like
-"this task reads from A and writes to B". Pipeviz stitches them together into complete end-to-end lineage chains, giving you the strategic big picture for free.
+When a data org doesn't have a trusted dependency graph:
+- **Impact analysis is hard.** What depends on this job? Where is bad data coming from?
+- **Onboarding is slow.** New hires can't see the big picture.
+- **Operational work is error-prone.** What to backfill? What to re-run? Backiflls get quite Byzantine.
+
+Current tools have gaps:
+- **Runtime instrumentation** (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
+- **Frameworks** (dbt) couple you to their dialect, manifest, and world view.
+- **Manual docs** (Confluence diagrams) rot immediately.
+
+With Pipeviz, declare your immediate dependencies at compile time: "this reads A, writes B". Pipeviz stitches them into complete end-to-end lineage. Since it is plain JSON, you can throw it into any LLM and get results.
 
 ## Quickstart
 [Live demo](https://pipeviz.org)
@@ -84,17 +93,6 @@ jq -s '{
   datasources: (map(.datasources // []) | add | group_by(.name) | map(add))
 }' team-*.json > pipeviz.json
 ```
-
-## Motivation
-Large polyglot codebases are hard to map. Processes on various linux-boxes in different languages: SQL, Python, shell scripts, etc. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently without shared runtimes or semantic layers.
-
-There is a central problem: engineers know their pipelines but have no format to declare them (even though they could... and often at compile-time). Instead, separate representations like diagrams in Confluence often spawn, and immediately begin to decay and fall behind once they are created.
-
-Lineage solutions do exist (and will get good results if you buy into their framework and/or World view): **but**...
-
-Current lineage tools ask for **a lot**. [OpenLineage](https://openlineage.io/) and [Marquez](https://marquezproject.ai/) need agents in your cluster, a metadata store, and careful integration with every scheduler. [Atlas](https://atlas.apache.org/#/) wants a full governance platform. [dbt](https://www.getdbt.com/) gives you lineage, but couples you to their manifest and you bend the knee to a framework.
-
-Pipeviz asks for one JSON file.
 
 ## Inspiration
 - The LISP [code-as-data](https://en.wikipedia.org/wiki/Code_as_data) ethos
