@@ -12,6 +12,10 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 - Each team owns their JSON, merge with `jq` for the org-wide view
 - Column-level lineage built in
 
+## Why
+Declare your immediate dependencies at compile time - the tactical stuff you already know like
+"this task reads from A and writes to B". Pipeviz stitches them together into complete end-to-end lineage chains, giving you the strategic big picture for free.
+
 ## Quickstart
 [Live demo](https://pipeviz.org)
 
