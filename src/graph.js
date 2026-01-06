@@ -1,4 +1,4 @@
-import { state } from './state.js'
+import { state, getConfigHash } from './state.js'
 import { renderAttributeGraph } from './attributes.js'
 
 export function generateGraphvizDot() {
@@ -280,20 +280,31 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
 
 
 
+let graphTabListenerAdded = false;
+
 export function renderGraph() {
     if (!state.currentConfig) return;
 
-    document.getElementById('graph-tab').addEventListener('shown.bs.tab', function() {
-        if (!state.graphviz) {
-            setTimeout(initializeGraph, 100);
-        } else {
-            // Force re-render when tab is shown
-            updateGraph();
-        }
-    });
+    const currentHash = getConfigHash(state.currentConfig);
+
+    if (!graphTabListenerAdded) {
+        document.getElementById('graph-tab').addEventListener('shown.bs.tab', function() {
+            const newHash = getConfigHash(state.currentConfig);
+            if (!state.graphviz) {
+                setTimeout(initializeGraph, 100);
+                state.lastRenderedConfigHash = newHash;
+            } else if (newHash !== state.lastRenderedConfigHash) {
+                // Only re-render if config has changed
+                updateGraph();
+                state.lastRenderedConfigHash = newHash;
+            }
+        });
+        graphTabListenerAdded = true;
+    }
 
     if (document.getElementById('graph-tab').classList.contains('active')) {
         setTimeout(initializeGraph, 100);
+        state.lastRenderedConfigHash = currentHash;
     }
 }
 

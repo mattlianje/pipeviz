@@ -1,4 +1,4 @@
-import { state } from "./state.js"
+import { state, getConfigHash } from "./state.js"
 export function generateAttributeDot() {
     if (!state.currentConfig) return ''
 
@@ -864,8 +864,12 @@ document.addEventListener('click', function(e) {
 
 // Set up attributes tab listener
 document.getElementById('attributes-tab')?.addEventListener('shown.bs.tab', function() {
-    setTimeout(() => {
-        buildAttributeLineageMap()
-        renderAttributeGraph()
-    }, 100)
+    const newHash = getConfigHash(state.currentConfig)
+    if (!state.attributeGraphviz || newHash !== state.attributeLastRenderedConfigHash) {
+        setTimeout(() => {
+            buildAttributeLineageMap()
+            renderAttributeGraph()
+            state.attributeLastRenderedConfigHash = newHash
+        }, 100)
+    }
 })

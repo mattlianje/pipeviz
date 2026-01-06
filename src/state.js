@@ -1,6 +1,7 @@
 // Centralized mutable state object
 export const state = {
     currentConfig: null,
+    lastRenderedConfigHash: null,
     graphviz: null,
     groupedView: true,
     expandedGroups: new Set(),
@@ -13,10 +14,15 @@ export const state = {
 
     // Attribute graph state
     attributeGraphviz: null,
+    attributeLastRenderedConfigHash: null,
     nestedClusterCount: 0,
     attributeLineageMap: {},
     datasourceLineageMap: {},
     selectedAttribute: null
+}
+
+export function getConfigHash(config) {
+    return JSON.stringify(config)
 }
 
 export const exampleConfig = {

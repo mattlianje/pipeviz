@@ -96,13 +96,15 @@ export async function loadFromUrl() {
             .catch(error => {
                 const statusDiv = document.getElementById('json-status')
                 statusDiv.innerHTML = `<div class="alert alert-danger">Error loading from URL: ${error.message}</div>`
-                loadExample()
+                if (!state.currentConfig) {
+                    loadExample()
+                }
             })
         return
     }
 
     const loaded = await tryLoadPipevizJson()
-    if (!loaded) {
+    if (!loaded && !state.currentConfig) {
         loadExample()
     }
 }

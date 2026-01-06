@@ -48,14 +48,14 @@ export function renderPipelines() {
                 data-description="${(pipeline.description || '').toLowerCase()}"
                 data-cluster="${(pipeline.cluster || '').toLowerCase()}"
                 data-tags="${(pipeline.tags || []).join(',').toLowerCase()}">
-                <td class="col-name"><strong>${pipeline.name}</strong></td>
-                <td class="col-desc">${pipeline.description || ''}</td>
-                <td class="col-schedule"><code class="text-success">${pipeline.schedule || ''}</code></td>
-                <td class="col-sources">${inputSources}</td>
-                <td class="col-sources">${outputSources}</td>
-                <td class="col-cluster">${cluster}</td>
-                <td class="col-tags">${tags}</td>
-                <td class="col-links">${links}</td>
+                <td class="col-name"><div><strong>${pipeline.name}</strong></div></td>
+                <td class="col-desc"><div>${pipeline.description || ''}</div></td>
+                <td class="col-schedule"><div><code class="text-success">${pipeline.schedule || ''}</code></div></td>
+                <td class="col-sources"><div>${inputSources}</div></td>
+                <td class="col-sources"><div>${outputSources}</div></td>
+                <td class="col-cluster"><div>${cluster}</div></td>
+                <td class="col-tags"><div>${tags}</div></td>
+                <td class="col-links"><div>${links}</div></td>
             </tr>
         `
     })
@@ -151,16 +151,13 @@ export function renderDatasources() {
                 data-cluster="${(ds.cluster || '').toLowerCase()}"
                 data-tags="${(ds.tags || []).join(',').toLowerCase()}"
                 data-search="${(ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase()}">
-                <td class="col-name">
-                    <div><strong>${ds.name}</strong></div>
-                    <div>${typeBadge}</div>
-                </td>
-                <td class="col-desc">${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</td>
-                <td class="col-owner small text-muted">${ds.owner || ''}</td>
-                <td class="col-metadata">${metadata}</td>
-                <td class="col-cluster">${cluster}</td>
-                <td class="col-tags">${tags}</td>
-                <td class="col-links">${links}</td>
+                <td class="col-name"><div><strong>${ds.name}</strong><br>${typeBadge}</div></td>
+                <td class="col-desc"><div>${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</div></td>
+                <td class="col-owner"><div class="small text-muted">${ds.owner || ''}</div></td>
+                <td class="col-metadata"><div>${metadata}</div></td>
+                <td class="col-cluster"><div>${cluster}</div></td>
+                <td class="col-tags"><div>${tags}</div></td>
+                <td class="col-links"><div>${links}</div></td>
             </tr>
         `
     })
