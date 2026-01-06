@@ -724,7 +724,8 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         items.forEach(x => {
             const indent = (x.depth - 1) * 12;
             const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
-            out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${x.name}</div>`;
+            const prefix = x.depth > 1 ? '└ ' : '';
+            out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${x.name}</div>`;
         });
         out += `</div>`;
         return out;

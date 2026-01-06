@@ -196,15 +196,12 @@ export function renderAttributeGraph() {
         d3.select('#attribute-graph').selectAll('.cluster').on('click', function(event) {
             event.stopPropagation()
             const title = d3.select(this).select('title').text()
-            // Cluster titles are "cluster_id", extract id
             if (title && title.startsWith('cluster_')) {
                 const id = title.substring(8)
-                // If id contains __, it's an attribute struct; otherwise it's a datasource
                 if (id.includes('__') && state.attributeLineageMap[id]) {
                     selectAttribute(id)
                 } else {
                     // It's a datasource - find and show its info
-                    const dsName = id.replace(/_/g, '-').replace(/--/g, '_'); // rough reverse
                     const ds = (state.currentConfig.datasources || []).find(d =>
                         d.name.replace(/[^a-zA-Z0-9]/g, '_') === id
                     )
@@ -321,9 +318,79 @@ export function buildAttributeLineageMap() {
     }
 
     Object.keys(state.attributeLineageMap).forEach(attrId => {
-        state.attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, 'upstream', new Set())
-        state.attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, 'downstream', new Set())
-    })
+        state.attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, 'upstream', new Set());
+        state.attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, 'downstream', new Set());
+    });
+
+    // Fourth pass: build datasource-to-datasource graph and compute depths via BFS
+    var dsDirectUpstream = {};
+    var dsDirectDownstream = {};
+
+    datasources.forEach(function(ds) {
+        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+        dsDirectUpstream[id] = new Set();
+        dsDirectDownstream[id] = new Set();
+    });
+
+    // Find direct datasource connections from attribute lineage
+    Object.values(state.attributeLineageMap).forEach(function(attr) {
+        if (!attr || !attr.datasource) return;
+        var dsId = attr.datasource.replace(/[^a-zA-Z0-9]/g, '_');
+
+        var upIds = attr.upstream || [];
+        for (var i = 0; i < upIds.length; i++) {
+            var upDs = upIds[i].split('__')[0];
+            if (upDs && upDs !== dsId && dsDirectUpstream[dsId]) {
+                dsDirectUpstream[dsId].add(upDs);
+            }
+        }
+
+        var downIds = attr.downstream || [];
+        for (var j = 0; j < downIds.length; j++) {
+            var downDs = downIds[j].split('__')[0];
+            if (downDs && downDs !== dsId && dsDirectDownstream[dsId]) {
+                dsDirectDownstream[dsId].add(downDs);
+            }
+        }
+    });
+
+    // BFS to compute depths
+    function bfsProvenance(startId, getNeighbors) {
+        var result = [];
+        var visited = new Set([startId]);
+        var queue = [];
+        var neighbors = getNeighbors(startId);
+        neighbors.forEach(function(id) {
+            queue.push({ id: id, depth: 1 });
+            visited.add(id);
+        });
+
+        while (queue.length > 0) {
+            var item = queue.shift();
+            result.push(item);
+            var next = getNeighbors(item.id);
+            next.forEach(function(nextId) {
+                if (!visited.has(nextId)) {
+                    visited.add(nextId);
+                    queue.push({ id: nextId, depth: item.depth + 1 });
+                }
+            });
+        }
+
+        result.sort(function(a, b) { return a.depth - b.depth; });
+        return result;
+    }
+
+    // Build datasource lineage map
+    state.datasourceLineageMap = {};
+    datasources.forEach(function(ds) {
+        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+        state.datasourceLineageMap[id] = {
+            name: ds.name,
+            upstream: bfsProvenance(id, function(x) { return dsDirectUpstream[x] || new Set(); }),
+            downstream: bfsProvenance(id, function(x) { return dsDirectDownstream[x] || new Set(); })
+        };
+    });
 }
 
 export function getFullProvenance(attrId, direction, visited = new Set()) {
@@ -477,7 +544,8 @@ export function showAttributeDetails(attrId, upstream, downstream) {
             if (upAttr) {
                 const indent = (x.depth - 1) * 12
                 const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15)
-                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${upAttr.fullName}</div>`
+                const prefix = x.depth > 1 ? '└ ' : ''
+                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${upAttr.fullName}</div>`
             }
         })
         html += `</div>`
@@ -491,7 +559,8 @@ export function showAttributeDetails(attrId, upstream, downstream) {
             if (downAttr) {
                 const indent = (x.depth - 1) * 12
                 const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15)
-                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${downAttr.fullName}</div>`
+                const prefix = x.depth > 1 ? '└ ' : ''
+                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${downAttr.fullName}</div>`
             }
         })
         html += `</div>`
@@ -513,25 +582,41 @@ export function showAttributeDetails(attrId, upstream, downstream) {
 }
 
 export function showDatasourceInAttributePanel(ds) {
-    state.selectedAttribute = null
+    state.selectedAttribute = null;
 
-    // Clear highlighting
+    var dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+    var dsLineage = state.datasourceLineageMap[dsId] || { upstream: [], downstream: [] };
+    var upstreamList = dsLineage.upstream || [];
+    var downstreamList = dsLineage.downstream || [];
+
+    var connectedIds = new Set();
+    upstreamList.forEach(function(x) { connectedIds.add(x.id); });
+    downstreamList.forEach(function(x) { connectedIds.add(x.id); });
+
+    // Clear and apply highlighting
     d3.select('#attribute-graph').selectAll('.node')
         .classed('node-highlighted', false)
         .classed('node-connected', false)
         .classed('node-dimmed', false)
+    d3.select('#attribute-graph').selectAll('.edge')
+        .classed('edge-highlighted', false)
+        .classed('edge-dimmed', false)
     d3.select('#attribute-graph').selectAll('.cluster')
         .classed('cluster-highlighted', false)
         .classed('cluster-connected', false)
         .classed('cluster-dimmed', false)
 
-    // Highlight this datasource cluster
-    const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
+    // Highlight datasource clusters
     d3.select('#attribute-graph').selectAll('.cluster').each(function() {
         const cluster = d3.select(this)
         const title = cluster.select('title').text()
-        if (title === `cluster_${dsId}`) {
-            cluster.classed('cluster-highlighted', true)
+        if (title && title.startsWith('cluster_')) {
+            const clusterId = title.substring(8)
+            if (clusterId === dsId) {
+                cluster.classed('cluster-highlighted', true)
+            } else if (connectedIds.has(clusterId)) {
+                cluster.classed('cluster-connected', true)
+            }
         }
     })
 
@@ -548,12 +633,45 @@ export function showDatasourceInAttributePanel(ds) {
     }, 50)
 
     let html = `<h5>${ds.name}</h5>`
-    html += `<div class="detail-label">Type</div>`
-    html += `<div class="detail-value"><span class="badge bg-secondary">Data Source</span></div>`
 
     if (ds.type) {
-        html += `<div class="detail-label">Source Type</div>`
+        html += `<div class="detail-label">TYPE</div>`
         html += `<div class="detail-value"><span class="badge badge-${ds.type}">${ds.type.toUpperCase()}</span></div>`
+    }
+
+    // Show datasource provenance with depth-based indentation
+    if (upstreamList.length > 0) {
+        html += '<div class="detail-label">UPSTREAM (' + upstreamList.length + ')</div>';
+        html += '<div class="detail-value">';
+        upstreamList.forEach(function(item) {
+            var depth = item.depth;
+            var indent = (depth - 1) * 16;
+            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
+            var found = (state.currentConfig.datasources || []).find(function(d) {
+                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id;
+            });
+            var name = found ? found.name : item.id;
+            var prefix = depth > 1 ? '└ ' : '';
+            html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + 'px; opacity: ' + opacity + ';">' + prefix + name + '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (downstreamList.length > 0) {
+        html += '<div class="detail-label">DOWNSTREAM (' + downstreamList.length + ')</div>';
+        html += '<div class="detail-value">';
+        downstreamList.forEach(function(item) {
+            var depth = item.depth;
+            var indent = (depth - 1) * 16;
+            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
+            var found = (state.currentConfig.datasources || []).find(function(d) {
+                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id;
+            });
+            var name = found ? found.name : item.id;
+            var prefix = depth > 1 ? '└ ' : '';
+            html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + 'px; opacity: ' + opacity + ';">' + prefix + name + '</div>';
+        });
+        html += '</div>';
     }
 
     if (ds.description) {
@@ -620,6 +738,15 @@ export function showDatasourceInAttributePanel(ds) {
     }
 
     content.innerHTML = html
+
+    // Add click handlers for datasource lineage links
+    content.querySelectorAll('.lineage-link[data-ds-name]').forEach(el => {
+        el.addEventListener('click', function() {
+            const dsName = this.getAttribute('data-ds-name')
+            const targetDs = (state.currentConfig.datasources || []).find(d => d.name === dsName)
+            if (targetDs) showDatasourceInAttributePanel(targetDs)
+        })
+    })
 }
 
 export function clearAttributeSelection() {
@@ -742,4 +869,3 @@ document.getElementById('attributes-tab')?.addEventListener('shown.bs.tab', func
         renderAttributeGraph()
     }, 100)
 })
-

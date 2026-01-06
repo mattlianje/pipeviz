@@ -15,6 +15,7 @@ export const state = {
     attributeGraphviz: null,
     nestedClusterCount: 0,
     attributeLineageMap: {},
+    datasourceLineageMap: {},
     selectedAttribute: null
 }
 

@@ -776,6 +776,7 @@ const state = {
   attributeGraphviz: null,
   nestedClusterCount: 0,
   attributeLineageMap: {},
+  datasourceLineageMap: {},
   selectedAttribute: null
 };
 const exampleConfig = {
@@ -1213,7 +1214,6 @@ function renderAttributeGraph() {
         if (id.includes("__") && state.attributeLineageMap[id]) {
           selectAttribute(id);
         } else {
-          id.replace(/_/g, "-").replace(/--/g, "_");
           const ds = (state.currentConfig.datasources || []).find(
             (d) => d.name.replace(/[^a-zA-Z0-9]/g, "_") === id
           );
@@ -1305,6 +1305,69 @@ function buildAttributeLineageMap() {
   Object.keys(state.attributeLineageMap).forEach((attrId) => {
     state.attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, "upstream", /* @__PURE__ */ new Set());
     state.attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, "downstream", /* @__PURE__ */ new Set());
+  });
+  var dsDirectUpstream = {};
+  var dsDirectDownstream = {};
+  datasources.forEach(function(ds) {
+    var id = ds.name.replace(/[^a-zA-Z0-9]/g, "_");
+    dsDirectUpstream[id] = /* @__PURE__ */ new Set();
+    dsDirectDownstream[id] = /* @__PURE__ */ new Set();
+  });
+  Object.values(state.attributeLineageMap).forEach(function(attr) {
+    if (!attr || !attr.datasource) return;
+    var dsId = attr.datasource.replace(/[^a-zA-Z0-9]/g, "_");
+    var upIds = attr.upstream || [];
+    for (var i = 0; i < upIds.length; i++) {
+      var upDs = upIds[i].split("__")[0];
+      if (upDs && upDs !== dsId && dsDirectUpstream[dsId]) {
+        dsDirectUpstream[dsId].add(upDs);
+      }
+    }
+    var downIds = attr.downstream || [];
+    for (var j = 0; j < downIds.length; j++) {
+      var downDs = downIds[j].split("__")[0];
+      if (downDs && downDs !== dsId && dsDirectDownstream[dsId]) {
+        dsDirectDownstream[dsId].add(downDs);
+      }
+    }
+  });
+  function bfsProvenance(startId, getNeighbors) {
+    var result = [];
+    var visited = /* @__PURE__ */ new Set([startId]);
+    var queue = [];
+    var neighbors = getNeighbors(startId);
+    neighbors.forEach(function(id) {
+      queue.push({ id, depth: 1 });
+      visited.add(id);
+    });
+    while (queue.length > 0) {
+      var item = queue.shift();
+      result.push(item);
+      var next = getNeighbors(item.id);
+      next.forEach(function(nextId) {
+        if (!visited.has(nextId)) {
+          visited.add(nextId);
+          queue.push({ id: nextId, depth: item.depth + 1 });
+        }
+      });
+    }
+    result.sort(function(a, b) {
+      return a.depth - b.depth;
+    });
+    return result;
+  }
+  state.datasourceLineageMap = {};
+  datasources.forEach(function(ds) {
+    var id = ds.name.replace(/[^a-zA-Z0-9]/g, "_");
+    state.datasourceLineageMap[id] = {
+      name: ds.name,
+      upstream: bfsProvenance(id, function(x) {
+        return dsDirectUpstream[x] || /* @__PURE__ */ new Set();
+      }),
+      downstream: bfsProvenance(id, function(x) {
+        return dsDirectDownstream[x] || /* @__PURE__ */ new Set();
+      })
+    };
   });
 }
 function selectAttribute(attrId) {
@@ -1404,7 +1467,8 @@ function showAttributeDetails(attrId, upstream, downstream) {
       if (upAttr) {
         const indent = (x.depth - 1) * 12;
         const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
-        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${upAttr.fullName}</div>`;
+        const prefix = x.depth > 1 ? "└ " : "";
+        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${upAttr.fullName}</div>`;
       }
     });
     html += `</div>`;
@@ -1417,7 +1481,8 @@ function showAttributeDetails(attrId, upstream, downstream) {
       if (downAttr) {
         const indent = (x.depth - 1) * 12;
         const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
-        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${downAttr.fullName}</div>`;
+        const prefix = x.depth > 1 ? "└ " : "";
+        html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${downAttr.fullName}</div>`;
       }
     });
     html += `</div>`;
@@ -1435,14 +1500,30 @@ function showAttributeDetails(attrId, upstream, downstream) {
 }
 function showDatasourceInAttributePanel(ds) {
   state.selectedAttribute = null;
+  var dsId = ds.name.replace(/[^a-zA-Z0-9]/g, "_");
+  var dsLineage = state.datasourceLineageMap[dsId] || { upstream: [], downstream: [] };
+  var upstreamList = dsLineage.upstream || [];
+  var downstreamList = dsLineage.downstream || [];
+  var connectedIds = /* @__PURE__ */ new Set();
+  upstreamList.forEach(function(x) {
+    connectedIds.add(x.id);
+  });
+  downstreamList.forEach(function(x) {
+    connectedIds.add(x.id);
+  });
   d3.select("#attribute-graph").selectAll(".node").classed("node-highlighted", false).classed("node-connected", false).classed("node-dimmed", false);
+  d3.select("#attribute-graph").selectAll(".edge").classed("edge-highlighted", false).classed("edge-dimmed", false);
   d3.select("#attribute-graph").selectAll(".cluster").classed("cluster-highlighted", false).classed("cluster-connected", false).classed("cluster-dimmed", false);
-  const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, "_");
   d3.select("#attribute-graph").selectAll(".cluster").each(function() {
     const cluster = d3.select(this);
     const title = cluster.select("title").text();
-    if (title === `cluster_${dsId}`) {
-      cluster.classed("cluster-highlighted", true);
+    if (title && title.startsWith("cluster_")) {
+      const clusterId = title.substring(8);
+      if (clusterId === dsId) {
+        cluster.classed("cluster-highlighted", true);
+      } else if (connectedIds.has(clusterId)) {
+        cluster.classed("cluster-connected", true);
+      }
     }
   });
   const col = document.getElementById("attribute-details-col");
@@ -1455,11 +1536,41 @@ function showDatasourceInAttributePanel(ds) {
     if (state.attributeGraphviz) state.attributeGraphviz.fit(true);
   }, 50);
   let html = `<h5>${ds.name}</h5>`;
-  html += `<div class="detail-label">Type</div>`;
-  html += `<div class="detail-value"><span class="badge bg-secondary">Data Source</span></div>`;
   if (ds.type) {
-    html += `<div class="detail-label">Source Type</div>`;
+    html += `<div class="detail-label">TYPE</div>`;
     html += `<div class="detail-value"><span class="badge badge-${ds.type}">${ds.type.toUpperCase()}</span></div>`;
+  }
+  if (upstreamList.length > 0) {
+    html += '<div class="detail-label">UPSTREAM (' + upstreamList.length + ")</div>";
+    html += '<div class="detail-value">';
+    upstreamList.forEach(function(item) {
+      var depth = item.depth;
+      var indent = (depth - 1) * 16;
+      var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
+      var found = (state.currentConfig.datasources || []).find(function(d) {
+        return d.name.replace(/[^a-zA-Z0-9]/g, "_") === item.id;
+      });
+      var name = found ? found.name : item.id;
+      var prefix = depth > 1 ? "└ " : "";
+      html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + "px; opacity: " + opacity + ';">' + prefix + name + "</div>";
+    });
+    html += "</div>";
+  }
+  if (downstreamList.length > 0) {
+    html += '<div class="detail-label">DOWNSTREAM (' + downstreamList.length + ")</div>";
+    html += '<div class="detail-value">';
+    downstreamList.forEach(function(item) {
+      var depth = item.depth;
+      var indent = (depth - 1) * 16;
+      var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
+      var found = (state.currentConfig.datasources || []).find(function(d) {
+        return d.name.replace(/[^a-zA-Z0-9]/g, "_") === item.id;
+      });
+      var name = found ? found.name : item.id;
+      var prefix = depth > 1 ? "└ " : "";
+      html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + "px; opacity: " + opacity + ';">' + prefix + name + "</div>";
+    });
+    html += "</div>";
   }
   if (ds.description) {
     html += `<div class="detail-label">Description</div>`;
@@ -1517,6 +1628,13 @@ function showDatasourceInAttributePanel(ds) {
     html += `</div>`;
   }
   content.innerHTML = html;
+  content.querySelectorAll(".lineage-link[data-ds-name]").forEach((el) => {
+    el.addEventListener("click", function() {
+      const dsName = this.getAttribute("data-ds-name");
+      const targetDs = (state.currentConfig.datasources || []).find((d) => d.name === dsName);
+      if (targetDs) showDatasourceInAttributePanel(targetDs);
+    });
+  });
 }
 function clearAttributeSelection() {
   state.selectedAttribute = null;
@@ -2188,7 +2306,8 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
     items.forEach((x) => {
       const indent = (x.depth - 1) * 12;
       const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15);
-      out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${x.name}</div>`;
+      const prefix = x.depth > 1 ? "└ " : "";
+      out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${x.name}</div>`;
     });
     out += `</div>`;
     return out;
