@@ -19,11 +19,11 @@ When a data org doesn't have a trusted dependency graph:
 - **Backfills are painful.** No clear order of operations when things need to be re-run.
 
 Current tools have gaps:
-- Runtime instrumentation (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
-- Frameworks (dbt) couple you to their dialect, manifest, and world view.
-- Manual docs (Confluence diagrams) rot immediately.
+- **Runtime instrumentation has a heavy upfront cost** (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
+- **Frameworks are brittle** (dbt) couple you to their dialect, manifest, and world view.
+- **Manual docs rot** (immediately).
 
-With Pipeviz, declare your immediate dependencies at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage.
+With Pipeviz, you declare your immediate dependencies (preferably) at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage.
 
 *Bonus: Since pipeviz is just niceties on top of a plain JSON spec, you can throw it into any LLM and get results.*
 
