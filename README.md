@@ -56,6 +56,19 @@ https://pipeviz.org?url=https://yoursite.com/pipeviz.json
 
 To self-host, download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html) and serve it from anywhere.
 
+<details>
+<summary>View a local JSON file (one-liner)</summary>
+
+```bash
+(curl -s https://raw.githubusercontent.com/mattlianje/pipeviz/master/pipeviz.html > /tmp/pipeviz.html && \
+  cp /path/to/your/pipeviz.json /tmp/ && \
+  echo "🛰️ Serving at http://localhost:8000" && \
+  python3 -m http.server 8000 -d /tmp 2>/dev/null & PID=$!; \
+  sleep 0.3; open "http://localhost:8000/pipeviz.html?url=http://localhost:8000/pipeviz.json"; \
+  read -p "Press enter to stop..."; kill $PID 2>/dev/null; echo "✓ Stopped")
+```
+</details>
+
 ## Merging Team Configs
 
 Each team maintains their own `pipeviz.json`. Merge them with `jq`:
