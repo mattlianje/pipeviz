@@ -104,9 +104,11 @@ jq -s '{
 ```
 
 ## Motivation
-Large polyglot codebases are hard to map. DAGs in Scala, SQL, Python, shell scripts. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. The central problem: engineers know their pipelines but have no format to declare them.
+Large polyglot codebases are hard to map. Process on different boxes in different languages, SQL, Python, shell scripts. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. 
 
-Lineage tools ask for a lot. [OpenLineage](https://openlineage.io/) and [Marquez](https://marquezproject.ai/) need agents in your cluster, a metadata store, and careful integration with every scheduler. [Atlas](https://atlas.apache.org/#/) wants a full governance platform. [dbt](https://www.getdbt.com/) gives you lineage, but couples you to their manifest and framework.
+There is a central problem: engineers know their pipelines but have no format to declare them (even though they could, and often at compile-time).
+
+On the other hand, current lineage tools ask for a lot. [OpenLineage](https://openlineage.io/) and [Marquez](https://marquezproject.ai/) need agents in your cluster, a metadata store, and careful integration with every scheduler. [Atlas](https://atlas.apache.org/#/) wants a full governance platform. [dbt](https://www.getdbt.com/) gives you lineage, but couples you to their manifest and you bend the knee to a framework.
 
 Pipeviz asks for one JSON file.
 
