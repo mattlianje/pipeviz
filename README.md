@@ -14,7 +14,9 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 
 ## Why
 Declare your immediate dependencies at compile time - the tactical stuff you already know like
-"this task reads from A and writes to B". Pipeviz stitches them together into complete end-to-end lineage chains, giving you the strategic big picture for free.
+"this piece of code reads from A and writes to B".
+
+Pipeviz stitches them together into complete end-to-end lineage chains, giving you the strategic big picture for free.
 
 ## Quickstart
 [Live demo](https://pipeviz.org)
