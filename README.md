@@ -115,5 +115,5 @@ Current lineage tools ask for **a lot**. [OpenLineage](https://openlineage.io/) 
 Pipeviz asks for one JSON file.
 
 ## Inspiration
-- The LISP code-as-data ethos
+- The LISP [code-as-data](https://en.wikipedia.org/wiki/Code_as_data) ethos
 - [Data-Oriented Programming](https://www.manning.com/books/data-oriented-programming) by Yehonathan Sharvit
