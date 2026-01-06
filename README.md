@@ -14,16 +14,18 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 
 ## Why
 When a data org doesn't have a trusted dependency graph:
-- Impact analysis is hard. You can't trace where bad data came from or what downstream jobs will break.
-- Onboarding is slow. New hires have no way to see the big picture.
-- Backfills get Byzantine. No clear order of operations when things need to be re-run.
+- **Impact analysis is hard.** You can't trace where bad data came from or what downstream jobs will break.
+- **Onboarding is slow.** New hires have no way to see the big picture.
+- **Backfills are painful.** No clear order of operations when things need to be re-run.
 
 Current tools have gaps:
 - Runtime instrumentation (OpenLineage, Marquez) needs agents, metadata stores, scheduler integration.
 - Frameworks (dbt) couple you to their dialect, manifest, and world view.
 - Manual docs (Confluence diagrams) rot immediately.
 
-With Pipeviz, declare your immediate dependencies at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage. Since it is plain JSON, you can throw it into any LLM and get results.
+With Pipeviz, declare your immediate dependencies at compile time: "this code reads from A, writes to B". Pipeviz stitches them into complete end-to-end lineage.
+
+*Bonus: Since pipeviz is just niceties on top of a plain JSON spec, you can throw it into any LLM and get results.*
 
 ## Quickstart
 [Live demo](https://pipeviz.org)
