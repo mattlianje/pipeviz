@@ -104,16 +104,16 @@ jq -s '{
 ```
 
 ## Motivation
-Large polyglot codebases are hard to map. Process on different boxes in different languages, SQL, Python, shell scripts. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. 
+Large polyglot codebases are hard to map. Processes on various linux-boxes in different languages: SQL, Python, shell scripts, etc. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. 
 
 There is a central problem: engineers know their pipelines but have no format to declare them (even though they could... and often at compile-time). Instead, separate representations like diagrams in Confluence often spawn, and immediately begin to decay and fall behind once they are created.
 
-There are lineage solutions out there (and many will get good results if you buy into their framework and/or World view): **but**...
+Lineage solutions do exist (and will get good results if you buy into their framework and/or World view): **but**...
 
 Current lineage tools ask for **a lot**. [OpenLineage](https://openlineage.io/) and [Marquez](https://marquezproject.ai/) need agents in your cluster, a metadata store, and careful integration with every scheduler. [Atlas](https://atlas.apache.org/#/) wants a full governance platform. [dbt](https://www.getdbt.com/) gives you lineage, but couples you to their manifest and you bend the knee to a framework.
 
 Pipeviz asks for one JSON file.
 
 ## Inspiration
-- The general LISP code-as-data ethos
+- The LISP code-as-data ethos
 - [Data-Oriented Programming](https://www.manning.com/books/data-oriented-programming) by Yehonathan Sharvit
