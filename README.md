@@ -106,7 +106,7 @@ jq -s '{
 ## Motivation
 Large polyglot codebases are hard to map. Process on different boxes in different languages, SQL, Python, shell scripts. Data moving between warehouses, message brokers, APIs. Teams owning pipelines independently, no shared runtime. 
 
-There is a central problem: engineers know their pipelines but have no format to declare them (even though they could declare them... and often at compile-time). Instead, separate representations like diagrams in Confluence often spawn, and immediately begin to decay and fall behind once they are created.
+There is a central problem: engineers know their pipelines but have no format to declare them (even though they could... and often at compile-time). Instead, separate representations like diagrams in Confluence often spawn, and immediately begin to decay and fall behind once they are created.
 
 There are lineage solutions out there (and many will get good results if you buy into their framework and/or World view): **but**...
 
