@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="pix/pipeviz.png" width="700">
+  <img src="pix/pipeviz-2.png" width="700">
 </p>
 
 # <img src="https://raw.githubusercontent.com/mattlianje/d4/refs/heads/master/pix/pipeviz.png" width="60"> Pipeviz
