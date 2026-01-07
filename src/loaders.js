@@ -44,9 +44,7 @@ async function tryLoadPipevizJson() {
             setTimeout(() => { statusDiv.innerHTML = '' }, 3000)
             return true
         }
-    } catch (error) {
-        // File doesn't exist, that's okay
-    }
+    } catch (error) {}
     return false
 }
 

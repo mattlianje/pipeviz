@@ -11,7 +11,6 @@ const activeFilters = {
 export function updateFilters() {
     if (!state.currentConfig) return
 
-    // Pipeline filters
     const pipelineTags = [...new Set(state.currentConfig.pipelines?.flatMap(p => p.tags || []) || [])].sort()
     const pipelineClusters = [...new Set(state.currentConfig.pipelines?.map(p => p.cluster).filter(c => c) || [])].sort()
 
@@ -32,7 +31,6 @@ export function updateFilters() {
     }
     document.getElementById('pipeline-filters').innerHTML = pipelineHtml
 
-    // Datasource filters
     const datasourceTypes = [...new Set(state.currentConfig.datasources?.map(ds => ds.type || 'unknown') || [])].sort()
     const datasourceTags = [...new Set(state.currentConfig.datasources?.flatMap(ds => ds.tags || []) || [])].sort()
     const datasourceClusters = [...new Set(state.currentConfig.datasources?.map(ds => ds.cluster).filter(c => c) || [])].sort()
@@ -61,7 +59,6 @@ export function updateFilters() {
     }
     document.getElementById('datasource-filters').innerHTML = datasourceHtml
 
-    // Add click handlers
     document.querySelectorAll('.filter-tag').forEach(tag => {
         tag.addEventListener('click', function() {
             const type = this.dataset.type

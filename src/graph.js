@@ -11,20 +11,20 @@ export function generateGraphvizDot() {
     const datasources = state.currentConfig.datasources || [];
     const explicitClusters = state.currentConfig.clusters || [];
 
-    // Handle grouped view - aggregate pipelines by group (unless expanded)
+    // Grouped view: aggregate pipelines by group (unless expanded)
     if (state.groupedView) {
         const groups = new Map();
         const ungroupedPipelines = [];
 
         pipelines.forEach(p => {
             if (p.group && !state.expandedGroups.has(p.group)) {
-                // Only group if not expanded
                 if (!groups.has(p.group)) {
                     groups.set(p.group, {
                         name: p.group,
                         description: `Grouped pipelines: ${p.group}`,
                         input_sources: new Set(),
                         output_sources: new Set(),
+                        upstream_pipelines: new Set(),
                         cluster: p.cluster,
                         _isGroup: true,
                         _members: []
@@ -33,48 +33,36 @@ export function generateGraphvizDot() {
                 const group = groups.get(p.group);
                 p.input_sources?.forEach(s => group.input_sources.add(s));
                 p.output_sources?.forEach(s => group.output_sources.add(s));
+                p.upstream_pipelines?.forEach(u => group.upstream_pipelines.add(u));
                 group._members.push(p.name);
             } else {
                 ungroupedPipelines.push(p);
             }
         });
 
-        // Convert groups to pipeline-like objects
         const groupedPipelines = Array.from(groups.values()).map(g => ({
             ...g,
             input_sources: Array.from(g.input_sources),
-            output_sources: Array.from(g.output_sources)
+            output_sources: Array.from(g.output_sources),
+            upstream_pipelines: Array.from(g.upstream_pipelines).filter(u => !g._members.includes(u))
         }));
 
         pipelines = [...ungroupedPipelines, ...groupedPipelines];
     }
 
-    // Collect ALL data sources (explicit + auto-created from pipeline references)
+    // Collect all data sources (explicit + auto-created from pipeline refs)
     const allDataSources = new Map();
+    datasources.forEach(ds => allDataSources.set(ds.name, ds));
     
-    // Add explicit data sources
-    datasources.forEach(ds => {
-        allDataSources.set(ds.name, ds);
-    });
-    
-    // Add auto-created data sources from pipeline input/output references
     pipelines.forEach(pipeline => {
         pipeline.input_sources?.forEach(sourceName => {
             if (!allDataSources.has(sourceName)) {
-                allDataSources.set(sourceName, { 
-                    name: sourceName, 
-                    type: 'auto-created'
-                    // No cluster assignment - let auto-created sources be unclustered
-                });
+                allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' });
             }
         });
         pipeline.output_sources?.forEach(sourceName => {
             if (!allDataSources.has(sourceName)) {
-                allDataSources.set(sourceName, { 
-                    name: sourceName, 
-                    type: 'auto-created'
-                    // No cluster assignment - let auto-created sources be unclustered
-                });
+                allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' });
             }
         });
     });
@@ -86,10 +74,9 @@ export function generateGraphvizDot() {
 
     // Build cluster hierarchy
     const clusterDefinitions = new Map();
-    const clusterHierarchy = new Map(); // child -> parent
-    const clusterChildren = new Map(); // parent -> [children]
+    const clusterHierarchy = new Map();  // child -> parent
+    const clusterChildren = new Map();   // parent -> [children]
 
-    // Process explicit clusters
     explicitClusters.forEach(cluster => {
         clusterDefinitions.set(cluster.name, cluster);
         allClusterNames.add(cluster.name);
@@ -100,11 +87,10 @@ export function generateGraphvizDot() {
                 clusterChildren.set(cluster.parent, []);
             }
             clusterChildren.get(cluster.parent).push(cluster.name);
-            allClusterNames.add(cluster.parent); // Ensure parent exists
+            allClusterNames.add(cluster.parent);
         }
     });
 
-    // Add implicit clusters (those referenced but not explicitly defined)
     allClusterNames.forEach(name => {
         if (!clusterDefinitions.has(name)) {
             clusterDefinitions.set(name, { name, description: `Auto-generated cluster: ${name}` });
@@ -119,13 +105,11 @@ export function generateGraphvizDot() {
 
 `;
 
-    // Generate cluster colors automatically
-    const clusterColors = [
+const clusterColors = [
         "#1976d2", "#7b1fa2", "#388e3c", "#f57c00", "#d32f2f",
         "#1976d2", "#616161", "#c2185b", "#303f9f", "#f57c00"
     ];
 
-    // Group nodes by cluster
     const nodesByCluster = new Map();
 
     pipelines.forEach(pipeline => {
@@ -136,7 +120,6 @@ export function generateGraphvizDot() {
         nodesByCluster.get(cluster).push({ type: 'pipeline', node: pipeline });
     });
 
-    // Use ALL data sources (explicit + auto-created)
     allDataSources.forEach(ds => {
         const cluster = ds.cluster || '_unclustered';
         if (!nodesByCluster.has(cluster)) {
@@ -145,7 +128,6 @@ export function generateGraphvizDot() {
         nodesByCluster.get(cluster).push({ type: 'datasource', node: ds });
     });
 
-    // Find root clusters (those without parents)
     const rootClusters = [];
     clusterDefinitions.forEach((cluster, name) => {
         if (!clusterHierarchy.has(name) && nodesByCluster.has(name)) {
@@ -162,7 +144,6 @@ export function generateGraphvizDot() {
         const nodesInCluster = nodesByCluster.get(clusterName) || [];
         const children = clusterChildren.get(clusterName) || [];
 
-        // Skip if cluster has no nodes and no children with nodes
         const hasNodes = nodesInCluster.length > 0;
         const hasChildrenWithNodes = children.some(child =>
             nodesByCluster.has(child) && nodesByCluster.get(child).length > 0
@@ -182,7 +163,6 @@ ${'    '.repeat(depth + 2)}fontname="Arial";
 
 `;
 
-        // Add nodes in this cluster
         nodesInCluster.forEach(item => {
             if (item.type === 'pipeline') {
                 const pipeline = item.node;
@@ -201,7 +181,7 @@ ${'    '.repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", pen
 ${'    '.repeat(depth + 3)}fontname="Arial",
 ${'    '.repeat(depth + 3)}label=${label}];
 `;
-            } else if (item.type === 'datasource') {
+            } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
                 const ds = item.node;
                 result += `${'    '.repeat(depth + 2)}"${ds.name}" [shape=ellipse, style=filled,
 ${'    '.repeat(depth + 3)}fillcolor="#f3e5f5", color="#7b1fa2",
@@ -210,7 +190,6 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
             }
         });
 
-        // Add child clusters
         children.forEach(childName => {
             result += renderCluster(childName, depth + 1);
         });
@@ -221,12 +200,10 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         return result;
     }
 
-    // Render all root clusters
-    rootClusters.forEach(clusterName => {
+rootClusters.forEach(clusterName => {
         dot += renderCluster(clusterName);
     });
 
-    // Add unclustered nodes
     const unclusteredNodes = nodesByCluster.get('_unclustered') || [];
     unclusteredNodes.forEach(item => {
         if (item.type === 'pipeline') {
@@ -246,7 +223,7 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         fontname="Arial",
         label=${label}];
 `;
-        } else if (item.type === 'datasource') {
+        } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
             const ds = item.node;
             dot += `    "${ds.name}" [shape=ellipse, style=filled,
         fillcolor="#f3e5f5", color="#7b1fa2",
@@ -255,22 +232,27 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         }
     });
 
-    // Add data flow edges
-    dot += '\n';
-    pipelines.forEach(pipeline => {
-        pipeline.input_sources?.forEach(source => {
-            dot += `    "${source}" -> "${pipeline.name}" [color="${edgeColor}", arrowsize=0.8];\n`;
+// Data flow edges (source -> pipeline -> target)
+    if (!state.pipelinesOnlyView) {
+        dot += '\n';
+        pipelines.forEach(pipeline => {
+            pipeline.input_sources?.forEach(source => {
+                dot += `    "${source}" -> "${pipeline.name}" [color="${edgeColor}", arrowsize=0.8];\n`;
+            });
+            pipeline.output_sources?.forEach(source => {
+                dot += `    "${pipeline.name}" -> "${source}" [color="${edgeColor}", arrowsize=0.8];\n`;
+            });
         });
-        pipeline.output_sources?.forEach(source => {
-            dot += `    "${pipeline.name}" -> "${source}" [color="${edgeColor}", arrowsize=0.8];\n`;
-        });
-    });
+    }
 
-    // Add pipeline dependencies
+// Pipeline-to-pipeline deps (orange edges)
+    const validNodeNames = new Set(pipelines.map(p => p.name));
     dot += '\n';
     pipelines.forEach(pipeline => {
         pipeline.upstream_pipelines?.forEach(upstream => {
-            dot += `    "${upstream}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`;
+            if (validNodeNames.has(upstream)) {
+                dot += `    "${upstream}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`;
+            }
         });
     });
 
@@ -294,7 +276,6 @@ export function renderGraph() {
                 setTimeout(initializeGraph, 100);
                 state.lastRenderedConfigHash = newHash;
             } else if (newHash !== state.lastRenderedConfigHash) {
-                // Only re-render if config has changed
                 updateGraph();
                 state.lastRenderedConfigHash = newHash;
             }
@@ -310,7 +291,6 @@ export function renderGraph() {
 
 export function initializeGraph() {
     try {
-        // Clear loading indicator
         document.getElementById('graph').innerHTML = '';
         state.graphviz = d3.select("#graph").graphviz()
             .width(document.getElementById('graph').clientWidth)
@@ -321,7 +301,6 @@ export function initializeGraph() {
         updateGraph();
     } catch (error) {
         console.error('Graphviz initialization error:', error);
-        // Fallback: show DOT code in graph area
         document.getElementById('graph').innerHTML = `
             <div class="alert alert-warning m-3">
                 <strong>Graph rendering issue detected.</strong><br>
@@ -340,7 +319,7 @@ export function updateGraph() {
 }
 
 export function setupGraphInteractivity() {
-    // Build and cache lineage maps once on render
+    // Build and cache lineage maps for fast provenance lookups
     state.cachedUpstreamMap = {};
     state.cachedDownstreamMap = {};
     state.cachedLineage = {};
@@ -359,7 +338,6 @@ export function setupGraphInteractivity() {
         }
     });
 
-    // Pre-compute full lineage for all nodes with distance
     function getFullChain(node, map, visited = new Set(), depth = 1) {
         if (visited.has(node)) return [];
         visited.add(node);
@@ -399,7 +377,6 @@ export function setupGraphInteractivity() {
         .on("dblclick", function(event, d) {
             event.stopPropagation();
             const nodeName = d3.select(this).select("title").text();
-            // Check if this is a group node
             if (state.groupedView && state.currentConfig?.pipelines) {
                 const isGroupNode = state.currentConfig.pipelines.some(p => p.group === nodeName);
                 if (isGroupNode) {
@@ -420,7 +397,6 @@ export function setupGraphInteractivity() {
         });
 
     d3.select("#graph").on("click", function(event) {
-        // Check if clicked on background
         if (event.target.tagName === "svg" || event.target === event.currentTarget || 
             event.target.classList.contains('graph-container') || 
             !event.target.closest('.node')) {
@@ -435,7 +411,6 @@ export function showNodeTooltip(event, nodeName) {
 
     let content = '';
 
-    // Check if this is a group node
     if (state.groupedView) {
         const groupMembers = state.currentConfig.pipelines?.filter(p => p.group === nodeName);
         if (groupMembers?.length > 0) {
@@ -500,13 +475,11 @@ export function selectNode(nodeName, nodeElement) {
     clearHighlights();
     d3.select(nodeElement).classed("node-highlighted", true);
 
-    // Use cached lineage for performance
     const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] };
     const upstream = lineage.upstream;
     const downstream = lineage.downstream;
     const allConnected = new Set([...upstream.map(x => x.name), ...downstream.map(x => x.name)]);
 
-    // Highlight connected nodes
     d3.select("#graph").selectAll(".node").each(function() {
         const node = d3.select(this);
         const nodeTitle = node.select("title").text();
@@ -517,7 +490,6 @@ export function selectNode(nodeName, nodeElement) {
         }
     });
 
-    // Highlight edges in the chain
     d3.select("#graph").selectAll(".edge").each(function() {
         const edge = d3.select(this);
         const title = edge.select("title").text();
@@ -535,7 +507,6 @@ export function selectNode(nodeName, nodeElement) {
         }
     });
 
-    // Show node details in side panel
     showNodeDetails(nodeName, upstream, downstream);
 }
 
@@ -549,14 +520,12 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     let nodeData = null;
     let nodeType = '';
 
-    // Check if it's a pipeline
     const pipeline = state.currentConfig.pipelines?.find(p => p.name === nodeName);
     if (pipeline) {
         nodeData = pipeline;
         nodeType = 'Pipeline';
     }
 
-    // Check if it's a pipeline group (in grouped view mode)
     if (!nodeData && state.groupedView) {
         const groupMembers = state.currentConfig.pipelines?.filter(p => p.group === nodeName);
         if (groupMembers?.length > 0) {
@@ -578,14 +547,12 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         }
     }
 
-    // Check if it's a datasource
     const datasource = state.currentConfig.datasources?.find(ds => ds.name === nodeName);
     if (datasource) {
         nodeData = datasource;
         nodeType = 'Data Source';
     }
 
-    // Check auto-created datasources
     if (!nodeData) {
         const allSources = new Set();
         state.currentConfig.pipelines?.forEach(p => {
@@ -607,7 +574,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html += `<div class="detail-label">Type</div>`;
     html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`;
 
-    // Add expand/collapse button for pipeline groups
     if (nodeType === 'Pipeline Group') {
         const isExpanded = state.expandedGroups.has(nodeName);
         html += `<div class="mt-2 mb-2">
@@ -617,7 +583,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         </div>`;
     }
 
-    // Add collapse button for pipelines that belong to an expanded group
     if (nodeType === 'Pipeline' && nodeData.group && state.expandedGroups.has(nodeData.group)) {
         html += `<div class="mt-2 mb-2">
             <button class="btn btn-sm btn-outline-secondary" onclick="toggleGroup('${nodeData.group}')">
@@ -704,7 +669,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         html += `</div>`;
     }
 
-    // Categorize upstream/downstream by type, deduplicate, sort by depth
     const pipelineNames = new Set((state.currentConfig.pipelines || []).map(p => p.name));
     if (state.groupedView) {
         (state.currentConfig.pipelines || []).forEach(p => {
@@ -712,7 +676,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         });
     }
 
-    // Deduplicate keeping lowest depth, then sort by depth
     function dedupeAndSort(items, filterFn) {
         const seen = new Map();
         items.filter(x => filterFn(x.name)).forEach(x => {
@@ -728,7 +691,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     const downstreamPipelines = dedupeAndSort(downstream, n => pipelineNames.has(n));
     const downstreamSources = dedupeAndSort(downstream, n => !pipelineNames.has(n));
 
-    // Render with depth indication
     function renderLineageList(items, label) {
         if (items.length === 0) return '';
         let out = `<div class="detail-label">${label} (${items.length})</div><div class="detail-value">`;
@@ -747,19 +709,16 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html += renderLineageList(downstreamPipelines, 'DOWNSTREAM PIPELINES');
     html += renderLineageList(downstreamSources, 'DOWNSTREAM SOURCES');
 
-    // Shrink graph and show panel
     const graphCol = document.getElementById('graph-col');
     graphCol.classList.remove('col-md-12');
     graphCol.classList.add('col-md-8');
     col.style.display = 'block';
     content.innerHTML = html;
 
-    // Add click handlers for lineage links
     content.querySelectorAll('.lineage-link').forEach(el => {
         el.addEventListener('click', function() {
             const targetName = this.getAttribute('data-node-name');
             if (targetName) {
-                // Find and click the node in the graph
                 d3.select("#graph").selectAll(".node").each(function() {
                     const nodeTitle = d3.select(this).select("title").text();
                     if (nodeTitle === targetName) {
@@ -774,7 +733,6 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 export function clearSelection() {
     state.selectedNode = null;
     clearHighlights();
-    // Hide details panel and expand graph
     const col = document.getElementById('node-details-col');
     const graphCol = document.getElementById('graph-col');
     if (col) col.style.display = 'none';
@@ -795,12 +753,10 @@ export function fuzzyMatch(text, query) {
     text = text.toLowerCase();
     query = query.toLowerCase();
 
-    // Direct substring match
     if (text.includes(query)) {
         return { match: true, score: query.length / text.length + 0.5 };
     }
 
-    // Fuzzy match - all query chars must appear in order
     let queryIdx = 0;
     let score = 0;
     let lastMatchIdx = -1;
@@ -827,7 +783,6 @@ export function highlightMatch(text, query) {
     const lowerText = text.toLowerCase();
     const lowerQuery = query.toLowerCase();
 
-    // Try substring match first
     const idx = lowerText.indexOf(lowerQuery);
     if (idx !== -1) {
         return text.substring(0, idx) +
@@ -835,7 +790,6 @@ export function highlightMatch(text, query) {
                text.substring(idx + query.length);
     }
 
-    // Fuzzy highlight
     let result = '';
     let queryIdx = 0;
     for (let i = 0; i < text.length; i++) {
@@ -853,7 +807,6 @@ export function searchNodes(event) {
     const dropdown = document.getElementById('graph-search-results');
     const items = dropdown.querySelectorAll('.search-result-item[data-name]');
 
-    // Handle arrow key navigation
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         if (items.length === 0) return;
@@ -873,7 +826,6 @@ export function searchNodes(event) {
         return;
     }
 
-    // Handle Enter key
     if (event.key === 'Enter') {
         const selected = dropdown.querySelector('.search-result-item.selected');
         if (selected && selected.dataset.name) {
@@ -882,7 +834,6 @@ export function searchNodes(event) {
         return;
     }
 
-    // Handle Escape key
     if (event.key === 'Escape') {
         dropdown.classList.remove('show');
         dropdown.innerHTML = '';
@@ -899,7 +850,6 @@ export function searchNodes(event) {
 
     const results = [];
 
-    // Search pipelines
     state.currentConfig.pipelines?.forEach(p => {
         const nameMatch = fuzzyMatch(p.name, query);
         const descMatch = p.description ? fuzzyMatch(p.description, query) : { match: false, score: 0 };
@@ -907,12 +857,11 @@ export function searchNodes(event) {
             results.push({
                 name: p.name,
                 type: 'pipeline',
-                score: Math.max(nameMatch.score * 1.5, descMatch.score) // Boost name matches
+                score: Math.max(nameMatch.score * 1.5, descMatch.score)
             });
         }
     });
 
-    // Search datasources
     state.currentConfig.datasources?.forEach(ds => {
         const nameMatch = fuzzyMatch(ds.name, query);
         const descMatch = ds.description ? fuzzyMatch(ds.description, query) : { match: false, score: 0 };
@@ -925,7 +874,6 @@ export function searchNodes(event) {
         }
     });
 
-    // Search auto-created datasources
     const autoSources = new Set();
     state.currentConfig.pipelines?.forEach(p => {
         p.input_sources?.forEach(s => autoSources.add(s));
@@ -944,10 +892,7 @@ export function searchNodes(event) {
         }
     });
 
-    // Sort by score
     results.sort((a, b) => b.score - a.score);
-
-    // Limit results
     const topResults = results.slice(0, 8);
 
     if (topResults.length === 0) {
@@ -966,13 +911,11 @@ export function searchNodes(event) {
 }
 
 export function selectSearchResult(nodeName) {
-    // Hide dropdown and clear search
     const dropdown = document.getElementById('graph-search-results');
     const searchInput = document.getElementById('graph-search');
     dropdown.classList.remove('show');
     searchInput.value = '';
 
-    // Find and click the node in the graph
     let found = false;
     d3.select("#graph").selectAll(".node").each(function() {
         const node = d3.select(this);
@@ -984,12 +927,10 @@ export function selectSearchResult(nodeName) {
     });
 
     if (!found) {
-        // Node might not be visible, just show details
         showNodeDetails(nodeName);
     }
 }
 
-// Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
     const dropdown = document.getElementById('graph-search-results');
     const searchInput = document.getElementById('graph-search');
@@ -1011,6 +952,19 @@ export function collapseAllGroups() {
     updateGraph();
 }
 
+export function togglePipelinesOnly() {
+    state.pipelinesOnlyView = !state.pipelinesOnlyView;
+    const btn = document.getElementById('pipelines-only-btn');
+    if (state.pipelinesOnlyView) {
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-secondary');
+    } else {
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-outline-secondary');
+    }
+    updateGraph();
+}
+
 export function toggleGroup(groupName) {
     if (state.expandedGroups.has(groupName)) {
         state.expandedGroups.delete(groupName);
@@ -1018,7 +972,6 @@ export function toggleGroup(groupName) {
         state.expandedGroups.add(groupName);
     }
     updateGraph();
-    // Refresh the details panel to update the button state
     showNodeDetails(groupName);
 }
 

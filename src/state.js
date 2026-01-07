@@ -4,6 +4,7 @@ export const state = {
     lastRenderedConfigHash: null,
     graphviz: null,
     groupedView: true,
+    pipelinesOnlyView: false,
     expandedGroups: new Set(),
     selectedNode: null,
 
@@ -96,7 +97,8 @@ export const exampleConfig = {
             "input_sources": ["user_cohorts"],
             "output_sources": ["salesforce_users"],
             "group": "data-exports",
-            "cluster": "analytics"
+            "cluster": "analytics",
+            "upstream_pipelines": ["analytics-aggregation"]
         },
         {
             "name": "export-to-hubspot",
@@ -104,7 +106,8 @@ export const exampleConfig = {
             "input_sources": ["user_cohorts"],
             "output_sources": ["hubspot_contacts"],
             "group": "data-exports",
-            "cluster": "analytics"
+            "cluster": "analytics",
+            "upstream_pipelines": ["analytics-aggregation"]
         },
         {
             "name": "export-to-amplitude",
@@ -112,7 +115,8 @@ export const exampleConfig = {
             "input_sources": ["daily_metrics"],
             "output_sources": ["amplitude_events"],
             "group": "data-exports",
-            "cluster": "analytics"
+            "cluster": "analytics",
+            "upstream_pipelines": ["analytics-aggregation"]
         },
         {
             "name": "weekly-rollup",
@@ -120,7 +124,8 @@ export const exampleConfig = {
             "input_sources": ["daily_metrics", "enriched_users"],
             "output_sources": ["executive_summary"],
             "schedule": "0 6 * * MON",
-            "cluster": "analytics"
+            "cluster": "analytics",
+            "upstream_pipelines": ["analytics-aggregation", "user-enrichment"]
         }
     ],
     "datasources": [

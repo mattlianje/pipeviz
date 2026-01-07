@@ -18,7 +18,6 @@ export function copyDotToClipboard(event) {
                 btn.textContent = originalText
             }, 2000)
         }).catch(() => {
-            // Fallback for older browsers
             dotOutput.select()
             dotOutput.setSelectionRange(0, 99999)
         })
