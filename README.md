@@ -23,9 +23,11 @@ Current tools have gaps:
 - **Frameworks are brittle** ([dbt](https://github.com/dbt-labs/dbt-core)) couple you to their dialect, manifest, and world view.
 - **Manual docs rot** (immediately).
 
-With Pipeviz, you declare your immediate dependencies (preferably) at compile time: "this code reads from A, writes to B". Pipeviz stitches these tactical declarations into complete end-to-end "strategic" lineage.
+With Pipeviz, you declare your immediate dependencies (preferably) at compile time: "this code reads from A, writes to B". Pipeviz stitches these declarations into complete end-to-end lineage.
 
-*Bonus: Since pipeviz is just niceties on top of a plain JSON spec, you can throw it into any LLM and get results.*
+## Of note...
+Essentially, pipeviz is just a collection of rendering niceties on top of a plain JSON spec... but this
+means you can throw the raw JSON into any LLM and get results.
 
 ## Quickstart
 [Live demo](https://pipeviz.org)
