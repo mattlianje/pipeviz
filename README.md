@@ -26,7 +26,7 @@ Current tools have gaps:
 With Pipeviz, you declare your immediate dependencies (preferably) at compile time: "this code reads from A, writes to B". Pipeviz stitches these declarations into complete end-to-end lineage.
 
 ## Of note...
-Essentially, pipeviz is just a collection of rendering niceties on top of a plain JSON spec... but this
+Essentially, pipeviz is just a bunch of rendering niceties on top of a plain JSON spec... but this
 means you can throw the raw JSON into any LLM and get results.
 
 ## Quickstart
