@@ -75,7 +75,7 @@ To self-host, download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob
   echo "🛰️ Serving at http://localhost:8000" && \
   python3 -m http.server 8000 -d /tmp 2>/dev/null & PID=$!; \
   sleep 0.3; open "http://localhost:8000/pipeviz.html?url=http://localhost:8000/pipeviz.json"; \
-  read -p "Press enter to stop..."; kill $PID 2>/dev/null; echo "✓ Stopped")
+  echo "Press enter to stop..."; read; kill $PID 2>/dev/null; echo "✓ Stopped")
 ```
 </details>
 
