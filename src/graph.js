@@ -193,8 +193,8 @@ ${'    '.repeat(depth + 2)}fontname="Arial";
                     (pipeline.schedule ?
                         `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
                         `"${pipeline.name}"`);
-                const fillColor = isGroup ? '#fff3e0' : '#e3f2fd';
-                const borderColor = isGroup ? '#ef6c00' : '#1976d2';
+                const fillColor = isGroup ? '#e0f2f1' : '#e3f2fd';
+                const borderColor = isGroup ? '#00897b' : '#1976d2';
                 const penWidth = isGroup ? '2' : '1';
                 result += `${'    '.repeat(depth + 2)}"${pipeline.name}" [shape=box, style="filled,rounded",
 ${'    '.repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
@@ -238,8 +238,8 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                 (pipeline.schedule ?
                     `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` :
                     `"${pipeline.name}"`);
-            const fillColor = isGroup ? '#fff3e0' : '#e3f2fd';
-            const borderColor = isGroup ? '#ef6c00' : '#1976d2';
+            const fillColor = isGroup ? '#e0f2f1' : '#e3f2fd';
+            const borderColor = isGroup ? '#00897b' : '#1976d2';
             const penWidth = isGroup ? '2' : '1';
             dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
         fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
@@ -675,7 +675,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     if (nodeData._members?.length) {
         html += `<div class="detail-label">Member Pipelines</div>`;
         html += `<div class="detail-value">${nodeData._members.map(p =>
-            `<span class="badge me-1 mb-1" style="background-color: #fff3e0; color: #ef6c00;">${p}</span>`
+            `<span class="badge me-1 mb-1" style="background-color: #e0f2f1; color: #00897b;">${p}</span>`
         ).join('')}</div>`;
     }
 

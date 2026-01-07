@@ -1906,8 +1906,8 @@ ${"    ".repeat(depth + 2)}fontname="Arial";
         const isGroup = pipeline._isGroup;
         const memberCount = pipeline._members?.length || 0;
         const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : pipeline.schedule ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` : `"${pipeline.name}"`;
-        const fillColor = isGroup ? "#fff3e0" : "#e3f2fd";
-        const borderColor = isGroup ? "#ef6c00" : "#1976d2";
+        const fillColor = isGroup ? "#e0f2f1" : "#e3f2fd";
+        const borderColor = isGroup ? "#00897b" : "#1976d2";
         const penWidth = isGroup ? "2" : "1";
         result += `${"    ".repeat(depth + 2)}"${pipeline.name}" [shape=box, style="filled,rounded",
 ${"    ".repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
@@ -1940,8 +1940,8 @@ ${"    ".repeat(depth + 3)}fontname="Arial", fontsize=10];
       const isGroup = pipeline._isGroup;
       const memberCount = pipeline._members?.length || 0;
       const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : pipeline.schedule ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` : `"${pipeline.name}"`;
-      const fillColor = isGroup ? "#fff3e0" : "#e3f2fd";
-      const borderColor = isGroup ? "#ef6c00" : "#1976d2";
+      const fillColor = isGroup ? "#e0f2f1" : "#e3f2fd";
+      const borderColor = isGroup ? "#00897b" : "#1976d2";
       const penWidth = isGroup ? "2" : "1";
       dot += `    "${pipeline.name}" [shape=box, style="filled,rounded",
         fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
@@ -2309,7 +2309,7 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   if (nodeData._members?.length) {
     html += `<div class="detail-label">Member Pipelines</div>`;
     html += `<div class="detail-value">${nodeData._members.map(
-      (p) => `<span class="badge me-1 mb-1" style="background-color: #fff3e0; color: #ef6c00;">${p}</span>`
+      (p) => `<span class="badge me-1 mb-1" style="background-color: #e0f2f1; color: #00897b;">${p}</span>`
     ).join("")}</div>`;
   }
   if (nodeData.tags?.length) {
@@ -3352,7 +3352,7 @@ jq -s '{
                                         <div class="legend">
                                             <div><strong>Legend:</strong></div>
                                             <div>■ = Pipeline</div>
-                                            <div style="color: #ef6c00;">■ = Group</div>
+                                            <div style="color: #00897b;">■ = Group</div>
                                             <div>● = Data Source</div>
                                             <div>□ = Cluster</div>
                                             <div>→ = Data flow</div>
