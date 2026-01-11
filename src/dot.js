@@ -10,16 +10,19 @@ export function updateDotView() {
 export function copyDotToClipboard(event) {
     const dotOutput = document.getElementById('dot-output')
     if (dotOutput) {
-        navigator.clipboard.writeText(dotOutput.value).then(() => {
-            const btn = event?.target || document.activeElement
-            const originalText = btn.textContent
-            btn.textContent = 'Copied!'
-            setTimeout(() => {
-                btn.textContent = originalText
-            }, 2000)
-        }).catch(() => {
-            dotOutput.select()
-            dotOutput.setSelectionRange(0, 99999)
-        })
+        navigator.clipboard
+            .writeText(dotOutput.value)
+            .then(() => {
+                const btn = event?.target || document.activeElement
+                const originalText = btn.textContent
+                btn.textContent = 'Copied!'
+                setTimeout(() => {
+                    btn.textContent = originalText
+                }, 2000)
+            })
+            .catch(() => {
+                dotOutput.select()
+                dotOutput.setSelectionRange(0, 99999)
+            })
     }
 }

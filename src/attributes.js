@@ -1,4 +1,4 @@
-import { state, getConfigHash } from "./state.js"
+import { state, getConfigHash } from './state.js'
 export function generateAttributeDot() {
     if (!state.currentConfig) return ''
 
@@ -25,18 +25,17 @@ export function generateAttributeDot() {
 
 `
 
-    // Collect source refs to identify attrs with downstream connections
     const sourceRefs = new Set()
     function collectSourceRefs(attrs) {
-        attrs.forEach(attr => {
+        attrs.forEach((attr) => {
             if (attr.from) {
                 const sources = Array.isArray(attr.from) ? attr.from : [attr.from]
-                sources.forEach(s => sourceRefs.add(s))
+                sources.forEach((s) => sourceRefs.add(s))
             }
             if (attr.attributes) collectSourceRefs(attr.attributes)
         })
     }
-    datasources.forEach(ds => {
+    datasources.forEach((ds) => {
         if (ds.attributes) collectSourceRefs(ds.attributes)
     })
 
@@ -45,13 +44,11 @@ export function generateAttributeDot() {
         return sourceRefs.has(ref)
     }
 
-    const structAttrs = new Set()  // attrs with children (for edge routing)
-
-    // Render attributes recursively with nested clusters
+    const structAttrs = new Set()
     state.nestedClusterCount = 0
     function renderAttributes(attrs, dsName, dsId, prefix = '', depth = 0) {
         let result = ''
-        attrs.forEach(attr => {
+        attrs.forEach((attr) => {
             const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name
             const attrId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`
             const hasUpstream = attr.from ? true : false
@@ -63,7 +60,7 @@ export function generateAttributeDot() {
                 structAttrs.add(attrId)
                 state.nestedClusterCount++
                 const clusterId = `cluster_${attrId}`
-                const nestedBg = hasLineage ? '#dde5ed' : (depth === 0 ? '#e8eef4' : '#dce4ec')
+                const nestedBg = hasLineage ? '#dde5ed' : depth === 0 ? '#e8eef4' : '#dce4ec'
                 result += `        subgraph ${clusterId} {
                     label="${attr.name}"
                     labelloc="t"
@@ -75,7 +72,7 @@ export function generateAttributeDot() {
                     fontsize="9"
                     margin="8"
 `
-                result += `            "${attrId}" [label="" shape=point width=0 height=0 fixedsize=true style=invis];\n`  // anchor
+                result += `            "${attrId}" [label="" shape=point width=0 height=0 fixedsize=true style=invis];\n` // anchor
                 result += renderAttributes(attr.attributes, dsName, dsId, attrPath, depth + 1)
                 result += `                        }\n`
             } else {
@@ -88,18 +85,21 @@ export function generateAttributeDot() {
 
     function collectLineage(attrs, dsId, prefix = '') {
         let edges = []
-        attrs.forEach(attr => {
+        attrs.forEach((attr) => {
             const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name
             const targetId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`
             const targetIsStruct = structAttrs.has(targetId)
 
             if (attr.from) {
                 const sources = Array.isArray(attr.from) ? attr.from : [attr.from]
-                sources.forEach(source => {
+                sources.forEach((source) => {
                     const parts = source.split('::')
                     if (parts.length >= 2) {
                         const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_')
-                        const sourcePath = parts.slice(1).join('__').replace(/[^a-zA-Z0-9_]/g, '_')
+                        const sourcePath = parts
+                            .slice(1)
+                            .join('__')
+                            .replace(/[^a-zA-Z0-9_]/g, '_')
                         const sourceId = `${sourceDs}__${sourcePath}`
                         const sourceIsStruct = structAttrs.has(sourceId)
 
@@ -117,7 +117,6 @@ export function generateAttributeDot() {
                 })
             }
 
-            // Recursively collect from nested attributes
             if (attr.attributes && attr.attributes.length > 0) {
                 edges = edges.concat(collectLineage(attr.attributes, dsId, attrPath))
             }
@@ -125,7 +124,7 @@ export function generateAttributeDot() {
         return edges
     }
 
-    datasources.forEach(ds => {
+    datasources.forEach((ds) => {
         if (!ds.attributes || ds.attributes.length === 0) return
 
         const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
@@ -143,11 +142,13 @@ export function generateAttributeDot() {
         dot += `    }\n\n`
     })
 
-    datasources.forEach(ds => {
+    datasources.forEach((ds) => {
         if (!ds.attributes) return
         const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
         const edges = collectLineage(ds.attributes, dsId)
-        edges.forEach(edge => { dot += edge; })
+        edges.forEach((edge) => {
+            dot += edge
+        })
     })
 
     dot += `}`
@@ -162,39 +163,45 @@ export function renderAttributeGraph() {
 
     if (!state.attributeGraphviz) {
         document.getElementById('attribute-graph').innerHTML = ''
-        state.attributeGraphviz = d3.select("#attribute-graph").graphviz()
+        state.attributeGraphviz = d3
+            .select('#attribute-graph')
+            .graphviz()
             .width(document.getElementById('attribute-graph').offsetWidth || 800)
             .height(500)
             .fit(true)
             .zoom(true)
     }
 
-    state.attributeGraphviz.renderDot(dot).on('end', function() {
-        d3.select('#attribute-graph').selectAll('.node').on('click', function(event) {
-            event.stopPropagation()
-            const title = d3.select(this).select('title').text()
-            if (title && state.attributeLineageMap[title]) {
-                selectAttribute(title)
-            }
-        })
-
-        d3.select('#attribute-graph').selectAll('.cluster').on('click', function(event) {
-            event.stopPropagation()
-            const title = d3.select(this).select('title').text()
-            if (title && title.startsWith('cluster_')) {
-                const id = title.substring(8)
-                if (id.includes('__') && state.attributeLineageMap[id]) {
-                    selectAttribute(id)
-                } else {
-                    const ds = (state.currentConfig.datasources || []).find(d =>
-                        d.name.replace(/[^a-zA-Z0-9]/g, '_') === id
-                    )
-                    if (ds) showDatasourceInAttributePanel(ds)
+    state.attributeGraphviz.renderDot(dot).on('end', function () {
+        d3.select('#attribute-graph')
+            .selectAll('.node')
+            .on('click', function (event) {
+                event.stopPropagation()
+                const title = d3.select(this).select('title').text()
+                if (title && state.attributeLineageMap[title]) {
+                    selectAttribute(title)
                 }
-            }
-        })
+            })
 
-        d3.select('#attribute-graph svg').on('click', function(event) {
+        d3.select('#attribute-graph')
+            .selectAll('.cluster')
+            .on('click', function (event) {
+                event.stopPropagation()
+                const title = d3.select(this).select('title').text()
+                if (title && title.startsWith('cluster_')) {
+                    const id = title.substring(8)
+                    if (id.includes('__') && state.attributeLineageMap[id]) {
+                        selectAttribute(id)
+                    } else {
+                        const ds = (state.currentConfig.datasources || []).find(
+                            (d) => d.name.replace(/[^a-zA-Z0-9]/g, '_') === id
+                        )
+                        if (ds) showDatasourceInAttributePanel(ds)
+                    }
+                }
+            })
+
+        d3.select('#attribute-graph svg').on('click', function (event) {
             if (event.target.tagName === 'svg' || event.target.classList.contains('graph')) {
                 clearAttributeSelection()
             }
@@ -217,10 +224,12 @@ export function buildAttributeLineageMap() {
     const datasources = state.currentConfig.datasources || []
 
     function registerAttributes(attrs, dsName, dsId, prefix = '') {
-        attrs.forEach(attr => {
+        attrs.forEach((attr) => {
             const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name
             const attrId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`
-            const fullName = prefix ? `${dsName}::${prefix.replace(/__/g, '::')}::${attr.name}` : `${dsName}::${attr.name}`
+            const fullName = prefix
+                ? `${dsName}::${prefix.replace(/__/g, '::')}::${attr.name}`
+                : `${dsName}::${attr.name}`
 
             state.attributeLineageMap[attrId] = {
                 id: attrId,
@@ -238,17 +247,20 @@ export function buildAttributeLineageMap() {
     }
 
     function collectAttributeLineage(attrs, dsId, prefix = '') {
-        attrs.forEach(attr => {
+        attrs.forEach((attr) => {
             const attrPath = prefix ? `${prefix}__${attr.name}` : attr.name
             const targetId = `${dsId}__${attrPath.replace(/[^a-zA-Z0-9_]/g, '_')}`
 
             if (attr.from) {
                 const sources = Array.isArray(attr.from) ? attr.from : [attr.from]
-                sources.forEach(source => {
+                sources.forEach((source) => {
                     const parts = source.split('::')
                     if (parts.length >= 2) {
                         const sourceDs = parts[0].replace(/[^a-zA-Z0-9]/g, '_')
-                        const sourcePath = parts.slice(1).join('__').replace(/[^a-zA-Z0-9_]/g, '_')
+                        const sourcePath = parts
+                            .slice(1)
+                            .join('__')
+                            .replace(/[^a-zA-Z0-9_]/g, '_')
                         const sourceId = `${sourceDs}__${sourcePath}`
 
                         if (state.attributeLineageMap[targetId]) {
@@ -261,27 +273,24 @@ export function buildAttributeLineageMap() {
                 })
             }
 
-if (attr.attributes && attr.attributes.length > 0) {
+            if (attr.attributes && attr.attributes.length > 0) {
                 collectAttributeLineage(attr.attributes, dsId, attrPath)
             }
         })
     }
 
-    // Pass 1: register all attributes
-    datasources.forEach(ds => {
+    datasources.forEach((ds) => {
         if (!ds.attributes) return
         const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
         registerAttributes(ds.attributes, ds.name, dsId)
     })
 
-    // Pass 2: build lineage relationships
-    datasources.forEach(ds => {
+    datasources.forEach((ds) => {
         if (!ds.attributes) return
         const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
         collectAttributeLineage(ds.attributes, dsId)
     })
 
-    // Pass 3: compute full provenance chains
     function computeFullChain(attrId, direction, visited = new Set(), depth = 1) {
         if (visited.has(attrId)) return []
         visited.add(attrId)
@@ -289,84 +298,89 @@ if (attr.attributes && attr.attributes.length > 0) {
         if (!attr) return []
         const next = direction === 'upstream' ? attr.upstream : attr.downstream
         let result = []
-        next.forEach(nextId => {
+        next.forEach((nextId) => {
             result.push({ id: nextId, depth: depth })
             result.push(...computeFullChain(nextId, direction, visited, depth + 1))
         })
         return result
     }
 
-    Object.keys(state.attributeLineageMap).forEach(attrId => {
-        state.attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, 'upstream', new Set());
-        state.attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, 'downstream', new Set());
-    });
+    Object.keys(state.attributeLineageMap).forEach((attrId) => {
+        state.attributeLineageMap[attrId].fullUpstream = computeFullChain(attrId, 'upstream', new Set())
+        state.attributeLineageMap[attrId].fullDownstream = computeFullChain(attrId, 'downstream', new Set())
+    })
 
-    // Pass 4: build datasource-to-datasource graph via BFS
-    var dsDirectUpstream = {};
-    var dsDirectDownstream = {};
+    var dsDirectUpstream = {}
+    var dsDirectDownstream = {}
 
-    datasources.forEach(function(ds) {
-        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
-        dsDirectUpstream[id] = new Set();
-        dsDirectDownstream[id] = new Set();
-    });
+    datasources.forEach(function (ds) {
+        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
+        dsDirectUpstream[id] = new Set()
+        dsDirectDownstream[id] = new Set()
+    })
 
-    Object.values(state.attributeLineageMap).forEach(function(attr) {
-        if (!attr || !attr.datasource) return;
-        var dsId = attr.datasource.replace(/[^a-zA-Z0-9]/g, '_');
+    Object.values(state.attributeLineageMap).forEach(function (attr) {
+        if (!attr || !attr.datasource) return
+        var dsId = attr.datasource.replace(/[^a-zA-Z0-9]/g, '_')
 
-        var upIds = attr.upstream || [];
+        var upIds = attr.upstream || []
         for (var i = 0; i < upIds.length; i++) {
-            var upDs = upIds[i].split('__')[0];
+            var upDs = upIds[i].split('__')[0]
             if (upDs && upDs !== dsId && dsDirectUpstream[dsId]) {
-                dsDirectUpstream[dsId].add(upDs);
+                dsDirectUpstream[dsId].add(upDs)
             }
         }
 
-        var downIds = attr.downstream || [];
+        var downIds = attr.downstream || []
         for (var j = 0; j < downIds.length; j++) {
-            var downDs = downIds[j].split('__')[0];
+            var downDs = downIds[j].split('__')[0]
             if (downDs && downDs !== dsId && dsDirectDownstream[dsId]) {
-                dsDirectDownstream[dsId].add(downDs);
+                dsDirectDownstream[dsId].add(downDs)
             }
         }
-    });
+    })
 
     function bfsProvenance(startId, getNeighbors) {
-        var result = [];
-        var visited = new Set([startId]);
-        var queue = [];
-        var neighbors = getNeighbors(startId);
-        neighbors.forEach(function(id) {
-            queue.push({ id: id, depth: 1 });
-            visited.add(id);
-        });
+        var result = []
+        var visited = new Set([startId])
+        var queue = []
+        var neighbors = getNeighbors(startId)
+        neighbors.forEach(function (id) {
+            queue.push({ id: id, depth: 1 })
+            visited.add(id)
+        })
 
         while (queue.length > 0) {
-            var item = queue.shift();
-            result.push(item);
-            var next = getNeighbors(item.id);
-            next.forEach(function(nextId) {
+            var item = queue.shift()
+            result.push(item)
+            var next = getNeighbors(item.id)
+            next.forEach(function (nextId) {
                 if (!visited.has(nextId)) {
-                    visited.add(nextId);
-                    queue.push({ id: nextId, depth: item.depth + 1 });
+                    visited.add(nextId)
+                    queue.push({ id: nextId, depth: item.depth + 1 })
                 }
-            });
+            })
         }
 
-        result.sort(function(a, b) { return a.depth - b.depth; });
-        return result;
+        result.sort(function (a, b) {
+            return a.depth - b.depth
+        })
+        return result
     }
 
-    state.datasourceLineageMap = {};
-    datasources.forEach(function(ds) {
-        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
+    state.datasourceLineageMap = {}
+    datasources.forEach(function (ds) {
+        var id = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
         state.datasourceLineageMap[id] = {
             name: ds.name,
-            upstream: bfsProvenance(id, function(x) { return dsDirectUpstream[x] || new Set(); }),
-            downstream: bfsProvenance(id, function(x) { return dsDirectDownstream[x] || new Set(); })
-        };
-    });
+            upstream: bfsProvenance(id, function (x) {
+                return dsDirectUpstream[x] || new Set()
+            }),
+            downstream: bfsProvenance(id, function (x) {
+                return dsDirectDownstream[x] || new Set()
+            })
+        }
+    })
 }
 
 export function getFullProvenance(attrId, direction, visited = new Set()) {
@@ -379,7 +393,7 @@ export function getFullProvenance(attrId, direction, visited = new Set()) {
     const next = direction === 'upstream' ? attr.upstream : attr.downstream
     let result = []
 
-    next.forEach(nextId => {
+    next.forEach((nextId) => {
         result.push(nextId)
         result.push(...getFullProvenance(nextId, direction, visited))
     })
@@ -392,59 +406,65 @@ export function selectAttribute(attrId) {
     const attr = state.attributeLineageMap[attrId]
     if (!attr) return
 
-    d3.select('#attribute-graph').selectAll('.node')
+    d3.select('#attribute-graph')
+        .selectAll('.node')
         .classed('node-highlighted', false)
         .classed('node-connected', false)
         .classed('node-dimmed', false)
-    d3.select('#attribute-graph').selectAll('.cluster')
+    d3.select('#attribute-graph')
+        .selectAll('.cluster')
         .classed('cluster-highlighted', false)
         .classed('cluster-connected', false)
         .classed('cluster-dimmed', false)
-    d3.select('#attribute-graph').selectAll('.edge')
-        .classed('edge-highlighted', false)
-        .classed('edge-dimmed', false)
+    d3.select('#attribute-graph').selectAll('.edge').classed('edge-highlighted', false).classed('edge-dimmed', false)
 
     const upstream = attr.fullUpstream || []
     const downstream = attr.fullDownstream || []
-    const allConnected = new Set([attrId, ...upstream.map(x => x.id), ...downstream.map(x => x.id)])
+    const allConnected = new Set([attrId, ...upstream.map((x) => x.id), ...downstream.map((x) => x.id)])
 
-    d3.select('#attribute-graph').selectAll('.node').each(function() {
-        const node = d3.select(this)
-        const title = node.select('title').text()
-        if (title === attrId) {
-            node.classed('node-highlighted', true).classed('node-dimmed', false)
-        } else if (allConnected.has(title)) {
-            node.classed('node-connected', true).classed('node-dimmed', false)
-        } else {
-            node.classed('node-dimmed', true)
-        }
-    })
-
-    d3.select('#attribute-graph').selectAll('.cluster').each(function() {
-        const cluster = d3.select(this)
-        const title = cluster.select('title').text()
-        if (title && title.startsWith('cluster_')) {
-            const clusterId = title.substring(8)
-            if (clusterId === attrId) {
-                cluster.classed('cluster-highlighted', true).classed('cluster-dimmed', false)
-            } else if (allConnected.has(clusterId)) {
-                cluster.classed('cluster-connected', true).classed('cluster-dimmed', false)
+    d3.select('#attribute-graph')
+        .selectAll('.node')
+        .each(function () {
+            const node = d3.select(this)
+            const title = node.select('title').text()
+            if (title === attrId) {
+                node.classed('node-highlighted', true).classed('node-dimmed', false)
+            } else if (allConnected.has(title)) {
+                node.classed('node-connected', true).classed('node-dimmed', false)
             } else {
-                cluster.classed('cluster-dimmed', true)
+                node.classed('node-dimmed', true)
             }
-        }
-    })
+        })
 
-    d3.select('#attribute-graph').selectAll('.edge').each(function() {
-        const edge = d3.select(this)
-        const title = edge.select('title').text()
-        const [from, to] = title.split('->').map(s => s.trim())
-        if (allConnected.has(from) && allConnected.has(to)) {
-            edge.classed('edge-highlighted', true).classed('edge-dimmed', false)
-        } else {
-            edge.classed('edge-dimmed', true)
-        }
-    })
+    d3.select('#attribute-graph')
+        .selectAll('.cluster')
+        .each(function () {
+            const cluster = d3.select(this)
+            const title = cluster.select('title').text()
+            if (title && title.startsWith('cluster_')) {
+                const clusterId = title.substring(8)
+                if (clusterId === attrId) {
+                    cluster.classed('cluster-highlighted', true).classed('cluster-dimmed', false)
+                } else if (allConnected.has(clusterId)) {
+                    cluster.classed('cluster-connected', true).classed('cluster-dimmed', false)
+                } else {
+                    cluster.classed('cluster-dimmed', true)
+                }
+            }
+        })
+
+    d3.select('#attribute-graph')
+        .selectAll('.edge')
+        .each(function () {
+            const edge = d3.select(this)
+            const title = edge.select('title').text()
+            const [from, to] = title.split('->').map((s) => s.trim())
+            if (allConnected.has(from) && allConnected.has(to)) {
+                edge.classed('edge-highlighted', true).classed('edge-dimmed', false)
+            } else {
+                edge.classed('edge-dimmed', true)
+            }
+        })
 
     showAttributeDetails(attrId, upstream, downstream)
 }
@@ -471,8 +491,8 @@ export function showAttributeDetails(attrId, upstream, downstream) {
 
     const childPrefix = attrId + '__'
     const children = Object.keys(state.attributeLineageMap)
-        .filter(id => id.startsWith(childPrefix))
-        .map(id => {
+        .filter((id) => id.startsWith(childPrefix))
+        .map((id) => {
             const child = state.attributeLineageMap[id]
             const relativePath = id.substring(childPrefix.length)
             const depth = (relativePath.match(/__/g) || []).length
@@ -483,7 +503,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
     if (children.length > 0) {
         html += `<div class="detail-label">CONTAINS (${children.length})</div>`
         html += `<div class="detail-value">`
-        children.forEach(child => {
+        children.forEach((child) => {
             const indent = child.depth * 12
             html += `<div class="lineage-link" data-attr-id="${child.id}" style="padding-left: ${indent}px;">${child.relativePath.replace(/__/g, '.')}</div>`
         })
@@ -492,7 +512,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
 
     function dedupeAndSort(items) {
         const seen = new Map()
-        items.forEach(x => {
+        items.forEach((x) => {
             if (!seen.has(x.id) || seen.get(x.id).depth > x.depth) {
                 seen.set(x.id, x)
             }
@@ -503,10 +523,117 @@ export function showAttributeDetails(attrId, upstream, downstream) {
     const sortedUpstream = dedupeAndSort(upstream)
     const sortedDownstream = dedupeAndSort(downstream)
 
+    function getDatasourceMetadata(dsName) {
+        const datasource = state.currentConfig?.datasources?.find((ds) => ds.name === dsName)
+        if (!datasource) return null
+        const meta = {}
+        if (datasource.description) meta.description = datasource.description
+        if (datasource.type) meta.source_type = datasource.type
+        if (datasource.cluster) meta.cluster = datasource.cluster
+        if (datasource.owner) meta.owner = datasource.owner
+        if (datasource.tags?.length) meta.tags = datasource.tags
+        if (datasource.links && Object.keys(datasource.links).length) meta.links = datasource.links
+        if (datasource.metadata && Object.keys(datasource.metadata).length) meta.metadata = datasource.metadata
+        return meta
+    }
+
+    const allUpstreamIds = new Set(sortedUpstream.map((x) => x.id))
+    const allDownstreamIds = new Set(sortedDownstream.map((x) => x.id))
+    const upstreamEdges = []
+    allUpstreamIds.forEach((id) => {
+        const upAttr = state.attributeLineageMap[id]
+        if (upAttr && upAttr.downstream) {
+            upAttr.downstream.forEach((downId) => {
+                if (allUpstreamIds.has(downId) || downId === attrId) {
+                    upstreamEdges.push({ from: id, to: downId })
+                }
+            })
+        }
+    })
+
+    const downstreamEdges = []
+    if (attr.downstream) {
+        attr.downstream.forEach((downId) => {
+            if (allDownstreamIds.has(downId)) {
+                downstreamEdges.push({ from: attrId, to: downId })
+            }
+        })
+    }
+    allDownstreamIds.forEach((id) => {
+        const downAttr = state.attributeLineageMap[id]
+        if (downAttr && downAttr.downstream) {
+            downAttr.downstream.forEach((nextId) => {
+                if (allDownstreamIds.has(nextId)) {
+                    downstreamEdges.push({ from: id, to: nextId })
+                }
+            })
+        }
+    })
+
+    const lineageJson = {
+        attribute: attrId,
+        name: attr.name,
+        fullName: attr.fullName,
+        datasource: attr.datasource,
+        datasource_metadata: getDatasourceMetadata(attr.datasource),
+        upstream: {
+            attributes: sortedUpstream
+                .map((x) => {
+                    const upAttr = state.attributeLineageMap[x.id]
+                    if (!upAttr) return null
+                    return {
+                        id: x.id,
+                        depth: x.depth,
+                        name: upAttr.name,
+                        fullName: upAttr.fullName,
+                        datasource: upAttr.datasource,
+                        datasource_metadata: getDatasourceMetadata(upAttr.datasource)
+                    }
+                })
+                .filter((x) => x),
+            edges: upstreamEdges
+        },
+        downstream: {
+            attributes: sortedDownstream
+                .map((x) => {
+                    const downAttr = state.attributeLineageMap[x.id]
+                    if (!downAttr) return null
+                    return {
+                        id: x.id,
+                        depth: x.depth,
+                        name: downAttr.name,
+                        fullName: downAttr.fullName,
+                        datasource: downAttr.datasource,
+                        datasource_metadata: getDatasourceMetadata(downAttr.datasource)
+                    }
+                })
+                .filter((x) => x),
+            edges: downstreamEdges
+        },
+        children: children.map((c) => ({
+            id: c.id,
+            name: c.name,
+            relativePath: c.relativePath,
+            depth: c.depth
+        }))
+    }
+
+    const hasLineage = sortedUpstream.length > 0 || sortedDownstream.length > 0
+
+    if (hasLineage) {
+        html += `<div class="lineage-view-toggle">
+            <span class="lineage-toggle-label active" data-view="tree">Tree</span>
+            <div class="lineage-toggle-slider"></div>
+            <span class="lineage-toggle-label" data-view="json">JSON</span>
+        </div>`
+    }
+
+    html += `<div class="lineage-tree-view">`
+
     if (sortedUpstream.length > 0) {
         html += `<div class="detail-label">UPSTREAM (${sortedUpstream.length})</div>`
         html += `<div class="detail-value">`
-        sortedUpstream.forEach(x => {
+        sortedUpstream.forEach((x) => {
             const upAttr = state.attributeLineageMap[x.id]
             if (upAttr) {
                 const indent = (x.depth - 1) * 12
@@ -521,7 +648,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
     if (sortedDownstream.length > 0) {
         html += `<div class="detail-label">DOWNSTREAM (${sortedDownstream.length})</div>`
         html += `<div class="detail-value">`
-        sortedDownstream.forEach(x => {
+        sortedDownstream.forEach((x) => {
             const downAttr = state.attributeLineageMap[x.id]
             if (downAttr) {
                 const indent = (x.depth - 1) * 12
@@ -537,10 +664,40 @@ export function showAttributeDetails(attrId, upstream, downstream) {
         html += `<div class="detail-value text-muted">No lineage connections</div>`
     }
 
+    html += `</div>`
+
+    html += `<div class="lineage-json-view" style="display: none;">
+        <div class="detail-label">LINEAGE JSON</div>
+        <pre class="lineage-json-pre">${JSON.stringify(lineageJson, null, 2)}</pre>
+    </div>`
+
     content.innerHTML = html
 
-    content.querySelectorAll('.lineage-link').forEach(el => {
-        el.addEventListener('click', function() {
+    const slider = content.querySelector('.lineage-toggle-slider')
+    if (slider) {
+        slider.addEventListener('click', function () {
+            const isJson = this.classList.toggle('json-active')
+            const treeView = content.querySelector('.lineage-tree-view')
+            const jsonView = content.querySelector('.lineage-json-view')
+            const treeLabel = content.querySelector('.lineage-toggle-label[data-view="tree"]')
+            const jsonLabel = content.querySelector('.lineage-toggle-label[data-view="json"]')
+
+            if (isJson) {
+                treeView.style.display = 'none'
+                jsonView.style.display = 'block'
+                treeLabel.classList.remove('active')
+                jsonLabel.classList.add('active')
+            } else {
+                treeView.style.display = 'block'
+                jsonView.style.display = 'none'
+                treeLabel.classList.add('active')
+                jsonLabel.classList.remove('active')
+            }
+        })
+    }
+
+    content.querySelectorAll('.lineage-link').forEach((el) => {
+        el.addEventListener('click', function () {
             const attrId = this.getAttribute('data-attr-id')
             if (attrId) selectAttribute(attrId)
         })
@@ -548,41 +705,47 @@ export function showAttributeDetails(attrId, upstream, downstream) {
 }
 
 export function showDatasourceInAttributePanel(ds) {
-    state.selectedAttribute = null;
+    state.selectedAttribute = null
 
-    var dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_');
-    var dsLineage = state.datasourceLineageMap[dsId] || { upstream: [], downstream: [] };
-    var upstreamList = dsLineage.upstream || [];
-    var downstreamList = dsLineage.downstream || [];
+    var dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
+    var dsLineage = state.datasourceLineageMap[dsId] || { upstream: [], downstream: [] }
+    var upstreamList = dsLineage.upstream || []
+    var downstreamList = dsLineage.downstream || []
 
-    var connectedIds = new Set();
-    upstreamList.forEach(function(x) { connectedIds.add(x.id); });
-    downstreamList.forEach(function(x) { connectedIds.add(x.id); });
+    var connectedIds = new Set()
+    upstreamList.forEach(function (x) {
+        connectedIds.add(x.id)
+    })
+    downstreamList.forEach(function (x) {
+        connectedIds.add(x.id)
+    })
 
-    d3.select('#attribute-graph').selectAll('.node')
+    d3.select('#attribute-graph')
+        .selectAll('.node')
         .classed('node-highlighted', false)
         .classed('node-connected', false)
         .classed('node-dimmed', false)
-    d3.select('#attribute-graph').selectAll('.edge')
-        .classed('edge-highlighted', false)
-        .classed('edge-dimmed', false)
-    d3.select('#attribute-graph').selectAll('.cluster')
+    d3.select('#attribute-graph').selectAll('.edge').classed('edge-highlighted', false).classed('edge-dimmed', false)
+    d3.select('#attribute-graph')
+        .selectAll('.cluster')
         .classed('cluster-highlighted', false)
         .classed('cluster-connected', false)
         .classed('cluster-dimmed', false)
 
-    d3.select('#attribute-graph').selectAll('.cluster').each(function() {
-        const cluster = d3.select(this)
-        const title = cluster.select('title').text()
-        if (title && title.startsWith('cluster_')) {
-            const clusterId = title.substring(8)
-            if (clusterId === dsId) {
-                cluster.classed('cluster-highlighted', true)
-            } else if (connectedIds.has(clusterId)) {
-                cluster.classed('cluster-connected', true)
+    d3.select('#attribute-graph')
+        .selectAll('.cluster')
+        .each(function () {
+            const cluster = d3.select(this)
+            const title = cluster.select('title').text()
+            if (title && title.startsWith('cluster_')) {
+                const clusterId = title.substring(8)
+                if (clusterId === dsId) {
+                    cluster.classed('cluster-highlighted', true)
+                } else if (connectedIds.has(clusterId)) {
+                    cluster.classed('cluster-connected', true)
+                }
             }
-        }
-    })
+        })
 
     const col = document.getElementById('attribute-details-col')
     const graphCol = document.getElementById('attribute-graph-col')
@@ -604,37 +767,57 @@ export function showDatasourceInAttributePanel(ds) {
     }
 
     if (upstreamList.length > 0) {
-        html += '<div class="detail-label">UPSTREAM (' + upstreamList.length + ')</div>';
-        html += '<div class="detail-value">';
-        upstreamList.forEach(function(item) {
-            var depth = item.depth;
-            var indent = (depth - 1) * 16;
-            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
-            var found = (state.currentConfig.datasources || []).find(function(d) {
-                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id;
-            });
-            var name = found ? found.name : item.id;
-            var prefix = depth > 1 ? '└ ' : '';
-            html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + 'px; opacity: ' + opacity + ';">' + prefix + name + '</div>';
-        });
-        html += '</div>';
+        html += '<div class="detail-label">UPSTREAM (' + upstreamList.length + ')</div>'
+        html += '<div class="detail-value">'
+        upstreamList.forEach(function (item) {
+            var depth = item.depth
+            var indent = (depth - 1) * 16
+            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2)
+            var found = (state.currentConfig.datasources || []).find(function (d) {
+                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id
+            })
+            var name = found ? found.name : item.id
+            var prefix = depth > 1 ? '└ ' : ''
+            html +=
+                '<div class="lineage-link" data-ds-name="' +
+                name +
+                '" style="padding-left: ' +
+                indent +
+                'px; opacity: ' +
+                opacity +
+                ';">' +
+                prefix +
+                name +
+                '</div>'
+        })
+        html += '</div>'
     }
 
     if (downstreamList.length > 0) {
-        html += '<div class="detail-label">DOWNSTREAM (' + downstreamList.length + ')</div>';
-        html += '<div class="detail-value">';
-        downstreamList.forEach(function(item) {
-            var depth = item.depth;
-            var indent = (depth - 1) * 16;
-            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2);
-            var found = (state.currentConfig.datasources || []).find(function(d) {
-                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id;
-            });
-            var name = found ? found.name : item.id;
-            var prefix = depth > 1 ? '└ ' : '';
-            html += '<div class="lineage-link" data-ds-name="' + name + '" style="padding-left: ' + indent + 'px; opacity: ' + opacity + ';">' + prefix + name + '</div>';
-        });
-        html += '</div>';
+        html += '<div class="detail-label">DOWNSTREAM (' + downstreamList.length + ')</div>'
+        html += '<div class="detail-value">'
+        downstreamList.forEach(function (item) {
+            var depth = item.depth
+            var indent = (depth - 1) * 16
+            var opacity = Math.max(0.4, 1 - (depth - 1) * 0.2)
+            var found = (state.currentConfig.datasources || []).find(function (d) {
+                return d.name.replace(/[^a-zA-Z0-9]/g, '_') === item.id
+            })
+            var name = found ? found.name : item.id
+            var prefix = depth > 1 ? '└ ' : ''
+            html +=
+                '<div class="lineage-link" data-ds-name="' +
+                name +
+                '" style="padding-left: ' +
+                indent +
+                'px; opacity: ' +
+                opacity +
+                ';">' +
+                prefix +
+                name +
+                '</div>'
+        })
+        html += '</div>'
     }
 
     if (ds.description) {
@@ -654,15 +837,15 @@ export function showDatasourceInAttributePanel(ds) {
 
     if (ds.tags && ds.tags.length > 0) {
         html += `<div class="detail-label">Tags</div>`
-        html += `<div class="detail-value">${ds.tags.map(t =>
-            `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404;">${t}</span>`
-        ).join('')}</div>`
+        html += `<div class="detail-value">${ds.tags
+            .map((t) => `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404;">${t}</span>`)
+            .join('')}</div>`
     }
 
     if (ds.attributes && ds.attributes.length > 0) {
         let attrCount = 0
         function countAttrs(attrs) {
-            attrs.forEach(attr => {
+            attrs.forEach((attr) => {
                 attrCount++
                 if (attr.attributes) countAttrs(attr.attributes)
             })
@@ -672,7 +855,7 @@ export function showDatasourceInAttributePanel(ds) {
         html += `<div class="detail-label">Attributes (${attrCount})</div>`
         html += `<div class="detail-value">`
         function listAttrs(attrs, indent = 0) {
-            attrs.forEach(attr => {
+            attrs.forEach((attr) => {
                 const hasChildren = attr.attributes && attr.attributes.length > 0
                 html += `<div class="small" style="padding-left: ${indent * 12}px;">${hasChildren ? '▸ ' : ''}${attr.name}</div>`
                 if (attr.attributes) listAttrs(attr.attributes, indent + 1)
@@ -702,10 +885,10 @@ export function showDatasourceInAttributePanel(ds) {
 
     content.innerHTML = html
 
-    content.querySelectorAll('.lineage-link[data-ds-name]').forEach(el => {
-        el.addEventListener('click', function() {
+    content.querySelectorAll('.lineage-link[data-ds-name]').forEach((el) => {
+        el.addEventListener('click', function () {
             const dsName = this.getAttribute('data-ds-name')
-            const targetDs = (state.currentConfig.datasources || []).find(d => d.name === dsName)
+            const targetDs = (state.currentConfig.datasources || []).find((d) => d.name === dsName)
             if (targetDs) showDatasourceInAttributePanel(targetDs)
         })
     })
@@ -714,19 +897,19 @@ export function showDatasourceInAttributePanel(ds) {
 export function clearAttributeSelection() {
     state.selectedAttribute = null
 
-    d3.select('#attribute-graph').selectAll('.node')
+    d3.select('#attribute-graph')
+        .selectAll('.node')
         .classed('node-highlighted', false)
         .classed('node-connected', false)
         .classed('node-dimmed', false)
 
-    d3.select('#attribute-graph').selectAll('.cluster')
+    d3.select('#attribute-graph')
+        .selectAll('.cluster')
         .classed('cluster-highlighted', false)
         .classed('cluster-connected', false)
         .classed('cluster-dimmed', false)
 
-    d3.select('#attribute-graph').selectAll('.edge')
-        .classed('edge-highlighted', false)
-        .classed('edge-dimmed', false)
+    d3.select('#attribute-graph').selectAll('.edge').classed('edge-highlighted', false).classed('edge-dimmed', false)
 
     const col = document.getElementById('attribute-details-col')
     const graphCol = document.getElementById('attribute-graph-col')
@@ -756,7 +939,7 @@ export function searchAttributes(event) {
             index = index > 0 ? index - 1 : items.length - 1
         }
 
-        items.forEach(item => item.classList.remove('selected'))
+        items.forEach((item) => item.classList.remove('selected'))
         items[index].classList.add('selected')
         items[index].scrollIntoView({ block: 'nearest' })
         return
@@ -784,7 +967,7 @@ export function searchAttributes(event) {
     }
 
     const matches = []
-    Object.values(state.attributeLineageMap).forEach(attr => {
+    Object.values(state.attributeLineageMap).forEach((attr) => {
         if (attr.fullName.toLowerCase().includes(query) || attr.name.toLowerCase().includes(query)) {
             matches.push(attr)
         }
@@ -813,13 +996,13 @@ export function selectAttributeFromSearch(attrId) {
     selectAttribute(attrId)
 }
 
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
     if (!e.target.closest('#attribute-search') && !e.target.closest('#attribute-search-results')) {
         document.getElementById('attribute-search-results')?.classList.remove('show')
     }
 })
 
-document.getElementById('attributes-tab')?.addEventListener('shown.bs.tab', function() {
+document.getElementById('attributes-tab')?.addEventListener('shown.bs.tab', function () {
     const newHash = getConfigHash(state.currentConfig)
     if (!state.attributeGraphviz || newHash !== state.attributeLastRenderedConfigHash) {
         setTimeout(() => {

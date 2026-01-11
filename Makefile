@@ -1,4 +1,4 @@
-.PHONY: dev build clean install publish
+.PHONY: dev build clean install publish fmt
 
 NVM_DIR := $(HOME)/.nvm
 SHELL := /bin/bash
@@ -6,6 +6,9 @@ SHELL := /bin/bash
 
 dev:
 	npm run dev
+
+fmt:
+	npm run fmt
 
 # Builds single file html
 build:
