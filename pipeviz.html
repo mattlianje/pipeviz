@@ -271,9 +271,12 @@
             }
             .node-highlighted text {
                 font-weight: normal !important;
-                fill: #000 !important;
+                fill: #000;
                 stroke: none !important;
                 stroke-width: 0 !important;
+            }
+            .node-highlighted text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             .node-connected {
                 stroke: #7b1fa2 !important;
@@ -281,9 +284,12 @@
             }
             .node-connected text {
                 font-weight: normal !important;
-                fill: #000 !important;
+                fill: #000;
                 stroke: none !important;
                 stroke-width: 0 !important;
+            }
+            .node-connected text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             .node-dimmed {
                 opacity: 0.35 !important;
@@ -1072,7 +1078,14 @@
             [data-theme='dark'] #graph .node text,
             [data-theme='dark'] #splash-graph .node text,
             [data-theme='dark'] #attribute-graph .node text {
-                fill: #000 !important;
+                fill: #000;
+            }
+            /* Preserve schedule magenta color in nodes */
+            [data-theme='dark'] #graph .node text[fill='#d63384'],
+            [data-theme='dark'] #splash-graph .node text[fill='#d63384'],
+            #graph .node text[fill='#d63384'],
+            #splash-graph .node text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             [data-theme='dark'] #graph .graph > polygon,
             [data-theme='dark'] #splash-graph .graph > polygon,
@@ -1551,6 +1564,8 @@ const state = {
   cachedUpstreamMap: {},
   cachedDownstreamMap: {},
   cachedLineage: {},
+  // View state cache for snappy group expand/collapse
+  viewStateCache: /* @__PURE__ */ new Map(),
   // Attribute graph state
   attributeGraphviz: null,
   attributeLastRenderedConfigHash: null,
@@ -1561,6 +1576,22 @@ const state = {
 };
 function getConfigHash(config) {
   return JSON.stringify(config);
+}
+function getViewStateKey() {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const expandedGroupsKey = Array.from(state.expandedGroups).sort().join(",");
+  return `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${expandedGroupsKey}`;
+}
+function clearViewStateCache() {
+  state.viewStateCache.clear();
+}
+const MAX_VIEW_CACHE_SIZE = 50;
+function addToViewCache(key, value) {
+  if (state.viewStateCache.size >= MAX_VIEW_CACHE_SIZE) {
+    const firstKey = state.viewStateCache.keys().next().value;
+    state.viewStateCache.delete(firstKey);
+  }
+  state.viewStateCache.set(key, value);
 }
 const exampleConfig = {
   clusters: [
@@ -2641,6 +2672,178 @@ document.getElementById("attributes-tab")?.addEventListener("shown.bs.tab", func
     }, 100);
   }
 });
+function generateBlastRadiusAnalysis(nodeName) {
+  if (!state.currentConfig || !nodeName) return null;
+  const pipelines = state.currentConfig.pipelines || [];
+  const datasources = state.currentConfig.datasources || [];
+  const groupMembers = pipelines.filter((p) => p.group === nodeName);
+  const isGroup = groupMembers.length > 0;
+  const downstream = /* @__PURE__ */ new Map();
+  const nodeTypes = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => {
+    nodeTypes.set(p.name, "pipeline");
+    if (!downstream.has(p.name)) downstream.set(p.name, /* @__PURE__ */ new Set());
+    p.output_sources?.forEach((s) => {
+      downstream.get(p.name).add(s);
+      if (!nodeTypes.has(s)) nodeTypes.set(s, "datasource");
+    });
+    p.input_sources?.forEach((s) => {
+      if (!downstream.has(s)) downstream.set(s, /* @__PURE__ */ new Set());
+      downstream.get(s).add(p.name);
+      if (!nodeTypes.has(s)) nodeTypes.set(s, "datasource");
+    });
+    p.upstream_pipelines?.forEach((u) => {
+      if (!downstream.has(u)) downstream.set(u, /* @__PURE__ */ new Set());
+      downstream.get(u).add(p.name);
+    });
+  });
+  datasources.forEach((ds) => {
+    if (!nodeTypes.has(ds.name)) nodeTypes.set(ds.name, "datasource");
+  });
+  const visited = /* @__PURE__ */ new Map();
+  const edges = [];
+  const startNodes = isGroup ? groupMembers.map((p) => p.name) : [nodeName];
+  const groupMemberNames = new Set(startNodes);
+  startNodes.forEach((startNode) => {
+    if (!visited.has(startNode)) {
+      visited.set(startNode, 0);
+    }
+  });
+  const queue = startNodes.map((n) => [n, 0]);
+  while (queue.length > 0) {
+    const [current, depth] = queue.shift();
+    const neighbors = downstream.get(current) || /* @__PURE__ */ new Set();
+    for (const neighbor of neighbors) {
+      if (isGroup && groupMemberNames.has(current) && groupMemberNames.has(neighbor)) {
+        continue;
+      }
+      edges.push({ source: isGroup ? nodeName : current, target: neighbor });
+      if (!visited.has(neighbor)) {
+        visited.set(neighbor, depth + 1);
+        queue.push([neighbor, depth + 1]);
+      }
+    }
+  }
+  const downstreamNodes = [];
+  visited.forEach((depth, node) => {
+    const isSourceOrMember = isGroup ? groupMemberNames.has(node) : node === nodeName;
+    if (!isSourceOrMember) {
+      const type = nodeTypes.get(node) || "unknown";
+      const pipeline = pipelines.find((p) => p.name === node);
+      const nodeInfo = { name: node, type, depth };
+      if (pipeline) {
+        if (pipeline.schedule) nodeInfo.schedule = pipeline.schedule;
+        if (pipeline.cluster) nodeInfo.cluster = pipeline.cluster;
+      }
+      downstreamNodes.push(nodeInfo);
+    }
+  });
+  downstreamNodes.sort((a, b) => a.depth - b.depth || a.name.localeCompare(b.name));
+  const byDepth = {};
+  downstreamNodes.forEach((n) => {
+    if (!byDepth[n.depth]) byDepth[n.depth] = [];
+    byDepth[n.depth].push(n);
+  });
+  const maxDepth = Math.max(...downstreamNodes.map((n) => n.depth), 0);
+  const result = {
+    source: nodeName,
+    source_type: isGroup ? "group" : nodeTypes.get(nodeName) || "unknown",
+    total_affected: downstreamNodes.length,
+    max_depth: maxDepth,
+    downstream: downstreamNodes,
+    by_depth: byDepth,
+    edges
+  };
+  if (isGroup) {
+    result.group_members = groupMembers.map((p) => p.name);
+    result.group_size = groupMembers.length;
+  }
+  return result;
+}
+function generateBlastRadiusDot(analysis) {
+  if (!analysis || analysis.downstream.length === 0) return null;
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const bgColor = isDark ? "#1a1a1a" : "#ffffff";
+  const textColor = isDark ? "#b0b0b0" : "#666666";
+  const edgeColor = isDark ? "#666666" : "#999999";
+  const depthColors = isDark ? [
+    { fill: "#4a2a2a", border: "#c98b8b", text: "#e0e0e0" },
+    // Source - warm red
+    { fill: "#4a3a2a", border: "#d4a574", text: "#e0e0e0" },
+    // Depth 1 - orange
+    { fill: "#4a4a2a", border: "#c4c474", text: "#e0e0e0" },
+    // Depth 2 - yellow
+    { fill: "#2a4a3a", border: "#7cb47c", text: "#e0e0e0" },
+    // Depth 3 - green
+    { fill: "#2a3a4a", border: "#6b9dc4", text: "#e0e0e0" },
+    // Depth 4 - blue
+    { fill: "#3a2a4a", border: "#a88bc4", text: "#e0e0e0" }
+    // Depth 5+ - purple
+  ] : [
+    { fill: "#fce4ec", border: "#c98b8b", text: "#495057" },
+    // Source - warm red
+    { fill: "#fff3e0", border: "#d4a574", text: "#495057" },
+    // Depth 1 - orange
+    { fill: "#fffde7", border: "#c4c474", text: "#495057" },
+    // Depth 2 - yellow
+    { fill: "#e8f5e9", border: "#7cb47c", text: "#495057" },
+    // Depth 3 - green
+    { fill: "#e3f2fd", border: "#6b9dc4", text: "#495057" },
+    // Depth 4 - blue
+    { fill: "#f3e5f5", border: "#a88bc4", text: "#495057" }
+    // Depth 5+ - purple
+  ];
+  let dot = `digraph BlastRadius {
+    rankdir=LR
+    bgcolor="${bgColor}"
+    fontname="Helvetica"
+    node [fontname="Helvetica" fontsize="9" style="filled"]
+    edge [color="${edgeColor}" arrowsize="0.6"]
+    
+`;
+  const sourceColor = depthColors[0];
+  const isGroup = analysis.source_type === "group";
+  const sourceShape = analysis.source_type === "datasource" ? "ellipse" : "box";
+  const sourceLabel = isGroup ? `${analysis.source}\\n(${analysis.group_size} pipelines)` : analysis.source;
+  const sourceBorderColor = isGroup ? "#00897b" : sourceColor.border;
+  dot += `    "${analysis.source}" [label="${sourceLabel}" shape="${sourceShape}" fillcolor="${sourceColor.fill}" color="${sourceBorderColor}" fontcolor="${sourceColor.text}" penwidth="2"]
+
+`;
+  Object.entries(analysis.by_depth).forEach(([depth, nodes]) => {
+    const colorIdx = Math.min(parseInt(depth), depthColors.length - 1);
+    const colors = depthColors[colorIdx];
+    dot += `    subgraph cluster_depth${depth} {
+        label="Depth ${depth}"
+        fontname="Helvetica"
+        style="dashed"
+        color="${colors.border}"
+        fontcolor="${textColor}"
+        fontsize="9"
+        
+`;
+    nodes.forEach((node) => {
+      const shape = node.type === "datasource" ? "ellipse" : "box";
+      dot += `        "${node.name}" [label="${node.name}" shape="${shape}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]
+`;
+    });
+    dot += `    }
+
+`;
+  });
+  const addedEdges = /* @__PURE__ */ new Set();
+  analysis.edges.forEach((edge) => {
+    const key = `${edge.source}|${edge.target}`;
+    if (!addedEdges.has(key)) {
+      addedEdges.add(key);
+      dot += `    "${edge.source}" -> "${edge.target}"
+`;
+    }
+  });
+  dot += `}
+`;
+  return dot;
+}
+let blastRadiusGraphInstance = null;
 function generateGraphvizDot() {
   if (!state.currentConfig) return "";
   const isDark = document.documentElement.getAttribute("data-theme") === "dark";
@@ -2876,7 +3079,7 @@ function renderGraph() {
 function initializeGraph() {
   try {
     document.getElementById("graph").innerHTML = "";
-    state.graphviz = d3.select("#graph").graphviz().width(document.getElementById("graph").clientWidth).height(500).fit(true).on("initEnd", setupGraphInteractivity).on("renderEnd", setupGraphInteractivity);
+    state.graphviz = d3.select("#graph").graphviz().width(document.getElementById("graph").clientWidth).height(500).fit(true).on("renderEnd", setupGraphInteractivity);
     updateGraph();
   } catch (error) {
     console.error("Graphviz initialization error:", error);
@@ -2891,45 +3094,113 @@ function initializeGraph() {
 }
 function updateGraph() {
   if (state.graphviz) {
-    const dotSrc = generateGraphvizDot();
-    state.graphviz.renderDot(dotSrc);
+    const viewKey = getViewStateKey();
+    let cached = state.viewStateCache.get(viewKey);
+    let dotSrc;
+    if (cached?.dot) {
+      dotSrc = cached.dot;
+    } else {
+      dotSrc = generateGraphvizDot();
+      if (!cached) {
+        cached = { dot: dotSrc };
+        addToViewCache(viewKey, cached);
+      } else {
+        cached.dot = dotSrc;
+      }
+    }
+    state.graphviz.transition(() => d3.transition().duration(150)).renderDot(dotSrc);
+    setTimeout(() => precomputeAdjacentStates(), 100);
   }
 }
-function setupGraphInteractivity() {
-  state.cachedUpstreamMap = {};
-  state.cachedDownstreamMap = {};
-  state.cachedLineage = {};
-  d3.select("#graph").selectAll(".edge").each(function() {
-    const edge = d3.select(this);
-    const title = edge.select("title").text();
-    const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
-    if (match) {
-      const source = match[1];
-      const target = match[2];
-      if (!state.cachedDownstreamMap[source]) state.cachedDownstreamMap[source] = [];
-      if (!state.cachedUpstreamMap[target]) state.cachedUpstreamMap[target] = [];
-      state.cachedDownstreamMap[source].push(target);
-      state.cachedUpstreamMap[target].push(source);
+function precomputeAdjacentStates() {
+  if (!state.currentConfig?.pipelines) return;
+  const groupNames = /* @__PURE__ */ new Set();
+  state.currentConfig.pipelines.forEach((p) => {
+    if (p.group) groupNames.add(p.group);
+  });
+  const currentExpanded = new Set(state.expandedGroups);
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  groupNames.forEach((groupName) => {
+    const wasExpanded = currentExpanded.has(groupName);
+    const altExpanded = new Set(currentExpanded);
+    if (wasExpanded) {
+      altExpanded.delete(groupName);
+    } else {
+      altExpanded.add(groupName);
+    }
+    const altExpandedKey = Array.from(altExpanded).sort().join(",");
+    const altKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${altExpandedKey}`;
+    if (!state.viewStateCache.has(altKey)) {
+      const savedExpanded = state.expandedGroups;
+      state.expandedGroups = altExpanded;
+      const altDot = generateGraphvizDot();
+      state.expandedGroups = savedExpanded;
+      addToViewCache(altKey, { dot: altDot });
     }
   });
-  function getFullChain(node, map, visited = /* @__PURE__ */ new Set(), depth = 1) {
-    if (visited.has(node)) return [];
-    visited.add(node);
-    const neighbors = map[node] || [];
-    let result = [];
-    neighbors.forEach((n) => {
-      result.push({ name: n, depth });
-      result.push(...getFullChain(n, map, visited, depth + 1));
-    });
-    return result;
-  }
-  d3.select("#graph").selectAll(".node").each(function() {
-    const nodeName = d3.select(this).select("title").text();
-    state.cachedLineage[nodeName] = {
-      upstream: getFullChain(nodeName, state.cachedUpstreamMap, /* @__PURE__ */ new Set()),
-      downstream: getFullChain(nodeName, state.cachedDownstreamMap, /* @__PURE__ */ new Set())
+}
+function setupGraphInteractivity() {
+  const viewKey = getViewStateKey();
+  let cached = state.viewStateCache.get(viewKey);
+  if (cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
+    state.cachedUpstreamMap = cached.lineage.upstreamMap;
+    state.cachedDownstreamMap = cached.lineage.downstreamMap;
+    state.cachedLineage = cached.lineage.nodeLineage;
+  } else {
+    let getFullChain2 = function(node, map, visited = /* @__PURE__ */ new Set(), depth = 1) {
+      if (visited.has(node)) return [];
+      visited.add(node);
+      const neighbors = map[node] || [];
+      let result = [];
+      neighbors.forEach((n) => {
+        result.push({ name: n, depth });
+        result.push(...getFullChain2(n, map, visited, depth + 1));
+      });
+      return result;
     };
-  });
+    var getFullChain = getFullChain2;
+    state.cachedUpstreamMap = {};
+    state.cachedDownstreamMap = {};
+    state.cachedLineage = {};
+    d3.select("#graph").selectAll(".edge").each(function() {
+      const edge = d3.select(this);
+      const title = edge.select("title").text();
+      const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
+      if (match) {
+        const source = match[1];
+        const target = match[2];
+        if (!state.cachedDownstreamMap[source]) state.cachedDownstreamMap[source] = [];
+        if (!state.cachedUpstreamMap[target]) state.cachedUpstreamMap[target] = [];
+        state.cachedDownstreamMap[source].push(target);
+        state.cachedUpstreamMap[target].push(source);
+      }
+    });
+    d3.select("#graph").selectAll(".node").each(function() {
+      const nodeName = d3.select(this).select("title").text();
+      state.cachedLineage[nodeName] = {
+        upstream: getFullChain2(nodeName, state.cachedUpstreamMap, /* @__PURE__ */ new Set()),
+        downstream: getFullChain2(nodeName, state.cachedDownstreamMap, /* @__PURE__ */ new Set())
+      };
+    });
+    if (Object.keys(state.cachedLineage).length > 0) {
+      if (!cached) {
+        cached = {
+          lineage: {
+            upstreamMap: state.cachedUpstreamMap,
+            downstreamMap: state.cachedDownstreamMap,
+            nodeLineage: state.cachedLineage
+          }
+        };
+        addToViewCache(viewKey, cached);
+      } else {
+        cached.lineage = {
+          upstreamMap: state.cachedUpstreamMap,
+          downstreamMap: state.cachedDownstreamMap,
+          nodeLineage: state.cachedLineage
+        };
+      }
+    }
+  }
   if (document.getElementById("node-tooltip")) {
     document.getElementById("node-tooltip").remove();
   }
@@ -3129,6 +3400,11 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   html = `<h5>${nodeData.name}</h5>`;
   html += `<div class="detail-label">Type</div>`;
   html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`;
+  html += `<div class="mt-2 mb-2">
+        <button class="btn btn-sm btn-outline-danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">
+            ◉ Blast Radius
+        </button>
+    </div>`;
   if (nodeType === "Pipeline Group") {
     const isExpanded = state.expandedGroups.has(nodeName);
     html += `<div class="mt-2 mb-2">
@@ -3560,6 +3836,148 @@ function toggleGroup(groupName) {
   }
   updateGraph();
   showNodeDetails(groupName);
+}
+function showBlastRadius(nodeName) {
+  const modal = document.getElementById("blastRadiusModal");
+  const graphContainer = document.getElementById("blast-radius-graph");
+  const summaryContainer = document.getElementById("blast-radius-summary");
+  const nodeNameEl = document.getElementById("blast-radius-node-name");
+  if (!modal || !graphContainer || !summaryContainer) return;
+  graphContainer.innerHTML = "";
+  blastRadiusGraphInstance = null;
+  nodeNameEl.textContent = nodeName;
+  const analysis = generateBlastRadiusAnalysis(nodeName);
+  if (!analysis || analysis.downstream.length === 0) {
+    summaryContainer.innerHTML = `
+            <div class="text-center" style="padding: 2rem; color: var(--text-muted);">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">✓</div>
+                <div>No downstream dependencies</div>
+                <div class="small mt-2">This node has no downstream impact.</div>
+            </div>
+        `;
+    graphContainer.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                No downstream dependencies to visualize
+            </div>
+        `;
+    const bsModal2 = new bootstrap.Modal(modal);
+    bsModal2.show();
+    return;
+  }
+  const isGroup = analysis.source_type === "group";
+  let summaryHtml = `
+        <div class="lineage-view-toggle" style="margin-bottom: 0.75rem;">
+            <span class="lineage-toggle-label active" data-view="tree">Summary</span>
+            <div class="lineage-toggle-slider" id="blast-radius-toggle"></div>
+            <span class="lineage-toggle-label" data-view="json">JSON</span>
+        </div>
+        <div id="blast-radius-tree-view">
+    `;
+  if (isGroup && analysis.group_members) {
+    summaryHtml += `
+            <div class="mb-3">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Group Members (${analysis.group_size})</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                    ${analysis.group_members.map((m) => `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid #00897b;">▢ ${m}</span>`).join("")}
+                </div>
+            </div>
+        `;
+  }
+  summaryHtml += `
+            <div class="mb-3">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Impact Summary</div>
+                <div style="display: flex; gap: 1rem;">
+                    <div style="text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #c98b8b;">${analysis.total_affected}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Total Affected</div>
+                    </div>
+                    <div style="text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #6b9dc4;">${analysis.max_depth}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Max Depth</div>
+                    </div>
+                </div>
+            </div>
+    `;
+  Object.entries(analysis.by_depth).forEach(([depth, nodes]) => {
+    const depthColors = ["#c98b8b", "#d4a574", "#c4c474", "#7cb47c", "#6b9dc4", "#a88bc4"];
+    const color = depthColors[Math.min(parseInt(depth), depthColors.length - 1)];
+    summaryHtml += `
+            <div class="mb-2">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    Depth ${depth} <span style="color: ${color};">●</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+        `;
+    nodes.forEach((node) => {
+      const icon = node.type === "pipeline" ? "▢" : "○";
+      summaryHtml += `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid ${color};">${icon} ${node.name}</span>`;
+    });
+    summaryHtml += `</div></div>`;
+  });
+  summaryHtml += `</div>`;
+  summaryHtml += `
+        <div id="blast-radius-json-view" style="display: none;">
+            <pre style="font-size: 0.7rem; max-height: 400px; overflow: auto; background: var(--bg-code); color: var(--text-primary); padding: 0.75rem; border-radius: 4px; margin: 0; border: 1px solid var(--border-color);">${JSON.stringify(analysis, null, 2)}</pre>
+        </div>
+    `;
+  summaryContainer.innerHTML = summaryHtml;
+  const toggle = document.getElementById("blast-radius-toggle");
+  if (toggle) {
+    toggle.addEventListener("click", function() {
+      const isJson = this.classList.toggle("json-active");
+      const treeView = document.getElementById("blast-radius-tree-view");
+      const jsonView = document.getElementById("blast-radius-json-view");
+      const treeLabel = summaryContainer.querySelector('.lineage-toggle-label[data-view="tree"]');
+      const jsonLabel = summaryContainer.querySelector('.lineage-toggle-label[data-view="json"]');
+      if (isJson) {
+        treeView.style.display = "none";
+        jsonView.style.display = "block";
+        treeLabel.classList.remove("active");
+        jsonLabel.classList.add("active");
+      } else {
+        treeView.style.display = "block";
+        jsonView.style.display = "none";
+        treeLabel.classList.add("active");
+        jsonLabel.classList.remove("active");
+      }
+    });
+  }
+  const bsModal = new bootstrap.Modal(modal);
+  modal.addEventListener(
+    "shown.bs.modal",
+    function onShown() {
+      modal.removeEventListener("shown.bs.modal", onShown);
+      const dot = generateBlastRadiusDot(analysis);
+      if (dot) {
+        try {
+          graphContainer.innerHTML = "";
+          const width = graphContainer.clientWidth || 600;
+          const height = 500;
+          blastRadiusGraphInstance = d3.select("#blast-radius-graph").graphviz().width(width).height(height).fit(true).zoom(false).on("end", function() {
+            const svg = d3.select("#blast-radius-graph svg");
+            const g = svg.select("g");
+            const zoom = d3.zoom().scaleExtent([0.1, 4]).on("zoom", function(event) {
+              g.attr("transform", event.transform);
+            });
+            svg.call(zoom);
+            svg.on("dblclick.zoom", function() {
+              svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+            });
+          });
+          blastRadiusGraphInstance.renderDot(dot);
+        } catch (e) {
+          console.error("Blast radius graph error:", e);
+          graphContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                        Error rendering graph
+                    </div>
+                `;
+        }
+      }
+    },
+    { once: true }
+  );
+  bsModal.show();
 }
 function toggleTheme() {
   const html = document.documentElement;
@@ -4596,157 +5014,6 @@ function generateAirflowBackfillDot(analysis) {
 `;
   return dot;
 }
-function generateBlastRadiusAnalysis(nodeName) {
-  if (!state.currentConfig || !nodeName) return null;
-  const pipelines = state.currentConfig.pipelines || [];
-  const datasources = state.currentConfig.datasources || [];
-  const downstream = /* @__PURE__ */ new Map();
-  const nodeTypes = /* @__PURE__ */ new Map();
-  pipelines.forEach((p) => {
-    nodeTypes.set(p.name, "pipeline");
-    if (!downstream.has(p.name)) downstream.set(p.name, /* @__PURE__ */ new Set());
-    p.output_sources?.forEach((s) => {
-      downstream.get(p.name).add(s);
-      if (!nodeTypes.has(s)) nodeTypes.set(s, "datasource");
-    });
-    p.input_sources?.forEach((s) => {
-      if (!downstream.has(s)) downstream.set(s, /* @__PURE__ */ new Set());
-      downstream.get(s).add(p.name);
-      if (!nodeTypes.has(s)) nodeTypes.set(s, "datasource");
-    });
-    p.upstream_pipelines?.forEach((u) => {
-      if (!downstream.has(u)) downstream.set(u, /* @__PURE__ */ new Set());
-      downstream.get(u).add(p.name);
-    });
-  });
-  datasources.forEach((ds) => {
-    if (!nodeTypes.has(ds.name)) nodeTypes.set(ds.name, "datasource");
-  });
-  const visited = /* @__PURE__ */ new Map();
-  const edges = [];
-  const queue = [[nodeName, 0]];
-  visited.set(nodeName, 0);
-  while (queue.length > 0) {
-    const [current, depth] = queue.shift();
-    const neighbors = downstream.get(current) || /* @__PURE__ */ new Set();
-    for (const neighbor of neighbors) {
-      edges.push({ source: current, target: neighbor });
-      if (!visited.has(neighbor)) {
-        visited.set(neighbor, depth + 1);
-        queue.push([neighbor, depth + 1]);
-      }
-    }
-  }
-  const downstreamNodes = [];
-  visited.forEach((depth, node) => {
-    if (node !== nodeName) {
-      const type = nodeTypes.get(node) || "unknown";
-      const pipeline = pipelines.find((p) => p.name === node);
-      const nodeInfo = { name: node, type, depth };
-      if (pipeline) {
-        if (pipeline.schedule) nodeInfo.schedule = pipeline.schedule;
-        if (pipeline.cluster) nodeInfo.cluster = pipeline.cluster;
-      }
-      downstreamNodes.push(nodeInfo);
-    }
-  });
-  downstreamNodes.sort((a, b) => a.depth - b.depth || a.name.localeCompare(b.name));
-  const byDepth = {};
-  downstreamNodes.forEach((n) => {
-    if (!byDepth[n.depth]) byDepth[n.depth] = [];
-    byDepth[n.depth].push(n);
-  });
-  const maxDepth = Math.max(...downstreamNodes.map((n) => n.depth), 0);
-  return {
-    source: nodeName,
-    source_type: nodeTypes.get(nodeName) || "unknown",
-    total_affected: downstreamNodes.length,
-    max_depth: maxDepth,
-    downstream: downstreamNodes,
-    by_depth: byDepth,
-    edges
-  };
-}
-function generateBlastRadiusDot(analysis) {
-  if (!analysis || analysis.downstream.length === 0) return null;
-  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-  const bgColor = isDark ? "#1a1a1a" : "#ffffff";
-  const textColor = isDark ? "#b0b0b0" : "#666666";
-  const edgeColor = isDark ? "#666666" : "#999999";
-  const depthColors = isDark ? [
-    { fill: "#4a2a2a", border: "#c98b8b", text: "#e0e0e0" },
-    // Source - warm red
-    { fill: "#4a3a2a", border: "#d4a574", text: "#e0e0e0" },
-    // Depth 1 - orange
-    { fill: "#4a4a2a", border: "#c4c474", text: "#e0e0e0" },
-    // Depth 2 - yellow
-    { fill: "#2a4a3a", border: "#7cb47c", text: "#e0e0e0" },
-    // Depth 3 - green
-    { fill: "#2a3a4a", border: "#6b9dc4", text: "#e0e0e0" },
-    // Depth 4 - blue
-    { fill: "#3a2a4a", border: "#a88bc4", text: "#e0e0e0" }
-    // Depth 5+ - purple
-  ] : [
-    { fill: "#fce4ec", border: "#c98b8b", text: "#495057" },
-    // Source - warm red
-    { fill: "#fff3e0", border: "#d4a574", text: "#495057" },
-    // Depth 1 - orange
-    { fill: "#fffde7", border: "#c4c474", text: "#495057" },
-    // Depth 2 - yellow
-    { fill: "#e8f5e9", border: "#7cb47c", text: "#495057" },
-    // Depth 3 - green
-    { fill: "#e3f2fd", border: "#6b9dc4", text: "#495057" },
-    // Depth 4 - blue
-    { fill: "#f3e5f5", border: "#a88bc4", text: "#495057" }
-    // Depth 5+ - purple
-  ];
-  let dot = `digraph BlastRadius {
-    rankdir=LR
-    bgcolor="${bgColor}"
-    fontname="Helvetica"
-    node [fontname="Helvetica" fontsize="9" style="filled"]
-    edge [color="${edgeColor}" arrowsize="0.6"]
-    
-`;
-  const sourceColor = depthColors[0];
-  const sourceShape = analysis.source_type === "datasource" ? "ellipse" : "box";
-  dot += `    "${analysis.source}" [label="${analysis.source}" shape="${sourceShape}" fillcolor="${sourceColor.fill}" color="${sourceColor.border}" fontcolor="${sourceColor.text}" penwidth="2"]
-
-`;
-  Object.entries(analysis.by_depth).forEach(([depth, nodes]) => {
-    const colorIdx = Math.min(parseInt(depth), depthColors.length - 1);
-    const colors = depthColors[colorIdx];
-    dot += `    subgraph cluster_depth${depth} {
-        label="Depth ${depth}"
-        fontname="Helvetica"
-        style="dashed"
-        color="${colors.border}"
-        fontcolor="${textColor}"
-        fontsize="9"
-        
-`;
-    nodes.forEach((node) => {
-      const shape = node.type === "datasource" ? "ellipse" : "box";
-      dot += `        "${node.name}" [label="${node.name}" shape="${shape}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]
-`;
-    });
-    dot += `    }
-
-`;
-  });
-  const addedEdges = /* @__PURE__ */ new Set();
-  analysis.edges.forEach((edge) => {
-    const key = `${edge.source}|${edge.target}`;
-    if (!addedEdges.has(key)) {
-      addedEdges.add(key);
-      dot += `    "${edge.source}" -> "${edge.target}"
-`;
-    }
-  });
-  dot += `}
-`;
-  return dot;
-}
 function updateBackfillPlan() {
   const output = document.getElementById("backfill-output");
   const graphContainer = document.getElementById("backfill-graph");
@@ -5320,6 +5587,7 @@ function loadJson() {
   }
   try {
     state.currentConfig = JSON.parse(jsonText);
+    clearViewStateCache();
     statusDiv.innerHTML = '<div class="alert alert-success">Configuration loaded successfully!</div>';
     renderPipelines();
     renderDatasources();
@@ -5346,6 +5614,7 @@ window.toggleGroup = toggleGroup;
 window.togglePipelinesOnly = togglePipelinesOnly;
 window.searchNodes = searchNodes;
 window.selectSearchResult = selectSearchResult;
+window.showBlastRadius = showBlastRadius;
 window.clearAttributeSelection = clearAttributeSelection;
 window.resetAttributeGraph = resetAttributeGraph;
 window.searchAttributes = searchAttributes;
@@ -6971,6 +7240,51 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
                                 <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
                                 <li>Links can point to any external tools (Airflow, monitoring, docs, etc.)</li>
                             </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blast Radius Modal -->
+        <div
+            class="modal fade"
+            id="blastRadiusModal"
+            tabindex="-1"
+            aria-labelledby="blastRadiusModalLabel"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="blastRadiusModalLabel">
+                            <span style="color: #c98b8b">◉</span> Blast Radius:
+                            <span id="blast-radius-node-name"></span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" style="padding: 0">
+                        <div class="row g-0">
+                            <div class="col-md-8">
+                                <div
+                                    id="blast-radius-graph"
+                                    style="
+                                        height: 500px;
+                                        background: var(--bg-primary);
+                                        overflow: hidden;
+                                        touch-action: none;
+                                    "
+                                ></div>
+                            </div>
+                            <div
+                                class="col-md-4"
+                                style="border-left: 1px solid var(--border-color); height: 500px; overflow-y: auto"
+                            >
+                                <div id="blast-radius-summary" style="padding: 1rem"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">

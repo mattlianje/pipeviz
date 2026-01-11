@@ -1,5 +1,8 @@
-import { state, getConfigHash } from './state.js'
+import { state, getConfigHash, getViewStateKey, clearViewStateCache, addToViewCache } from './state.js'
 import { renderAttributeGraph } from './attributes.js'
+import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
+
+let blastRadiusGraphInstance = null
 
 export function generateGraphvizDot() {
     if (!state.currentConfig) return ''
@@ -302,7 +305,6 @@ export function initializeGraph() {
             .width(document.getElementById('graph').clientWidth)
             .height(500)
             .fit(true)
-            .on('initEnd', setupGraphInteractivity)
             .on('renderEnd', setupGraphInteractivity)
         updateGraph()
     } catch (error) {
@@ -319,54 +321,149 @@ export function initializeGraph() {
 
 export function updateGraph() {
     if (state.graphviz) {
-        const dotSrc = generateGraphvizDot()
-        state.graphviz.renderDot(dotSrc)
+        const viewKey = getViewStateKey()
+        let cached = state.viewStateCache.get(viewKey)
+
+        let dotSrc
+        if (cached?.dot) {
+            // Use cached DOT string
+            dotSrc = cached.dot
+        } else {
+            // Generate and cache the DOT string
+            dotSrc = generateGraphvizDot()
+            if (!cached) {
+                cached = { dot: dotSrc }
+                addToViewCache(viewKey, cached)
+            } else {
+                cached.dot = dotSrc
+            }
+        }
+
+        // Use transition for smoother rendering
+        state.graphviz.transition(() => d3.transition().duration(150)).renderDot(dotSrc)
+
+        // Pre-cache adjacent states (opposite of current expanded groups)
+        // This makes toggling feel instant on second use
+        setTimeout(() => precomputeAdjacentStates(), 100)
     }
 }
 
+// Pre-compute DOT strings for likely next states (toggle each expanded/collapsed group)
+function precomputeAdjacentStates() {
+    if (!state.currentConfig?.pipelines) return
+
+    // Find all group names
+    const groupNames = new Set()
+    state.currentConfig.pipelines.forEach((p) => {
+        if (p.group) groupNames.add(p.group)
+    })
+
+    // Snapshot current state to avoid race conditions
+    const currentExpanded = new Set(state.expandedGroups)
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+
+    // For each group, compute the alternate state key without modifying actual state
+    groupNames.forEach((groupName) => {
+        const wasExpanded = currentExpanded.has(groupName)
+
+        // Compute alternate expanded set
+        const altExpanded = new Set(currentExpanded)
+        if (wasExpanded) {
+            altExpanded.delete(groupName)
+        } else {
+            altExpanded.add(groupName)
+        }
+
+        // Compute key without modifying state
+        const altExpandedKey = Array.from(altExpanded).sort().join(',')
+        const altKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${altExpandedKey}`
+
+        if (!state.viewStateCache.has(altKey)) {
+            // Temporarily swap state just for DOT generation
+            const savedExpanded = state.expandedGroups
+            state.expandedGroups = altExpanded
+            const altDot = generateGraphvizDot()
+            state.expandedGroups = savedExpanded
+            addToViewCache(altKey, { dot: altDot })
+        }
+    })
+}
+
 export function setupGraphInteractivity() {
-    // Build and cache lineage maps for fast provenance lookups
-    state.cachedUpstreamMap = {}
-    state.cachedDownstreamMap = {}
-    state.cachedLineage = {}
+    const viewKey = getViewStateKey()
+    let cached = state.viewStateCache.get(viewKey)
 
-    d3.select('#graph')
-        .selectAll('.edge')
-        .each(function () {
-            const edge = d3.select(this)
-            const title = edge.select('title').text()
-            const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/)
-            if (match) {
-                const source = match[1]
-                const target = match[2]
-                if (!state.cachedDownstreamMap[source]) state.cachedDownstreamMap[source] = []
-                if (!state.cachedUpstreamMap[target]) state.cachedUpstreamMap[target] = []
-                state.cachedDownstreamMap[source].push(target)
-                state.cachedUpstreamMap[target].push(source)
+    // Check if we have cached lineage data for this view state
+    // Also verify the cache has actual data (not empty from initEnd)
+    if (cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
+        // Restore cached lineage maps
+        state.cachedUpstreamMap = cached.lineage.upstreamMap
+        state.cachedDownstreamMap = cached.lineage.downstreamMap
+        state.cachedLineage = cached.lineage.nodeLineage
+    } else {
+        // Build lineage maps by parsing the rendered graph
+        state.cachedUpstreamMap = {}
+        state.cachedDownstreamMap = {}
+        state.cachedLineage = {}
+
+        d3.select('#graph')
+            .selectAll('.edge')
+            .each(function () {
+                const edge = d3.select(this)
+                const title = edge.select('title').text()
+                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/)
+                if (match) {
+                    const source = match[1]
+                    const target = match[2]
+                    if (!state.cachedDownstreamMap[source]) state.cachedDownstreamMap[source] = []
+                    if (!state.cachedUpstreamMap[target]) state.cachedUpstreamMap[target] = []
+                    state.cachedDownstreamMap[source].push(target)
+                    state.cachedUpstreamMap[target].push(source)
+                }
+            })
+
+        function getFullChain(node, map, visited = new Set(), depth = 1) {
+            if (visited.has(node)) return []
+            visited.add(node)
+            const neighbors = map[node] || []
+            let result = []
+            neighbors.forEach((n) => {
+                result.push({ name: n, depth: depth })
+                result.push(...getFullChain(n, map, visited, depth + 1))
+            })
+            return result
+        }
+
+        d3.select('#graph')
+            .selectAll('.node')
+            .each(function () {
+                const nodeName = d3.select(this).select('title').text()
+                state.cachedLineage[nodeName] = {
+                    upstream: getFullChain(nodeName, state.cachedUpstreamMap, new Set()),
+                    downstream: getFullChain(nodeName, state.cachedDownstreamMap, new Set())
+                }
+            })
+
+        // Cache the computed lineage data (only if we actually have nodes)
+        if (Object.keys(state.cachedLineage).length > 0) {
+            if (!cached) {
+                cached = {
+                    lineage: {
+                        upstreamMap: state.cachedUpstreamMap,
+                        downstreamMap: state.cachedDownstreamMap,
+                        nodeLineage: state.cachedLineage
+                    }
+                }
+                addToViewCache(viewKey, cached)
+            } else {
+                cached.lineage = {
+                    upstreamMap: state.cachedUpstreamMap,
+                    downstreamMap: state.cachedDownstreamMap,
+                    nodeLineage: state.cachedLineage
+                }
             }
-        })
-
-    function getFullChain(node, map, visited = new Set(), depth = 1) {
-        if (visited.has(node)) return []
-        visited.add(node)
-        const neighbors = map[node] || []
-        let result = []
-        neighbors.forEach((n) => {
-            result.push({ name: n, depth: depth })
-            result.push(...getFullChain(n, map, visited, depth + 1))
-        })
-        return result
+        }
     }
-
-    d3.select('#graph')
-        .selectAll('.node')
-        .each(function () {
-            const nodeName = d3.select(this).select('title').text()
-            state.cachedLineage[nodeName] = {
-                upstream: getFullChain(nodeName, state.cachedUpstreamMap, new Set()),
-                downstream: getFullChain(nodeName, state.cachedDownstreamMap, new Set())
-            }
-        })
 
     if (document.getElementById('node-tooltip')) {
         document.getElementById('node-tooltip').remove()
@@ -593,6 +690,13 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html = `<h5>${nodeData.name}</h5>`
     html += `<div class="detail-label">Type</div>`
     html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`
+
+    // Blast Radius button - always show for any node
+    html += `<div class="mt-2 mb-2">
+        <button class="btn btn-sm btn-outline-danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">
+            ◉ Blast Radius
+        </button>
+    </div>`
 
     if (nodeType === 'Pipeline Group') {
         const isExpanded = state.expandedGroups.has(nodeName)
@@ -1125,4 +1229,191 @@ export function toggleGroup(groupName) {
     }
     updateGraph()
     showNodeDetails(groupName)
+}
+
+export function showBlastRadius(nodeName) {
+    const modal = document.getElementById('blastRadiusModal')
+    const graphContainer = document.getElementById('blast-radius-graph')
+    const summaryContainer = document.getElementById('blast-radius-summary')
+    const nodeNameEl = document.getElementById('blast-radius-node-name')
+
+    if (!modal || !graphContainer || !summaryContainer) return
+
+    // Reset the graph container completely to avoid zoom issues
+    graphContainer.innerHTML = ''
+    blastRadiusGraphInstance = null
+
+    nodeNameEl.textContent = nodeName
+
+    const analysis = generateBlastRadiusAnalysis(nodeName)
+
+    if (!analysis || analysis.downstream.length === 0) {
+        summaryContainer.innerHTML = `
+            <div class="text-center" style="padding: 2rem; color: var(--text-muted);">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">✓</div>
+                <div>No downstream dependencies</div>
+                <div class="small mt-2">This node has no downstream impact.</div>
+            </div>
+        `
+        graphContainer.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                No downstream dependencies to visualize
+            </div>
+        `
+        // Show modal
+        const bsModal = new bootstrap.Modal(modal)
+        bsModal.show()
+        return
+    }
+
+    // Build summary HTML with Tree/JSON toggle
+    const isGroup = analysis.source_type === 'group'
+    let summaryHtml = `
+        <div class="lineage-view-toggle" style="margin-bottom: 0.75rem;">
+            <span class="lineage-toggle-label active" data-view="tree">Summary</span>
+            <div class="lineage-toggle-slider" id="blast-radius-toggle"></div>
+            <span class="lineage-toggle-label" data-view="json">JSON</span>
+        </div>
+        <div id="blast-radius-tree-view">
+    `
+
+    // Show group members if this is a group
+    if (isGroup && analysis.group_members) {
+        summaryHtml += `
+            <div class="mb-3">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Group Members (${analysis.group_size})</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                    ${analysis.group_members.map((m) => `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid #00897b;">▢ ${m}</span>`).join('')}
+                </div>
+            </div>
+        `
+    }
+
+    summaryHtml += `
+            <div class="mb-3">
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Impact Summary</div>
+                <div style="display: flex; gap: 1rem;">
+                    <div style="text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #c98b8b;">${analysis.total_affected}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Total Affected</div>
+                    </div>
+                    <div style="text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #6b9dc4;">${analysis.max_depth}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Max Depth</div>
+                    </div>
+                </div>
+            </div>
+    `
+
+    // Affected nodes by depth
+    Object.entries(analysis.by_depth).forEach(([depth, nodes]) => {
+        const depthColors = ['#c98b8b', '#d4a574', '#c4c474', '#7cb47c', '#6b9dc4', '#a88bc4']
+        const color = depthColors[Math.min(parseInt(depth), depthColors.length - 1)]
+
+        summaryHtml += `
+            <div class="mb-2">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">
+                    Depth ${depth} <span style="color: ${color};">●</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+        `
+        nodes.forEach((node) => {
+            const icon = node.type === 'pipeline' ? '▢' : '○'
+            summaryHtml += `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid ${color};">${icon} ${node.name}</span>`
+        })
+        summaryHtml += `</div></div>`
+    })
+
+    summaryHtml += `</div>`
+
+    // JSON view
+    summaryHtml += `
+        <div id="blast-radius-json-view" style="display: none;">
+            <pre style="font-size: 0.7rem; max-height: 400px; overflow: auto; background: var(--bg-code); color: var(--text-primary); padding: 0.75rem; border-radius: 4px; margin: 0; border: 1px solid var(--border-color);">${JSON.stringify(analysis, null, 2)}</pre>
+        </div>
+    `
+
+    summaryContainer.innerHTML = summaryHtml
+
+    // Set up toggle listener
+    const toggle = document.getElementById('blast-radius-toggle')
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            const isJson = this.classList.toggle('json-active')
+            const treeView = document.getElementById('blast-radius-tree-view')
+            const jsonView = document.getElementById('blast-radius-json-view')
+            const treeLabel = summaryContainer.querySelector('.lineage-toggle-label[data-view="tree"]')
+            const jsonLabel = summaryContainer.querySelector('.lineage-toggle-label[data-view="json"]')
+
+            if (isJson) {
+                treeView.style.display = 'none'
+                jsonView.style.display = 'block'
+                treeLabel.classList.remove('active')
+                jsonLabel.classList.add('active')
+            } else {
+                treeView.style.display = 'block'
+                jsonView.style.display = 'none'
+                treeLabel.classList.add('active')
+                jsonLabel.classList.remove('active')
+            }
+        })
+    }
+
+    // Render the graph - wait for modal to be shown first for proper sizing
+    const bsModal = new bootstrap.Modal(modal)
+
+    modal.addEventListener(
+        'shown.bs.modal',
+        function onShown() {
+            modal.removeEventListener('shown.bs.modal', onShown)
+
+            const dot = generateBlastRadiusDot(analysis)
+            if (dot) {
+                try {
+                    graphContainer.innerHTML = ''
+                    const width = graphContainer.clientWidth || 600
+                    const height = 500
+
+                    blastRadiusGraphInstance = d3
+                        .select('#blast-radius-graph')
+                        .graphviz()
+                        .width(width)
+                        .height(height)
+                        .fit(true)
+                        .zoom(false) // Disable built-in zoom, we'll add our own
+                        .on('end', function () {
+                            // Add manual zoom behavior after render
+                            const svg = d3.select('#blast-radius-graph svg')
+                            const g = svg.select('g')
+
+                            const zoom = d3
+                                .zoom()
+                                .scaleExtent([0.1, 4])
+                                .on('zoom', function (event) {
+                                    g.attr('transform', event.transform)
+                                })
+
+                            svg.call(zoom)
+
+                            // Add reset button behavior
+                            svg.on('dblclick.zoom', function () {
+                                svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity)
+                            })
+                        })
+
+                    blastRadiusGraphInstance.renderDot(dot)
+                } catch (e) {
+                    console.error('Blast radius graph error:', e)
+                    graphContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                        Error rendering graph
+                    </div>
+                `
+                }
+            }
+        },
+        { once: true }
+    )
+
+    bsModal.show()
 }
