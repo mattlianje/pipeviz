@@ -271,9 +271,12 @@
             }
             .node-highlighted text {
                 font-weight: normal !important;
-                fill: #000 !important;
+                fill: #000;
                 stroke: none !important;
                 stroke-width: 0 !important;
+            }
+            .node-highlighted text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             .node-connected {
                 stroke: #7b1fa2 !important;
@@ -281,9 +284,12 @@
             }
             .node-connected text {
                 font-weight: normal !important;
-                fill: #000 !important;
+                fill: #000;
                 stroke: none !important;
                 stroke-width: 0 !important;
+            }
+            .node-connected text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             .node-dimmed {
                 opacity: 0.35 !important;
@@ -1072,7 +1078,14 @@
             [data-theme='dark'] #graph .node text,
             [data-theme='dark'] #splash-graph .node text,
             [data-theme='dark'] #attribute-graph .node text {
-                fill: #000 !important;
+                fill: #000;
+            }
+            /* Preserve schedule magenta color in nodes */
+            [data-theme='dark'] #graph .node text[fill='#d63384'],
+            [data-theme='dark'] #splash-graph .node text[fill='#d63384'],
+            #graph .node text[fill='#d63384'],
+            #splash-graph .node text[fill='#d63384'] {
+                fill: #d63384 !important;
             }
             [data-theme='dark'] #graph .graph > polygon,
             [data-theme='dark'] #splash-graph .graph > polygon,
@@ -3090,6 +3103,51 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
                                 <li>Use <code>upstream_pipelines</code> to show pipeline dependencies</li>
                                 <li>Links can point to any external tools (Airflow, monitoring, docs, etc.)</li>
                             </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blast Radius Modal -->
+        <div
+            class="modal fade"
+            id="blastRadiusModal"
+            tabindex="-1"
+            aria-labelledby="blastRadiusModalLabel"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="blastRadiusModalLabel">
+                            <span style="color: #c98b8b">◉</span> Blast Radius:
+                            <span id="blast-radius-node-name"></span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" style="padding: 0">
+                        <div class="row g-0">
+                            <div class="col-md-8">
+                                <div
+                                    id="blast-radius-graph"
+                                    style="
+                                        height: 500px;
+                                        background: var(--bg-primary);
+                                        overflow: hidden;
+                                        touch-action: none;
+                                    "
+                                ></div>
+                            </div>
+                            <div
+                                class="col-md-4"
+                                style="border-left: 1px solid var(--border-color); height: 500px; overflow-y: auto"
+                            >
+                                <div id="blast-radius-summary" style="padding: 1rem"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">

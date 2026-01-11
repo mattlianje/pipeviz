@@ -10,6 +10,8 @@ export const state = {
     cachedUpstreamMap: {},
     cachedDownstreamMap: {},
     cachedLineage: {},
+    // View state cache for snappy group expand/collapse
+    viewStateCache: new Map(),
     // Attribute graph state
     attributeGraphviz: null,
     attributeLastRenderedConfigHash: null,
@@ -21,6 +23,31 @@ export const state = {
 
 export function getConfigHash(config) {
     return JSON.stringify(config)
+}
+
+// Generate a unique key for the current view state (for caching)
+export function getViewStateKey() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+    const expandedGroupsKey = Array.from(state.expandedGroups).sort().join(',')
+    return `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${expandedGroupsKey}`
+}
+
+// Clear view state cache (call when config changes)
+export function clearViewStateCache() {
+    state.viewStateCache.clear()
+}
+
+// Max cache entries to prevent memory issues with many group combinations
+const MAX_VIEW_CACHE_SIZE = 50
+
+// Add entry to cache with LRU eviction
+export function addToViewCache(key, value) {
+    if (state.viewStateCache.size >= MAX_VIEW_CACHE_SIZE) {
+        // Remove oldest entry (first key in Map)
+        const firstKey = state.viewStateCache.keys().next().value
+        state.viewStateCache.delete(firstKey)
+    }
+    state.viewStateCache.set(key, value)
 }
 
 export const exampleConfig = {

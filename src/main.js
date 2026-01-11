@@ -17,7 +17,8 @@ import {
     toggleGroup,
     togglePipelinesOnly,
     searchNodes,
-    selectSearchResult
+    selectSearchResult,
+    showBlastRadius
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -53,6 +54,7 @@ window.toggleGroup = toggleGroup
 window.togglePipelinesOnly = togglePipelinesOnly
 window.searchNodes = searchNodes
 window.selectSearchResult = selectSearchResult
+window.showBlastRadius = showBlastRadius
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
 window.searchAttributes = searchAttributes

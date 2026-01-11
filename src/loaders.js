@@ -1,4 +1,4 @@
-import { state, exampleConfig } from './state.js'
+import { state, exampleConfig, clearViewStateCache } from './state.js'
 import { renderPipelines, renderDatasources } from './tables.js'
 import { updateFilters } from './filters.js'
 import { renderGraph } from './graph.js'
@@ -218,6 +218,8 @@ export function loadJson() {
 
     try {
         state.currentConfig = JSON.parse(jsonText)
+        // Clear cached view states when config changes
+        clearViewStateCache()
         statusDiv.innerHTML = '<div class="alert alert-success">Configuration loaded successfully!</div>'
 
         renderPipelines()
