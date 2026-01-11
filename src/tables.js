@@ -22,25 +22,41 @@ export function renderPipelines() {
             <tbody>
     `
 
-    state.currentConfig.pipelines.forEach(pipeline => {
-        const inputSources = pipeline.input_sources?.map(s =>
-            `<span class="badge me-1 mb-1" style="background-color: #e3f2fd; color: #1565c0; font-size: 0.85em;">${s}</span>`
-        ).join('') || ''
+    state.currentConfig.pipelines.forEach((pipeline) => {
+        const inputSources =
+            pipeline.input_sources
+                ?.map(
+                    (s) =>
+                        `<span class="badge me-1 mb-1" style="background-color: #e3f2fd; color: #1565c0; font-size: 0.85em;">${s}</span>`
+                )
+                .join('') || ''
 
-        const outputSources = pipeline.output_sources?.map(s =>
-            `<span class="badge me-1 mb-1" style="background-color: #e8f5e8; color: #2e7d32; font-size: 0.85em;">${s}</span>`
-        ).join('') || ''
+        const outputSources =
+            pipeline.output_sources
+                ?.map(
+                    (s) =>
+                        `<span class="badge me-1 mb-1" style="background-color: #e8f5e8; color: #2e7d32; font-size: 0.85em;">${s}</span>`
+                )
+                .join('') || ''
 
-        const cluster = pipeline.cluster ?
-            `<span class="badge badge-cluster me-1 mb-1">${pipeline.cluster}</span>` : ''
+        const cluster = pipeline.cluster ? `<span class="badge badge-cluster me-1 mb-1">${pipeline.cluster}</span>` : ''
 
-        const tags = pipeline.tags?.map(t =>
-            `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
-        ).join('') || ''
+        const tags =
+            pipeline.tags
+                ?.map(
+                    (t) =>
+                        `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
+                )
+                .join('') || ''
 
-        const links = pipeline.links ? Object.entries(pipeline.links).map(([name, url]) =>
-            `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
-        ).join('') : ''
+        const links = pipeline.links
+            ? Object.entries(pipeline.links)
+                  .map(
+                      ([name, url]) =>
+                          `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                  )
+                  .join('')
+            : ''
 
         html += `
             <tr class="pipeline-row"
@@ -74,13 +90,13 @@ export function renderDatasources() {
     const allDataSources = new Map()
 
     if (state.currentConfig.datasources) {
-        state.currentConfig.datasources.forEach(ds => {
+        state.currentConfig.datasources.forEach((ds) => {
             allDataSources.set(ds.name, ds)
         })
     }
 
-    state.currentConfig.pipelines.forEach(pipeline => {
-        pipeline.input_sources?.forEach(sourceName => {
+    state.currentConfig.pipelines.forEach((pipeline) => {
+        pipeline.input_sources?.forEach((sourceName) => {
             if (!allDataSources.has(sourceName)) {
                 allDataSources.set(sourceName, {
                     name: sourceName,
@@ -90,7 +106,7 @@ export function renderDatasources() {
                 })
             }
         })
-        pipeline.output_sources?.forEach(sourceName => {
+        pipeline.output_sources?.forEach((sourceName) => {
             if (!allDataSources.has(sourceName)) {
                 allDataSources.set(sourceName, {
                     name: sourceName,
@@ -126,23 +142,36 @@ export function renderDatasources() {
             <tbody>
     `
 
-    allDataSources.forEach(ds => {
+    allDataSources.forEach((ds) => {
         const typeBadge = `<span class="badge badge-${ds.type || 'secondary'}">${(ds.type || 'unknown').toUpperCase()}</span>`
 
-        const metadata = ds.metadata ? Object.entries(ds.metadata).map(([k, v]) =>
-            `<div class="small text-muted mb-1"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
-        ).join('') : ''
+        const metadata = ds.metadata
+            ? Object.entries(ds.metadata)
+                  .map(
+                      ([k, v]) =>
+                          `<div class="small text-muted mb-1"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
+                  )
+                  .join('')
+            : ''
 
-        const cluster = ds.cluster ?
-            `<span class="badge badge-cluster me-1 mb-1">${ds.cluster}</span>` : ''
+        const cluster = ds.cluster ? `<span class="badge badge-cluster me-1 mb-1">${ds.cluster}</span>` : ''
 
-        const tags = ds.tags?.map(t =>
-            `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
-        ).join('') || ''
+        const tags =
+            ds.tags
+                ?.map(
+                    (t) =>
+                        `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
+                )
+                .join('') || ''
 
-        const links = ds.links ? Object.entries(ds.links).map(([name, url]) =>
-            `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
-        ).join('') : ''
+        const links = ds.links
+            ? Object.entries(ds.links)
+                  .map(
+                      ([name, url]) =>
+                          `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                  )
+                  .join('')
+            : ''
 
         html += `
             <tr class="datasource-row"
@@ -152,7 +181,7 @@ export function renderDatasources() {
                 data-tags="${(ds.tags || []).join(',').toLowerCase()}"
                 data-search="${(ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase()}">
                 <td class="col-name"><div><strong>${ds.name}</strong><br>${typeBadge}</div></td>
-                <td class="col-desc"><div>${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : (ds.description || '')}</div></td>
+                <td class="col-desc"><div>${ds.isAutoCreated ? `<span class="text-secondary fst-italic">${ds.description}</span>` : ds.description || ''}</div></td>
                 <td class="col-owner"><div class="small text-muted">${ds.owner || ''}</div></td>
                 <td class="col-metadata"><div>${metadata}</div></td>
                 <td class="col-cluster"><div>${cluster}</div></td>

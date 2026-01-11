@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fmt": "prettier --write 'src/**/*.js' 'index.html'",
+    "fmt:check": "prettier --check 'src/**/*.js' 'index.html'"
   },
   "repository": {
     "type": "git",
@@ -21,6 +23,7 @@
   },
   "homepage": "https://github.com/mattlianje/pipeviz#readme",
   "devDependencies": {
+    "prettier": "^3.2.0",
     "vite": "^7.3.0",
     "vite-plugin-singlefile": "^2.3.0"
   }

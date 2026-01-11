@@ -1,14 +1,45 @@
-// Main entry point for pipeviz
 import { initTheme, toggleTheme } from './theme.js'
 import { setupTabs, activateTabFromHash } from './tabs.js'
-import { setupDragDrop, setupAutoProcess, loadFromUrl, loadExample, loadFromFile, generateShareableUrl } from './loaders.js'
+import {
+    setupDragDrop,
+    setupAutoProcess,
+    loadFromUrl,
+    loadExample,
+    loadFromFile,
+    generateShareableUrl
+} from './loaders.js'
 import { filterPipelines, filterDatasources } from './filters.js'
 import { renderSplashGraph } from './splash.js'
-import { clearSelection, resetGraph, collapseAllGroups, toggleGroup, togglePipelinesOnly, searchNodes, selectSearchResult } from './graph.js'
-import { clearAttributeSelection, resetAttributeGraph, searchAttributes, selectAttributeFromSearch } from './attributes.js'
+import {
+    clearSelection,
+    resetGraph,
+    collapseAllGroups,
+    toggleGroup,
+    togglePipelinesOnly,
+    searchNodes,
+    selectSearchResult
+} from './graph.js'
+import {
+    clearAttributeSelection,
+    resetAttributeGraph,
+    searchAttributes,
+    selectAttributeFromSearch
+} from './attributes.js'
 import { updateDotView, copyDotToClipboard } from './dot.js'
+import {
+    updateExportView,
+    copyExportToClipboard,
+    setExportFormat,
+    populateBackfillSelect,
+    updateBackfillPlan,
+    copyBackfillToClipboard,
+    setBackfillView,
+    toggleBackfillPicker,
+    clearBackfillSelection,
+    filterBackfillPipelines
+} from './export.js'
+import { renderStats } from './stats.js'
 
-// Expose functions to global scope for onclick handlers in HTML
 window.toggleTheme = toggleTheme
 window.loadExample = loadExample
 window.loadFromFile = loadFromFile
@@ -28,15 +59,24 @@ window.searchAttributes = searchAttributes
 window.selectAttributeFromSearch = selectAttributeFromSearch
 window.updateDotView = updateDotView
 window.copyDotToClipboard = copyDotToClipboard
+window.updateExportView = updateExportView
+window.copyExportToClipboard = copyExportToClipboard
+window.setExportFormat = setExportFormat
+window.populateBackfillSelect = populateBackfillSelect
+window.updateBackfillPlan = updateBackfillPlan
+window.copyBackfillToClipboard = copyBackfillToClipboard
+window.setBackfillView = setBackfillView
+window.toggleBackfillPicker = toggleBackfillPicker
+window.clearBackfillSelection = clearBackfillSelection
+window.filterBackfillPipelines = filterBackfillPipelines
 
-// Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
     setupTabs()
     activateTabFromHash()
+    document.getElementById('stats-tab')?.addEventListener('shown.bs.tab', renderStats)
 })
 
-// Initialize on window load
 window.addEventListener('load', () => {
     setupDragDrop()
     setupAutoProcess()
@@ -44,5 +84,4 @@ window.addEventListener('load', () => {
     renderSplashGraph()
 })
 
-// Handle hash changes
 window.addEventListener('hashchange', activateTabFromHash)

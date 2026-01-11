@@ -12,9 +12,5 @@ export function renderSplashGraph() {
         "raw_events" -> "etl-job"
         "etl-job" -> "cleaned_events"
     }`
-    d3.select("#splash-graph").graphviz()
-        .width(260)
-        .height(110)
-        .fit(true)
-        .renderDot(dot)
+    d3.select('#splash-graph').graphviz().width(260).height(110).fit(true).renderDot(dot)
 }

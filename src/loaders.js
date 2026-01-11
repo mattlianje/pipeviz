@@ -3,6 +3,8 @@ import { renderPipelines, renderDatasources } from './tables.js'
 import { updateFilters } from './filters.js'
 import { renderGraph } from './graph.js'
 import { updateDotView } from './dot.js'
+import { updateExportView, populateBackfillSelect } from './export.js'
+import { renderStats } from './stats.js'
 
 export function loadExample() {
     document.getElementById('json-input').value = JSON.stringify(exampleConfig, null, 2)
@@ -20,15 +22,18 @@ export function generateShareableUrl() {
     const currentUrl = window.location.origin + window.location.pathname
     const shareableUrl = `${currentUrl}?config=${encodedConfig}`
 
-    navigator.clipboard.writeText(shareableUrl).then(() => {
-        const statusDiv = document.getElementById('json-status')
-        statusDiv.innerHTML = '<div class="alert alert-success">Shareable URL copied to clipboard!</div>'
-        setTimeout(() => {
-            statusDiv.innerHTML = ''
-        }, 3000)
-    }).catch(() => {
-        prompt('Copy this shareable URL:', shareableUrl)
-    })
+    navigator.clipboard
+        .writeText(shareableUrl)
+        .then(() => {
+            const statusDiv = document.getElementById('json-status')
+            statusDiv.innerHTML = '<div class="alert alert-success">Shareable URL copied to clipboard!</div>'
+            setTimeout(() => {
+                statusDiv.innerHTML = ''
+            }, 3000)
+        })
+        .catch(() => {
+            prompt('Copy this shareable URL:', shareableUrl)
+        })
 }
 
 async function tryLoadPipevizJson() {
@@ -41,7 +46,9 @@ async function tryLoadPipevizJson() {
             loadJson()
             const statusDiv = document.getElementById('json-status')
             statusDiv.innerHTML = '<div class="alert alert-success">Loaded pipeviz.json</div>'
-            setTimeout(() => { statusDiv.innerHTML = '' }, 3000)
+            setTimeout(() => {
+                statusDiv.innerHTML = ''
+            }, 3000)
             return true
         }
     } catch (error) {}
@@ -72,13 +79,13 @@ export async function loadFromUrl() {
 
     if (urlParam) {
         fetch(urlParam)
-            .then(response => {
+            .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`)
                 }
                 return response.text()
             })
-            .then(configText => {
+            .then((configText) => {
                 try {
                     const parsed = JSON.parse(configText)
                     document.getElementById('json-input').value = JSON.stringify(parsed, null, 2)
@@ -91,7 +98,7 @@ export async function loadFromUrl() {
                     loadJson()
                 }
             })
-            .catch(error => {
+            .catch((error) => {
                 const statusDiv = document.getElementById('json-status')
                 statusDiv.innerHTML = `<div class="alert alert-danger">Error loading from URL: ${error.message}</div>`
                 if (!state.currentConfig) {
@@ -111,7 +118,7 @@ export function setupDragDrop() {
     const dropZone = document.getElementById('drop-zone')
     const textarea = document.getElementById('json-input')
 
-    ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
         dropZone.addEventListener(eventName, preventDefaults, false)
     })
 
@@ -120,11 +127,10 @@ export function setupDragDrop() {
         e.stopPropagation()
     }
 
-    ;['dragenter', 'dragover'].forEach(eventName => {
+    ;['dragenter', 'dragover'].forEach((eventName) => {
         dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false)
     })
-
-    ;['dragleave', 'drop'].forEach(eventName => {
+    ;['dragleave', 'drop'].forEach((eventName) => {
         dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false)
     })
 
@@ -134,9 +140,9 @@ export function setupDragDrop() {
         const files = e.dataTransfer.files
         if (files.length > 0) {
             const file = files[0]
-            if (file.type === "application/json" || file.name.endsWith('.json')) {
+            if (file.type === 'application/json' || file.name.endsWith('.json')) {
                 const reader = new FileReader()
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     try {
                         const parsed = JSON.parse(e.target.result)
                         textarea.value = JSON.stringify(parsed, null, 2)
@@ -157,9 +163,9 @@ export function setupDragDrop() {
 
 export function loadFromFile(event) {
     const file = event.target.files[0]
-    if (file && (file.type === "application/json" || file.name.endsWith('.json'))) {
+    if (file && (file.type === 'application/json' || file.name.endsWith('.json'))) {
         const reader = new FileReader()
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             try {
                 const parsed = JSON.parse(e.target.result)
                 document.getElementById('json-input').value = JSON.stringify(parsed, null, 2)
@@ -181,7 +187,7 @@ export function setupAutoProcess() {
     const statusDiv = document.getElementById('json-status')
     let timeout
 
-    textarea.addEventListener('input', function() {
+    textarea.addEventListener('input', function () {
         clearTimeout(timeout)
         timeout = setTimeout(() => {
             const content = textarea.value.trim()
@@ -191,7 +197,8 @@ export function setupAutoProcess() {
             }
             try {
                 JSON.parse(content)
-                statusDiv.innerHTML = '<div class="alert alert-success py-1 px-2" style="font-size: 0.85em;">Valid JSON</div>'
+                statusDiv.innerHTML =
+                    '<div class="alert alert-success py-1 px-2" style="font-size: 0.85em;">Valid JSON</div>'
                 loadJson()
             } catch (e) {
                 statusDiv.innerHTML = `<div class="alert alert-danger py-1 px-2" style="font-size: 0.85em;">Invalid JSON: ${e.message}</div>`
@@ -218,7 +225,9 @@ export function loadJson() {
         updateFilters()
         renderGraph()
         updateDotView()
-
+        updateExportView()
+        populateBackfillSelect()
+        renderStats()
     } catch (error) {
         statusDiv.innerHTML = `<div class="alert alert-danger">JSON Parse Error: ${error.message}</div>`
     }
