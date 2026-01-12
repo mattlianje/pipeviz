@@ -11,6 +11,8 @@ A JSON spec for lineage. Declare your pipelines, get a graph.
 - Works with any stack: SQL, Spark, Kafka, S3, APIs, shell scripts
 - Each team owns their JSON, merge with `jq` for the org-wide view
 - Column-level lineage built in
+- Blast radius to see what breaks
+- Backfill stages to parallelize safely
 
 ## Why?
 When a data org doesn't have a trusted dependency graph:
@@ -194,6 +196,15 @@ jq -s '{
   datasources: (map(.datasources // []) | add | group_by(.name) | map(add))
 }' team-*.json > pipeviz.json
 ```
+
+## What you get from the graph
+
+- Topological sort into parallel stages for backfills
+- Cycle detection
+- Diamond dependency handling
+- Blast radius analysis (downstream impact)
+- Mermaid export
+- MCP-ready JSON graph for LLM tooling
 
 ## Inspiration
 - The LISP [code-as-data](https://en.wikipedia.org/wiki/Code_as_data) ethos

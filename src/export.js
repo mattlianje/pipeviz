@@ -576,7 +576,9 @@ export function toggleBackfillPicker() {
 
 function closePickerOnClickOutside(e) {
     const picker = document.querySelector('.backfill-pipeline-picker')
-    if (picker && !picker.contains(e.target)) {
+    const viewBtns = document.querySelectorAll('.backfill-view-btn')
+    const isViewBtn = Array.from(viewBtns).some((btn) => btn.contains(e.target))
+    if (picker && !picker.contains(e.target) && !isViewBtn) {
         const dropdown = document.getElementById('backfill-picker-dropdown')
         if (dropdown) dropdown.classList.remove('show')
         document.removeEventListener('click', closePickerOnClickOutside)
@@ -667,8 +669,8 @@ function generateBackfillDot(analysis) {
 }
 
 const VIEW_HINTS = {
-    pipeline: 'Select pipelines to plan backfill execution order',
-    airflow: 'Maps pipelines to Airflow DAGs for backfill commands',
+    pipeline: 'Select pipelines to plan execution order',
+    airflow: 'Maps pipelines to Airflow DAGs',
     blast: 'Select a node to see all downstream dependencies affected by changes'
 }
 
@@ -695,6 +697,19 @@ export function setBackfillView(view) {
     populateBackfillSelect()
     updatePickerButton()
     updateBackfillPlan()
+
+    // Show picker dropdown when view is clicked
+    const dropdown = document.getElementById('backfill-picker-dropdown')
+    if (dropdown && !dropdown.classList.contains('show')) {
+        dropdown.classList.add('show')
+        const filterInput = document.getElementById('backfill-picker-filter')
+        if (filterInput) {
+            setTimeout(() => filterInput.focus(), 0)
+        }
+        setTimeout(() => {
+            document.addEventListener('click', closePickerOnClickOutside)
+        }, 0)
+    }
 }
 
 function extractAirflowDag(airflowUrl) {
@@ -707,46 +722,46 @@ function generateAirflowAnalysis(pipelineAnalysis) {
     if (!pipelineAnalysis || !pipelineAnalysis.waves) return null
 
     const pipelines = state.currentConfig?.pipelines || []
-    const missingAirflow = []
     const pipelineToDag = {}
+
     pipelineAnalysis.waves.forEach((wave) => {
         wave.pipelines.forEach((p) => {
             const pipeline = pipelines.find((pl) => pl.name === p.name)
             const airflowUrl = pipeline?.links?.airflow
 
             if (!airflowUrl) {
-                missingAirflow.push(p.name)
+                // Pipeline without airflow link - show with ? indicator
+                pipelineToDag[p.name] = {
+                    dag: p.name,
+                    airflow_url: null,
+                    missing: true
+                }
             } else {
                 pipelineToDag[p.name] = {
                     dag: extractAirflowDag(airflowUrl),
-                    airflow_url: airflowUrl
+                    airflow_url: airflowUrl,
+                    missing: false
                 }
             }
         })
     })
 
-    if (missingAirflow.length > 0) {
-        return {
-            error: 'Missing Airflow links',
-            message: `Cannot generate Airflow backfill plan. The following pipelines are missing airflow links: ${missingAirflow.join(', ')}`,
-            missing_pipelines: missingAirflow
-        }
-    }
-
     const airflowWaves = pipelineAnalysis.waves.map((wave) => {
-        const dagMap = new Map() // dag name -> { dag, airflow_url, pipelines: [] }
+        const dagMap = new Map() // dag name -> { dag, airflow_url, pipelines: [], missing: bool }
 
         wave.pipelines.forEach((p) => {
             const dagInfo = pipelineToDag[p.name]
             if (dagInfo) {
-                if (!dagMap.has(dagInfo.dag)) {
-                    dagMap.set(dagInfo.dag, {
+                const key = dagInfo.missing ? `missing_${p.name}` : dagInfo.dag
+                if (!dagMap.has(key)) {
+                    dagMap.set(key, {
                         dag: dagInfo.dag,
                         airflow_url: dagInfo.airflow_url,
-                        pipelines: []
+                        pipelines: [],
+                        missing: dagInfo.missing
                     })
                 }
-                dagMap.get(dagInfo.dag).pipelines.push(p.name)
+                dagMap.get(key).pipelines.push(p.name)
             }
         })
 
@@ -786,12 +801,15 @@ function generateAirflowAnalysis(pipelineAnalysis) {
 }
 
 function generateAirflowBackfillDot(analysis) {
-    if (!analysis || !analysis.waves || analysis.waves.length === 0 || analysis.error) return null
+    if (!analysis || !analysis.waves || analysis.waves.length === 0) return null
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
     const bgColor = isDark ? '#1a1a1a' : '#ffffff'
     const textColor = isDark ? '#b0b0b0' : '#666666'
     const edgeColor = isDark ? '#666666' : '#999999'
+    const missingColor = isDark
+        ? { fill: '#2a2a2a', border: '#555555', text: '#888888' }
+        : { fill: '#f5f5f5', border: '#cccccc', text: '#999999' }
     const wave0Color = isDark ? WAVE0_COLOR_DARK : WAVE0_COLOR
     const waveColors = isDark ? WAVE_COLORS_DARK : WAVE_COLORS
 
@@ -807,7 +825,7 @@ function generateAirflowBackfillDot(analysis) {
     analysis.waves.forEach((wave) => {
         const colors = wave.wave === 0 ? wave0Color : waveColors[(wave.wave - 1) % waveColors.length]
         dot += `    subgraph cluster_wave${wave.wave} {
-        label="Wave ${wave.wave}"
+        label="Stage ${wave.wave}"
         fontname="Helvetica"
         style="dashed"
         color="${colors.border}"
@@ -816,7 +834,14 @@ function generateAirflowBackfillDot(analysis) {
         
 `
         wave.dags.forEach((d) => {
-            dot += `        "${d.dag}" [label="${d.dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]\n`
+            if (d.missing) {
+                // Pipeline without airflow link - show with ? indicator
+                const label = `${d.dag}\\n?`
+                dot += `        "${d.dag}" [label="${label}" fillcolor="${missingColor.fill}" color="${missingColor.border}" fontcolor="${missingColor.text}" style="filled,rounded,dashed"]\n`
+            } else {
+                // DAG with airflow link - clickable
+                dot += `        "${d.dag}" [label="${d.dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}" href="${d.airflow_url}" target="_blank" tooltip="Open in Airflow"]\n`
+            }
         })
         dot += `    }\n\n`
     })

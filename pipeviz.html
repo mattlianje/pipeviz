@@ -33,6 +33,13 @@
             html {
                 overflow-y: scroll;
             }
+            /* Prevent modal from causing body padding jitter */
+            body.modal-open {
+                padding-right: 0 !important;
+            }
+            .modal-backdrop {
+                width: 100% !important;
+            }
             body {
                 background-color: var(--bg-primary);
                 min-height: 100vh;
@@ -52,9 +59,6 @@
                 }
                 .feature-grid {
                     grid-template-columns: 1fr !important;
-                }
-                .feature-tile-centered {
-                    width: 100% !important;
                 }
             }
             .nav-tabs {
@@ -525,18 +529,7 @@
             .backfill-pipeline-picker {
                 position: relative;
             }
-            #backfill-picker-btn {
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
             @media (max-width: 768px) {
-                #backfill-picker-btn {
-                    max-width: 140px;
-                    font-size: 11px;
-                    padding: 4px 8px;
-                }
                 .backfill-view-btn {
                     font-size: 11px !important;
                     padding: 4px 8px !important;
@@ -562,10 +555,6 @@
                     font-size: 10px !important;
                     padding: 6px 4px !important;
                     white-space: nowrap;
-                }
-                #backfill-picker-btn {
-                    max-width: none;
-                    flex: 1;
                 }
                 .backfill-pipeline-picker {
                     flex: 1;
@@ -1170,6 +1159,14 @@
                 gap: 1rem;
                 margin-bottom: 2.5rem;
             }
+            .superpowers-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem 1.5rem;
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }
             @media (max-width: 992px) {
                 .feature-grid {
                     grid-template-columns: repeat(2, 1fr);
@@ -1179,14 +1176,19 @@
                 .feature-grid {
                     grid-template-columns: 1fr;
                 }
-                .feature-tile {
-                    padding: 1rem 1.25rem;
+                .superpowers-grid {
+                    grid-template-columns: 1fr;
                 }
             }
             /* Feature tiles */
             .feature-tile {
                 padding: 0.875rem;
                 background: var(--bg-secondary);
+            }
+            @media (max-width: 576px) {
+                .feature-tile {
+                    padding: 1rem 1.25rem;
+                }
             }
             .feature-icon {
                 color: var(--text-muted);
@@ -4789,7 +4791,9 @@ function toggleBackfillPicker() {
 }
 function closePickerOnClickOutside(e) {
   const picker = document.querySelector(".backfill-pipeline-picker");
-  if (picker && !picker.contains(e.target)) {
+  const viewBtns = document.querySelectorAll(".backfill-view-btn");
+  const isViewBtn = Array.from(viewBtns).some((btn) => btn.contains(e.target));
+  if (picker && !picker.contains(e.target) && !isViewBtn) {
     const dropdown = document.getElementById("backfill-picker-dropdown");
     if (dropdown) dropdown.classList.remove("show");
     document.removeEventListener("click", closePickerOnClickOutside);
@@ -4871,8 +4875,8 @@ function generateBackfillDot(analysis) {
   return dot;
 }
 const VIEW_HINTS = {
-  pipeline: "Select pipelines to plan backfill execution order",
-  airflow: "Maps pipelines to Airflow DAGs for backfill commands",
+  pipeline: "Select pipelines to plan execution order",
+  airflow: "Maps pipelines to Airflow DAGs",
   blast: "Select a node to see all downstream dependencies affected by changes"
 };
 function setBackfillView(view) {
@@ -4894,6 +4898,17 @@ function setBackfillView(view) {
   populateBackfillSelect();
   updatePickerButton();
   updateBackfillPlan();
+  const dropdown = document.getElementById("backfill-picker-dropdown");
+  if (dropdown && !dropdown.classList.contains("show")) {
+    dropdown.classList.add("show");
+    const filterInput = document.getElementById("backfill-picker-filter");
+    if (filterInput) {
+      setTimeout(() => filterInput.focus(), 0);
+    }
+    setTimeout(() => {
+      document.addEventListener("click", closePickerOnClickOutside);
+    }, 0);
+  }
 }
 function extractAirflowDag(airflowUrl) {
   if (!airflowUrl) return null;
@@ -4903,42 +4918,41 @@ function extractAirflowDag(airflowUrl) {
 function generateAirflowAnalysis(pipelineAnalysis) {
   if (!pipelineAnalysis || !pipelineAnalysis.waves) return null;
   const pipelines = state.currentConfig?.pipelines || [];
-  const missingAirflow = [];
   const pipelineToDag = {};
   pipelineAnalysis.waves.forEach((wave) => {
     wave.pipelines.forEach((p) => {
       const pipeline = pipelines.find((pl) => pl.name === p.name);
       const airflowUrl = pipeline?.links?.airflow;
       if (!airflowUrl) {
-        missingAirflow.push(p.name);
+        pipelineToDag[p.name] = {
+          dag: p.name,
+          airflow_url: null,
+          missing: true
+        };
       } else {
         pipelineToDag[p.name] = {
           dag: extractAirflowDag(airflowUrl),
-          airflow_url: airflowUrl
+          airflow_url: airflowUrl,
+          missing: false
         };
       }
     });
   });
-  if (missingAirflow.length > 0) {
-    return {
-      error: "Missing Airflow links",
-      message: `Cannot generate Airflow backfill plan. The following pipelines are missing airflow links: ${missingAirflow.join(", ")}`,
-      missing_pipelines: missingAirflow
-    };
-  }
   const airflowWaves = pipelineAnalysis.waves.map((wave) => {
     const dagMap = /* @__PURE__ */ new Map();
     wave.pipelines.forEach((p) => {
       const dagInfo = pipelineToDag[p.name];
       if (dagInfo) {
-        if (!dagMap.has(dagInfo.dag)) {
-          dagMap.set(dagInfo.dag, {
+        const key = dagInfo.missing ? `missing_${p.name}` : dagInfo.dag;
+        if (!dagMap.has(key)) {
+          dagMap.set(key, {
             dag: dagInfo.dag,
             airflow_url: dagInfo.airflow_url,
-            pipelines: []
+            pipelines: [],
+            missing: dagInfo.missing
           });
         }
-        dagMap.get(dagInfo.dag).pipelines.push(p.name);
+        dagMap.get(key).pipelines.push(p.name);
       }
     });
     return {
@@ -4972,11 +4986,12 @@ function generateAirflowAnalysis(pipelineAnalysis) {
   };
 }
 function generateAirflowBackfillDot(analysis) {
-  if (!analysis || !analysis.waves || analysis.waves.length === 0 || analysis.error) return null;
+  if (!analysis || !analysis.waves || analysis.waves.length === 0) return null;
   const isDark = document.documentElement.getAttribute("data-theme") === "dark";
   const bgColor = isDark ? "#1a1a1a" : "#ffffff";
   const textColor = isDark ? "#b0b0b0" : "#666666";
   const edgeColor = isDark ? "#666666" : "#999999";
+  const missingColor = isDark ? { fill: "#2a2a2a", border: "#555555", text: "#888888" } : { fill: "#f5f5f5", border: "#cccccc", text: "#999999" };
   const wave0Color = isDark ? WAVE0_COLOR_DARK : WAVE0_COLOR;
   const waveColors = isDark ? WAVE_COLORS_DARK : WAVE_COLORS;
   let dot = `digraph AirflowBackfill {
@@ -4990,7 +5005,7 @@ function generateAirflowBackfillDot(analysis) {
   analysis.waves.forEach((wave) => {
     const colors = wave.wave === 0 ? wave0Color : waveColors[(wave.wave - 1) % waveColors.length];
     dot += `    subgraph cluster_wave${wave.wave} {
-        label="Wave ${wave.wave}"
+        label="Stage ${wave.wave}"
         fontname="Helvetica"
         style="dashed"
         color="${colors.border}"
@@ -4999,8 +5014,14 @@ function generateAirflowBackfillDot(analysis) {
         
 `;
     wave.dags.forEach((d) => {
-      dot += `        "${d.dag}" [label="${d.dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]
+      if (d.missing) {
+        const label = `${d.dag}\\n?`;
+        dot += `        "${d.dag}" [label="${label}" fillcolor="${missingColor.fill}" color="${missingColor.border}" fontcolor="${missingColor.text}" style="filled,rounded,dashed"]
 `;
+      } else {
+        dot += `        "${d.dag}" [label="${d.dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}" href="${d.airflow_url}" target="_blank" tooltip="Open in Airflow"]
+`;
+      }
     });
     dot += `    }
 
@@ -5765,7 +5786,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                             data-bs-target="#backfill-pane"
                             title="Plan downstream execution order"
                         >
-                            Backfill
+                            Planner
                         </button>
                     </li>
                     <li class="nav-item">
@@ -5892,7 +5913,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                             </div>
 
                             <!-- Feature tiles -->
-                            <div class="feature-grid">
+                            <div class="feature-grid" style="margin-bottom: 2rem">
                                 <div class="feature-tile">
                                     <svg
                                         width="16"
@@ -5918,7 +5939,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                     >
                                         Stack Agnostic
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         SQL, Spark, Kafka, APIs, shell scripts. Just JSON.
                                     </div>
                                 </div>
@@ -5945,7 +5966,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                     >
                                         Zero Dependencies
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         One HTML file. No backend, no build step. Host anywhere.
                                     </div>
                                 </div>
@@ -5975,7 +5996,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                     >
                                         Federated
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         Each team owns their JSON. Merge with jq for the org-wide view.
                                     </div>
                                 </div>
@@ -6004,7 +6025,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                     >
                                         Column-Level Lineage
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         Track field-level provenance. See where each attribute comes from.
                                     </div>
                                 </div>
@@ -6043,7 +6064,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                         >
                                             Define
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Write a <code>pipeviz.json</code> describing your pipelines and data sources
                                         </div>
                                     </div>
@@ -6063,7 +6084,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                         >
                                             Load
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Drop your file here, or host both files together on any static server
                                         </div>
                                     </div>
@@ -6083,9 +6104,150 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                         >
                                             Explore
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Click through the graph, trace dependencies, export DOT for other tools
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Superpowers -->
+                            <div style="margin-bottom: 2rem">
+                                <div
+                                    style="
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        margin-bottom: 0.5rem;
+                                        color: var(--text-muted);
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    "
+                                >
+                                    Superpowers
+                                </div>
+                                <p
+                                    style="
+                                        font-size: 13px;
+                                        color: var(--text-secondary);
+                                        line-height: 1.5;
+                                        margin: 0 0 1rem 0;
+                                    "
+                                >
+                                    Each pipeline declares what it reads and writes. Pipeviz stitches these into a
+                                    complete graph. From there:
+                                </p>
+                                <div class="superpowers-grid">
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M4 6h4M4 12h6M4 18h8" />
+                                            <path d="M14 6h6M12 12h8M10 18h10" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Parallelize backfills</strong>
+                                            by topologically sorting nodes into stages. Independent pipelines run
+                                            together.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <circle cx="12" cy="12" r="9" />
+                                            <path d="M12 8v4l2 2" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)"
+                                                >Detect circular dependencies</strong
+                                            >
+                                            before they break your backfill. Cycles shown in red.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M12 2l8 10-8 10-8-10z" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)"
+                                                >Handle diamond dependencies</strong
+                                            >
+                                            correctly. Each node runs only after all its parents complete.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Trace blast radius</strong>
+                                            downstream from any node. Know exactly what breaks.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M4 17l6-6-6-6" />
+                                            <path d="M12 19h8" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Export to Mermaid</strong> and
+                                            embed diagrams in CI/CD, PRs, or docs.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                                            <path d="M9 9h6M9 12h6M9 15h4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Build MCPs</strong> on top of
+                                            your graph. LLMs can query your lineage.</span
+                                        >
                                     </div>
                                 </div>
                             </div>
@@ -6464,16 +6626,9 @@ Load a configuration to see the graph export...</pre
                         <div class="card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">Backfill Planner</h5>
+                                    <h5 class="mb-0">Planner</h5>
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="backfill-pipeline-picker">
-                                            <button
-                                                class="btn btn-sm btn-outline-secondary"
-                                                onclick="toggleBackfillPicker()"
-                                                id="backfill-picker-btn"
-                                            >
-                                                Select pipelines...
-                                            </button>
                                             <div class="backfill-picker-dropdown" id="backfill-picker-dropdown">
                                                 <div class="backfill-picker-search">
                                                     <input

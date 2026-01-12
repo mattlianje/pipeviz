@@ -33,6 +33,13 @@
             html {
                 overflow-y: scroll;
             }
+            /* Prevent modal from causing body padding jitter */
+            body.modal-open {
+                padding-right: 0 !important;
+            }
+            .modal-backdrop {
+                width: 100% !important;
+            }
             body {
                 background-color: var(--bg-primary);
                 min-height: 100vh;
@@ -52,9 +59,6 @@
                 }
                 .feature-grid {
                     grid-template-columns: 1fr !important;
-                }
-                .feature-tile-centered {
-                    width: 100% !important;
                 }
             }
             .nav-tabs {
@@ -525,18 +529,7 @@
             .backfill-pipeline-picker {
                 position: relative;
             }
-            #backfill-picker-btn {
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
             @media (max-width: 768px) {
-                #backfill-picker-btn {
-                    max-width: 140px;
-                    font-size: 11px;
-                    padding: 4px 8px;
-                }
                 .backfill-view-btn {
                     font-size: 11px !important;
                     padding: 4px 8px !important;
@@ -562,10 +555,6 @@
                     font-size: 10px !important;
                     padding: 6px 4px !important;
                     white-space: nowrap;
-                }
-                #backfill-picker-btn {
-                    max-width: none;
-                    flex: 1;
                 }
                 .backfill-pipeline-picker {
                     flex: 1;
@@ -1170,6 +1159,14 @@
                 gap: 1rem;
                 margin-bottom: 2.5rem;
             }
+            .superpowers-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem 1.5rem;
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }
             @media (max-width: 992px) {
                 .feature-grid {
                     grid-template-columns: repeat(2, 1fr);
@@ -1179,14 +1176,19 @@
                 .feature-grid {
                     grid-template-columns: 1fr;
                 }
-                .feature-tile {
-                    padding: 1rem 1.25rem;
+                .superpowers-grid {
+                    grid-template-columns: 1fr;
                 }
             }
             /* Feature tiles */
             .feature-tile {
                 padding: 0.875rem;
                 background: var(--bg-secondary);
+            }
+            @media (max-width: 576px) {
+                .feature-tile {
+                    padding: 1rem 1.25rem;
+                }
             }
             .feature-icon {
                 color: var(--text-muted);
@@ -1628,7 +1630,7 @@
                             data-bs-target="#backfill-pane"
                             title="Plan downstream execution order"
                         >
-                            Backfill
+                            Planner
                         </button>
                     </li>
                     <li class="nav-item">
@@ -1755,7 +1757,7 @@
                             </div>
 
                             <!-- Feature tiles -->
-                            <div class="feature-grid">
+                            <div class="feature-grid" style="margin-bottom: 2rem">
                                 <div class="feature-tile">
                                     <svg
                                         width="16"
@@ -1781,7 +1783,7 @@
                                     >
                                         Stack Agnostic
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         SQL, Spark, Kafka, APIs, shell scripts. Just JSON.
                                     </div>
                                 </div>
@@ -1808,7 +1810,7 @@
                                     >
                                         Zero Dependencies
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         One HTML file. No backend, no build step. Host anywhere.
                                     </div>
                                 </div>
@@ -1838,7 +1840,7 @@
                                     >
                                         Federated
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         Each team owns their JSON. Merge with jq for the org-wide view.
                                     </div>
                                 </div>
@@ -1867,7 +1869,7 @@
                                     >
                                         Column-Level Lineage
                                     </div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">
                                         Track field-level provenance. See where each attribute comes from.
                                     </div>
                                 </div>
@@ -1906,7 +1908,7 @@
                                         >
                                             Define
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Write a <code>pipeviz.json</code> describing your pipelines and data sources
                                         </div>
                                     </div>
@@ -1926,7 +1928,7 @@
                                         >
                                             Load
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Drop your file here, or host both files together on any static server
                                         </div>
                                     </div>
@@ -1946,9 +1948,150 @@
                                         >
                                             Explore
                                         </div>
-                                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4">
+                                        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">
                                             Click through the graph, trace dependencies, export DOT for other tools
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Superpowers -->
+                            <div style="margin-bottom: 2rem">
+                                <div
+                                    style="
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        margin-bottom: 0.5rem;
+                                        color: var(--text-muted);
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    "
+                                >
+                                    Superpowers
+                                </div>
+                                <p
+                                    style="
+                                        font-size: 13px;
+                                        color: var(--text-secondary);
+                                        line-height: 1.5;
+                                        margin: 0 0 1rem 0;
+                                    "
+                                >
+                                    Each pipeline declares what it reads and writes. Pipeviz stitches these into a
+                                    complete graph. From there:
+                                </p>
+                                <div class="superpowers-grid">
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M4 6h4M4 12h6M4 18h8" />
+                                            <path d="M14 6h6M12 12h8M10 18h10" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Parallelize backfills</strong>
+                                            by topologically sorting nodes into stages. Independent pipelines run
+                                            together.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <circle cx="12" cy="12" r="9" />
+                                            <path d="M12 8v4l2 2" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)"
+                                                >Detect circular dependencies</strong
+                                            >
+                                            before they break your backfill. Cycles shown in red.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M12 2l8 10-8 10-8-10z" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)"
+                                                >Handle diamond dependencies</strong
+                                            >
+                                            correctly. Each node runs only after all its parents complete.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Trace blast radius</strong>
+                                            downstream from any node. Know exactly what breaks.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M4 17l6-6-6-6" />
+                                            <path d="M12 19h8" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Export to Mermaid</strong> and
+                                            embed diagrams in CI/CD, PRs, or docs.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                                            <path d="M9 9h6M9 12h6M9 15h4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Build MCPs</strong> on top of
+                                            your graph. LLMs can query your lineage.</span
+                                        >
                                     </div>
                                 </div>
                             </div>
@@ -2327,16 +2470,9 @@ Load a configuration to see the graph export...</pre
                         <div class="card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">Backfill Planner</h5>
+                                    <h5 class="mb-0">Planner</h5>
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="backfill-pipeline-picker">
-                                            <button
-                                                class="btn btn-sm btn-outline-secondary"
-                                                onclick="toggleBackfillPicker()"
-                                                id="backfill-picker-btn"
-                                            >
-                                                Select pipelines...
-                                            </button>
                                             <div class="backfill-picker-dropdown" id="backfill-picker-dropdown">
                                                 <div class="backfill-picker-search">
                                                     <input
