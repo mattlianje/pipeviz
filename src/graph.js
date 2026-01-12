@@ -324,12 +324,20 @@ export function updateGraph() {
         const viewKey = getViewStateKey()
         let cached = state.viewStateCache.get(viewKey)
 
+        if (cached?.svg) {
+            const graphContainer = document.getElementById('graph')
+            if (graphContainer) {
+                graphContainer.innerHTML = cached.svg
+                // Re-attach interactivity after swap
+                setupGraphInteractivity()
+            }
+            return
+        }
+
         let dotSrc
         if (cached?.dot) {
-            // Use cached DOT string
             dotSrc = cached.dot
         } else {
-            // Generate and cache the DOT string
             dotSrc = generateGraphvizDot()
             if (!cached) {
                 cached = { dot: dotSrc }
@@ -339,12 +347,19 @@ export function updateGraph() {
             }
         }
 
-        // Use transition for smoother rendering
-        state.graphviz.transition(() => d3.transition().duration(150)).renderDot(dotSrc)
-
-        // Pre-cache adjacent states (opposite of current expanded groups)
-        // This makes toggling feel instant on second use
-        setTimeout(() => precomputeAdjacentStates(), 100)
+        // Render and cache the result
+        state.graphviz
+            .transition(() => d3.transition().duration(100))
+            .renderDot(dotSrc)
+            .on('end', () => {
+                // Cache the rendered SVG for instant future swaps
+                const graphContainer = document.getElementById('graph')
+                if (graphContainer && cached) {
+                    cached.svg = graphContainer.innerHTML
+                }
+                // Pre-cache adjacent states
+                setTimeout(() => precomputeAdjacentStates(), 100)
+            })
     }
 }
 
@@ -353,17 +368,21 @@ function precomputeAdjacentStates() {
     if (!state.currentConfig?.pipelines) return
 
     // Find all group names
-    const groupNames = new Set()
+    const groupNames = []
     state.currentConfig.pipelines.forEach((p) => {
-        if (p.group) groupNames.add(p.group)
+        if (p.group && !groupNames.includes(p.group)) groupNames.push(p.group)
     })
 
     // Snapshot current state to avoid race conditions
     const currentExpanded = new Set(state.expandedGroups)
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
-    // For each group, compute the alternate state key without modifying actual state
-    groupNames.forEach((groupName) => {
+    // Process one group at a time using requestIdleCallback or setTimeout
+    let index = 0
+    function processNext() {
+        if (index >= groupNames.length) return
+
+        const groupName = groupNames[index++]
         const wasExpanded = currentExpanded.has(groupName)
 
         // Compute alternate expanded set
@@ -386,7 +405,14 @@ function precomputeAdjacentStates() {
             state.expandedGroups = savedExpanded
             addToViewCache(altKey, { dot: altDot })
         }
-    })
+
+        // Schedule next group with a small delay to avoid blocking
+        if (index < groupNames.length) {
+            setTimeout(processNext, 10)
+        }
+    }
+
+    processNext()
 }
 
 export function setupGraphInteractivity() {

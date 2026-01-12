@@ -575,13 +575,13 @@
                 display: none;
                 position: absolute;
                 top: 100%;
-                left: 0;
+                right: 0;
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
                 border-radius: 4px;
-                min-width: 280px;
+                width: 280px;
                 max-height: 380px;
-                z-index: 100;
+                z-index: 1000;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             }
             .backfill-picker-dropdown.show {
@@ -2472,7 +2472,7 @@ Load a configuration to see the graph export...</pre
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h5 class="mb-0">Planner</h5>
                                     <div class="d-flex align-items-center gap-3">
-                                        <div class="backfill-pipeline-picker">
+                                        <div class="btn-group btn-group-sm backfill-pipeline-picker">
                                             <div class="backfill-picker-dropdown" id="backfill-picker-dropdown">
                                                 <div class="backfill-picker-search">
                                                     <input
@@ -2493,8 +2493,6 @@ Load a configuration to see the graph export...</pre
                                                     </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="btn-group btn-group-sm">
                                             <button
                                                 class="btn btn-outline-secondary backfill-view-btn active"
                                                 data-view="pipeline"
