@@ -324,16 +324,6 @@ export function updateGraph() {
         const viewKey = getViewStateKey()
         let cached = state.viewStateCache.get(viewKey)
 
-        if (cached?.svg) {
-            const graphContainer = document.getElementById('graph')
-            if (graphContainer) {
-                graphContainer.innerHTML = cached.svg
-                // Re-attach interactivity after swap
-                setupGraphInteractivity()
-            }
-            return
-        }
-
         let dotSrc
         if (cached?.dot) {
             dotSrc = cached.dot
@@ -347,17 +337,15 @@ export function updateGraph() {
             }
         }
 
-        // Render and cache the result
+        // Subtle dim while rendering
+        const container = d3.select('#graph')
+        container.style('opacity', 0.6)
+
         state.graphviz
-            .transition(() => d3.transition().duration(100))
+            .transition(() => d3.transition().duration(150))
             .renderDot(dotSrc)
             .on('end', () => {
-                // Cache the rendered SVG for instant future swaps
-                const graphContainer = document.getElementById('graph')
-                if (graphContainer && cached) {
-                    cached.svg = graphContainer.innerHTML
-                }
-                // Pre-cache adjacent states
+                container.style('opacity', 1)
                 setTimeout(() => precomputeAdjacentStates(), 100)
             })
     }
