@@ -3094,29 +3094,54 @@ function initializeGraph() {
         `;
   }
 }
+let isRendering = false;
+let pendingUpdate = false;
+let renderTimeout = null;
 function updateGraph() {
-  if (state.graphviz) {
-    const viewKey = getViewStateKey();
-    let cached = state.viewStateCache.get(viewKey);
-    let dotSrc;
-    if (cached?.dot) {
-      dotSrc = cached.dot;
+  if (!state.graphviz) return;
+  if (isRendering) {
+    pendingUpdate = true;
+    return;
+  }
+  const viewKey = getViewStateKey();
+  let cached = state.viewStateCache.get(viewKey);
+  let dotSrc;
+  if (cached?.dot) {
+    dotSrc = cached.dot;
+  } else {
+    dotSrc = generateGraphvizDot();
+    if (!cached) {
+      cached = { dot: dotSrc };
+      addToViewCache(viewKey, cached);
     } else {
-      dotSrc = generateGraphvizDot();
-      if (!cached) {
-        cached = { dot: dotSrc };
-        addToViewCache(viewKey, cached);
-      } else {
-        cached.dot = dotSrc;
+      cached.dot = dotSrc;
+    }
+  }
+  isRendering = true;
+  const container = d3.select("#graph");
+  container.style("opacity", 0.6);
+  if (renderTimeout) clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(() => {
+    if (isRendering) {
+      container.style("opacity", 1);
+      isRendering = false;
+      if (pendingUpdate) {
+        pendingUpdate = false;
+        updateGraph();
       }
     }
-    const container = d3.select("#graph");
-    container.style("opacity", 0.6);
-    state.graphviz.transition(() => d3.transition().duration(150)).renderDot(dotSrc).on("end", () => {
-      container.style("opacity", 1);
+  }, 3e3);
+  state.graphviz.transition(() => d3.transition().duration(150)).renderDot(dotSrc).on("end", () => {
+    if (renderTimeout) clearTimeout(renderTimeout);
+    container.style("opacity", 1);
+    isRendering = false;
+    if (pendingUpdate) {
+      pendingUpdate = false;
+      updateGraph();
+    } else {
       setTimeout(() => precomputeAdjacentStates(), 100);
-    });
-  }
+    }
+  });
 }
 function precomputeAdjacentStates() {
   if (!state.currentConfig?.pipelines) return;

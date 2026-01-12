@@ -319,36 +319,68 @@ export function initializeGraph() {
     }
 }
 
-export function updateGraph() {
-    if (state.graphviz) {
-        const viewKey = getViewStateKey()
-        let cached = state.viewStateCache.get(viewKey)
+let isRendering = false
+let pendingUpdate = false
+let renderTimeout = null
 
-        let dotSrc
-        if (cached?.dot) {
-            dotSrc = cached.dot
+export function updateGraph() {
+    if (!state.graphviz) return
+
+    // If already rendering, mark that we need another update when done
+    if (isRendering) {
+        pendingUpdate = true
+        return
+    }
+
+    const viewKey = getViewStateKey()
+    let cached = state.viewStateCache.get(viewKey)
+
+    let dotSrc
+    if (cached?.dot) {
+        dotSrc = cached.dot
+    } else {
+        dotSrc = generateGraphvizDot()
+        if (!cached) {
+            cached = { dot: dotSrc }
+            addToViewCache(viewKey, cached)
         } else {
-            dotSrc = generateGraphvizDot()
-            if (!cached) {
-                cached = { dot: dotSrc }
-                addToViewCache(viewKey, cached)
-            } else {
-                cached.dot = dotSrc
+            cached.dot = dotSrc
+        }
+    }
+
+    isRendering = true
+    const container = d3.select('#graph')
+    container.style('opacity', 0.6)
+
+    // Safety timeout to reset rendering state if transition gets stuck
+    if (renderTimeout) clearTimeout(renderTimeout)
+    renderTimeout = setTimeout(() => {
+        if (isRendering) {
+            container.style('opacity', 1)
+            isRendering = false
+            if (pendingUpdate) {
+                pendingUpdate = false
+                updateGraph()
             }
         }
+    }, 3000)
 
-        // Subtle dim while rendering
-        const container = d3.select('#graph')
-        container.style('opacity', 0.6)
+    state.graphviz
+        .transition(() => d3.transition().duration(150))
+        .renderDot(dotSrc)
+        .on('end', () => {
+            if (renderTimeout) clearTimeout(renderTimeout)
+            container.style('opacity', 1)
+            isRendering = false
 
-        state.graphviz
-            .transition(() => d3.transition().duration(150))
-            .renderDot(dotSrc)
-            .on('end', () => {
-                container.style('opacity', 1)
+            // If there's a pending update, do it now
+            if (pendingUpdate) {
+                pendingUpdate = false
+                updateGraph()
+            } else {
                 setTimeout(() => precomputeAdjacentStates(), 100)
-            })
-    }
+            }
+        })
 }
 
 // Pre-compute DOT strings for likely next states (toggle each expanded/collapsed group)
