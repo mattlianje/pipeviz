@@ -232,8 +232,118 @@
             .graph-controls {
                 position: absolute;
                 top: 10px;
+                left: 10px;
                 right: 10px;
                 z-index: 10;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                align-items: center;
+            }
+            .analysis-toggle {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .analysis-toggle input {
+                display: none;
+            }
+            .graph-ctrl-btn {
+                padding: 4px 10px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+                font-family: inherit;
+            }
+            .graph-ctrl-btn:hover {
+                border-color: var(--text-muted);
+                color: var(--text-primary);
+            }
+            .graph-ctrl-btn:active {
+                background: var(--bg-secondary);
+            }
+            .graph-ctrl-btn.danger {
+                border-color: #c98b8b;
+                color: #c98b8b;
+            }
+            .graph-ctrl-btn.danger:hover {
+                background: #fbe9e7;
+                border-color: #c98b8b;
+                color: #8b5a5a;
+            }
+            [data-theme='dark'] .graph-ctrl-btn.danger:hover {
+                background: rgba(201, 139, 139, 0.15);
+                color: #e0a0a0;
+            }
+            .node-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin: 10px 0;
+            }
+            #pipelines-only-btn.active,
+            #collapse-all-btn.active {
+                background: #e3f2fd;
+                border-color: #2196f3;
+                color: #1565c0;
+            }
+            [data-theme='dark'] #pipelines-only-btn.active,
+            [data-theme='dark'] #collapse-all-btn.active {
+                background: rgba(33, 150, 243, 0.2);
+                color: #90caf9;
+            }
+            .analysis-toggle label {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+            }
+            .analysis-toggle label:hover {
+                border-color: var(--text-muted);
+            }
+            #cp-toggle:checked + label {
+                background: #fce4ec;
+                border-color: #d63384;
+                color: #ad1457;
+            }
+            [data-theme='dark'] #cp-toggle:checked + label {
+                background: rgba(214, 51, 132, 0.2);
+                color: #f48fb1;
+            }
+            #cost-toggle:checked + label {
+                background: #e8f5e9;
+                border-color: #66bb6a;
+                color: #2e7d32;
+            }
+            [data-theme='dark'] #cost-toggle:checked + label {
+                background: rgba(102, 187, 106, 0.2);
+                color: #a5d6a7;
+            }
+            .cp-indicator,
+            .cost-indicator {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #ccc;
+            }
+            #cp-toggle:checked + label .cp-indicator {
+                background: #d63384;
+                box-shadow: 0 0 6px #d63384;
+            }
+            #cost-toggle:checked + label .cost-indicator {
+                background: #66bb6a;
+                box-shadow: 0 0 6px #66bb6a;
             }
             #graph svg {
                 width: 100%;
@@ -298,6 +408,40 @@
             .node-dimmed {
                 opacity: 0.35 !important;
                 transition: opacity 0.2s ease;
+            }
+            .node-critical-path {
+                filter: drop-shadow(0 0 8px rgba(214, 51, 132, 0.6)) drop-shadow(0 0 3px rgba(214, 51, 132, 0.8));
+            }
+            .node-critical-path polygon,
+            .node-critical-path ellipse,
+            .node-critical-path path {
+                stroke: #d63384 !important;
+                stroke-width: 2px !important;
+            }
+            .edge-critical-path path {
+                stroke: #d63384 !important;
+                stroke-width: 2.5px !important;
+            }
+            .edge-critical-path polygon {
+                stroke: #d63384 !important;
+                fill: #d63384 !important;
+            }
+            .node-costliest-path {
+                filter: drop-shadow(0 0 8px rgba(102, 187, 106, 0.6)) drop-shadow(0 0 3px rgba(102, 187, 106, 0.8));
+            }
+            .node-costliest-path polygon,
+            .node-costliest-path ellipse,
+            .node-costliest-path path {
+                stroke: #66bb6a !important;
+                stroke-width: 2px !important;
+            }
+            .edge-costliest-path path {
+                stroke: #66bb6a !important;
+                stroke-width: 2.5px !important;
+            }
+            .edge-costliest-path polygon {
+                stroke: #66bb6a !important;
+                fill: #66bb6a !important;
             }
             .edge-highlighted {
                 stroke: #7b1fa2 !important;
@@ -1384,6 +1528,124 @@
                 color: var(--text-muted);
             }
 
+            /* Critical Path - Gantt-style */
+            .critical-path-section {
+                background: transparent;
+                border-left: 3px solid #d63384;
+                padding: 8px 0 8px 12px;
+                margin-bottom: 12px;
+            }
+            .critical-path-section .section-title {
+                color: var(--text-primary);
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+            }
+            .critical-path-summary {
+                display: flex;
+                gap: 16px;
+                margin-bottom: 12px;
+                font-size: 11px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            }
+            .cp-stat {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+            }
+            .cp-stat-value {
+                color: #d63384;
+                font-weight: 600;
+            }
+            .cp-stat-label {
+                color: var(--text-muted);
+                font-size: 9px;
+            }
+            .cp-coverage {
+                color: var(--text-muted);
+                align-self: center;
+            }
+            .critical-path-gantt {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            .cp-bar-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .cp-bar-label {
+                font-size: 10px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-secondary);
+                width: 140px;
+                text-align: right;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .cp-bar-track {
+                flex: 1;
+                height: 16px;
+                background: var(--border-color);
+                position: relative;
+            }
+            .cp-bar-fill {
+                position: absolute;
+                height: 100%;
+                background: linear-gradient(90deg, #f8bbd9 0%, #f48fb1 100%);
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                padding-right: 4px;
+                min-width: 24px;
+            }
+            .cp-bar-duration {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: #880e4f;
+                font-weight: 500;
+            }
+            .cp-bar-cost {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-muted);
+                width: 60px;
+                text-align: right;
+            }
+            .cp-bar-time {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-muted);
+                width: 50px;
+                text-align: right;
+            }
+            [data-theme='dark'] .critical-path-section {
+                border-left-color: #f48fb1;
+            }
+            [data-theme='dark'] .cp-stat-value {
+                color: #f48fb1;
+            }
+            [data-theme='dark'] .cp-bar-fill {
+                background: linear-gradient(90deg, #ad1457 0%, #d63384 100%);
+            }
+            [data-theme='dark'] .cp-bar-duration {
+                color: #fff;
+            }
+
+            /* Costliest Path */
+            .costliest-path-section {
+                background: transparent;
+                border-left: 3px solid #66bb6a;
+                padding: 8px 0 8px 12px;
+                margin-bottom: 12px;
+            }
+            [data-theme='dark'] .costliest-path-section {
+                border-left-color: #81c784;
+            }
+
             /* Cycles */
             .stats-section.cycles-warning {
                 background: rgba(183, 28, 28, 0.08);
@@ -2093,6 +2355,40 @@
                                             your graph. LLMs can query your lineage.</span
                                         >
                                     </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M3 12h4l3-9 4 18 3-9h4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Find critical path</strong> via
+                                            PERT analysis. Know your pipeline's true bottleneck.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Track spend</strong> per node
+                                            and path. See where your compute budget goes.</span
+                                        >
+                                    </div>
                                 </div>
                             </div>
 
@@ -2286,34 +2582,40 @@ jq -s '{
                                     <div id="graph-col" class="col-md-12">
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        onclick="togglePipelinesOnly()"
-                                                        id="pipelines-only-btn"
-                                                    >
-                                                        Pipelines Only
-                                                    </button>
-                                                </div>
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        onclick="collapseAllGroups()"
-                                                    >
-                                                        Collapse All
-                                                    </button>
-                                                </div>
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-warning"
-                                                        onclick="clearSelection()"
-                                                    >
-                                                        Clear Selection
-                                                    </button>
-                                                </div>
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">
-                                                    Reset
+                                                <button
+                                                    class="graph-ctrl-btn"
+                                                    onclick="togglePipelinesOnly()"
+                                                    id="pipelines-only-btn"
+                                                >
+                                                    Pipelines Only
                                                 </button>
+                                                <button
+                                                    class="graph-ctrl-btn active"
+                                                    onclick="toggleCollapseAll()"
+                                                    id="collapse-all-btn"
+                                                >
+                                                    Expand All
+                                                </button>
+                                                <button class="graph-ctrl-btn" onclick="clearSelection()">Clear</button>
+                                                <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
+                                                <div class="analysis-toggle ms-auto">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="cp-toggle"
+                                                        onchange="toggleAnalysisMode('critical-path', this)"
+                                                    />
+                                                    <label for="cp-toggle"
+                                                        ><span class="cp-indicator"></span>Critical Path</label
+                                                    >
+                                                    <input
+                                                        type="checkbox"
+                                                        id="cost-toggle"
+                                                        onchange="toggleCostLabels(this.checked)"
+                                                    />
+                                                    <label for="cost-toggle"
+                                                        ><span class="cost-indicator"></span>Show Costs</label
+                                                    >
+                                                </div>
                                             </div>
                                             <div id="graph">
                                                 <div class="graph-loading text-center py-5 text-muted">
@@ -2665,52 +2967,6 @@ jq -s '
 ' *.json > merged.json</code></pre>
                             </div>
 
-                            <div class="merge-section">
-                                <h6>Merge from Multiple Git Repos</h6>
-                                <p>Pull configs from different repos and merge:</p>
-                                <pre class="merge-code"><code>#!/bin/bash
-# Fetch configs from multiple repos
-curl -s https://raw.githubusercontent.com/org/repo-a/main/pipeviz.json > /tmp/a.json
-curl -s https://raw.githubusercontent.com/org/repo-b/main/pipeviz.json > /tmp/b.json
-
-# Merge them
-jq -s '{
-  pipelines: [.[].pipelines[]] | unique_by(.name),
-  datasources: [.[].datasources[]] | unique_by(.name)
-}' /tmp/a.json /tmp/b.json > combined.json</code></pre>
-                            </div>
-
-                            <div class="merge-section">
-                                <h6>Validate After Merge</h6>
-                                <p>Check for duplicate names or missing references:</p>
-                                <pre class="merge-code"><code># Find duplicate pipeline names
-jq '.pipelines | group_by(.name) | map(select(length > 1)) | .[].name' combined.json
-
-# Find datasources referenced but not defined
-jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]] 
-    | unique 
-    - [.datasources[].name] 
-    | if length > 0 then "Missing: " + (. | join(", ")) else "All good!" end' combined.json</code></pre>
-                            </div>
-
-                            <div class="merge-section">
-                                <h6>CI/CD Integration</h6>
-                                <p>Add to your pipeline to auto-generate and deploy:</p>
-                                <pre class="merge-code"><code># .github/workflows/pipeviz.yml
-- name: Merge Pipeviz configs
-  run: |
-    jq -s '{
-      pipelines: [.[].pipelines[]] | unique_by(.name),
-      datasources: [.[].datasources[]] | unique_by(.name)
-    }' services/*/pipeviz.json > docs/pipeviz.json
-
-- name: Deploy to GitHub Pages
-  uses: peaceiris/actions-gh-pages@v3
-  with:
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-    publish_dir: ./docs</code></pre>
-                            </div>
-
                             <style>
                                 .merge-section {
                                     margin-bottom: 1.5rem;
@@ -2894,6 +3150,18 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
                                         <td>No</td>
                                         <td>name to URL</td>
                                     </tr>
+                                    <tr>
+                                        <td><code>duration</code></td>
+                                        <td>number</td>
+                                        <td>No</td>
+                                        <td>Runtime in minutes (for critical path)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>cost</code></td>
+                                        <td>number</td>
+                                        <td>No</td>
+                                        <td>Cost per run (for spend analysis)</td>
+                                    </tr>
                                 </table>
                                 <pre class="spec-pre">
 {
@@ -2905,6 +3173,8 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
   "cluster": "user-processing",
   "group": "etl-jobs",
   "schedule": "Every 2 hours",
+  "duration": 45,
+  "cost": 12.50,
   "tags": ["user-data", "ml"],
   "links": {
     "airflow": "https://...",

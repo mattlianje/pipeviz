@@ -232,8 +232,118 @@
             .graph-controls {
                 position: absolute;
                 top: 10px;
+                left: 10px;
                 right: 10px;
                 z-index: 10;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                align-items: center;
+            }
+            .analysis-toggle {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .analysis-toggle input {
+                display: none;
+            }
+            .graph-ctrl-btn {
+                padding: 4px 10px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+                font-family: inherit;
+            }
+            .graph-ctrl-btn:hover {
+                border-color: var(--text-muted);
+                color: var(--text-primary);
+            }
+            .graph-ctrl-btn:active {
+                background: var(--bg-secondary);
+            }
+            .graph-ctrl-btn.danger {
+                border-color: #c98b8b;
+                color: #c98b8b;
+            }
+            .graph-ctrl-btn.danger:hover {
+                background: #fbe9e7;
+                border-color: #c98b8b;
+                color: #8b5a5a;
+            }
+            [data-theme='dark'] .graph-ctrl-btn.danger:hover {
+                background: rgba(201, 139, 139, 0.15);
+                color: #e0a0a0;
+            }
+            .node-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin: 10px 0;
+            }
+            #pipelines-only-btn.active,
+            #collapse-all-btn.active {
+                background: #e3f2fd;
+                border-color: #2196f3;
+                color: #1565c0;
+            }
+            [data-theme='dark'] #pipelines-only-btn.active,
+            [data-theme='dark'] #collapse-all-btn.active {
+                background: rgba(33, 150, 243, 0.2);
+                color: #90caf9;
+            }
+            .analysis-toggle label {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+            }
+            .analysis-toggle label:hover {
+                border-color: var(--text-muted);
+            }
+            #cp-toggle:checked + label {
+                background: #fce4ec;
+                border-color: #d63384;
+                color: #ad1457;
+            }
+            [data-theme='dark'] #cp-toggle:checked + label {
+                background: rgba(214, 51, 132, 0.2);
+                color: #f48fb1;
+            }
+            #cost-toggle:checked + label {
+                background: #e8f5e9;
+                border-color: #66bb6a;
+                color: #2e7d32;
+            }
+            [data-theme='dark'] #cost-toggle:checked + label {
+                background: rgba(102, 187, 106, 0.2);
+                color: #a5d6a7;
+            }
+            .cp-indicator,
+            .cost-indicator {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #ccc;
+            }
+            #cp-toggle:checked + label .cp-indicator {
+                background: #d63384;
+                box-shadow: 0 0 6px #d63384;
+            }
+            #cost-toggle:checked + label .cost-indicator {
+                background: #66bb6a;
+                box-shadow: 0 0 6px #66bb6a;
             }
             #graph svg {
                 width: 100%;
@@ -298,6 +408,40 @@
             .node-dimmed {
                 opacity: 0.35 !important;
                 transition: opacity 0.2s ease;
+            }
+            .node-critical-path {
+                filter: drop-shadow(0 0 8px rgba(214, 51, 132, 0.6)) drop-shadow(0 0 3px rgba(214, 51, 132, 0.8));
+            }
+            .node-critical-path polygon,
+            .node-critical-path ellipse,
+            .node-critical-path path {
+                stroke: #d63384 !important;
+                stroke-width: 2px !important;
+            }
+            .edge-critical-path path {
+                stroke: #d63384 !important;
+                stroke-width: 2.5px !important;
+            }
+            .edge-critical-path polygon {
+                stroke: #d63384 !important;
+                fill: #d63384 !important;
+            }
+            .node-costliest-path {
+                filter: drop-shadow(0 0 8px rgba(102, 187, 106, 0.6)) drop-shadow(0 0 3px rgba(102, 187, 106, 0.8));
+            }
+            .node-costliest-path polygon,
+            .node-costliest-path ellipse,
+            .node-costliest-path path {
+                stroke: #66bb6a !important;
+                stroke-width: 2px !important;
+            }
+            .edge-costliest-path path {
+                stroke: #66bb6a !important;
+                stroke-width: 2.5px !important;
+            }
+            .edge-costliest-path polygon {
+                stroke: #66bb6a !important;
+                fill: #66bb6a !important;
             }
             .edge-highlighted {
                 stroke: #7b1fa2 !important;
@@ -1384,6 +1528,124 @@
                 color: var(--text-muted);
             }
 
+            /* Critical Path - Gantt-style */
+            .critical-path-section {
+                background: transparent;
+                border-left: 3px solid #d63384;
+                padding: 8px 0 8px 12px;
+                margin-bottom: 12px;
+            }
+            .critical-path-section .section-title {
+                color: var(--text-primary);
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+            }
+            .critical-path-summary {
+                display: flex;
+                gap: 16px;
+                margin-bottom: 12px;
+                font-size: 11px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            }
+            .cp-stat {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+            }
+            .cp-stat-value {
+                color: #d63384;
+                font-weight: 600;
+            }
+            .cp-stat-label {
+                color: var(--text-muted);
+                font-size: 9px;
+            }
+            .cp-coverage {
+                color: var(--text-muted);
+                align-self: center;
+            }
+            .critical-path-gantt {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            .cp-bar-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .cp-bar-label {
+                font-size: 10px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-secondary);
+                width: 140px;
+                text-align: right;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .cp-bar-track {
+                flex: 1;
+                height: 16px;
+                background: var(--border-color);
+                position: relative;
+            }
+            .cp-bar-fill {
+                position: absolute;
+                height: 100%;
+                background: linear-gradient(90deg, #f8bbd9 0%, #f48fb1 100%);
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                padding-right: 4px;
+                min-width: 24px;
+            }
+            .cp-bar-duration {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: #880e4f;
+                font-weight: 500;
+            }
+            .cp-bar-cost {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-muted);
+                width: 60px;
+                text-align: right;
+            }
+            .cp-bar-time {
+                font-size: 9px;
+                font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+                color: var(--text-muted);
+                width: 50px;
+                text-align: right;
+            }
+            [data-theme='dark'] .critical-path-section {
+                border-left-color: #f48fb1;
+            }
+            [data-theme='dark'] .cp-stat-value {
+                color: #f48fb1;
+            }
+            [data-theme='dark'] .cp-bar-fill {
+                background: linear-gradient(90deg, #ad1457 0%, #d63384 100%);
+            }
+            [data-theme='dark'] .cp-bar-duration {
+                color: #fff;
+            }
+
+            /* Costliest Path */
+            .costliest-path-section {
+                background: transparent;
+                border-left: 3px solid #66bb6a;
+                padding: 8px 0 8px 12px;
+                margin-bottom: 12px;
+            }
+            [data-theme='dark'] .costliest-path-section {
+                border-left-color: #81c784;
+            }
+
             /* Cycles */
             .stats-section.cycles-warning {
                 background: rgba(183, 28, 28, 0.08);
@@ -1560,6 +1822,9 @@ const state = {
   graphviz: null,
   groupedView: true,
   pipelinesOnlyView: false,
+  analysisMode: null,
+  // null, 'critical-path'
+  showCostLabels: false,
   expandedGroups: /* @__PURE__ */ new Set(),
   selectedNode: null,
   // Cached lineage maps for performance
@@ -1622,6 +1887,8 @@ const exampleConfig = {
       input_sources: ["raw_users", "user_events"],
       output_sources: ["enriched_users"],
       schedule: "Every 2 hours",
+      duration: 45,
+      cost: 18.5,
       tags: ["user-data", "ml", "enrichment"],
       cluster: "user-processing",
       links: {
@@ -1637,6 +1904,8 @@ const exampleConfig = {
       input_sources: ["raw_orders", "inventory"],
       output_sources: ["processed_orders", "order_audit"],
       schedule: "Every 15 minutes",
+      duration: 12,
+      cost: 4.2,
       tags: ["orders", "real-time", "validation"],
       cluster: "real-time",
       links: {
@@ -1652,6 +1921,8 @@ const exampleConfig = {
       input_sources: ["enriched_users", "processed_orders", "user_events"],
       output_sources: ["daily_metrics", "user_cohorts"],
       schedule: "Daily at 1:00 AM",
+      duration: 90,
+      cost: 42,
       tags: ["analytics", "aggregation", "daily"],
       cluster: "analytics",
       links: {
@@ -1667,6 +1938,8 @@ const exampleConfig = {
       output_sources: ["salesforce_users"],
       group: "data-exports",
       cluster: "analytics",
+      duration: 8,
+      cost: 2.1,
       upstream_pipelines: ["analytics-aggregation"],
       links: {
         airflow: "https://airflow.company.com/dags/crm_exports"
@@ -1679,6 +1952,8 @@ const exampleConfig = {
       output_sources: ["hubspot_contacts"],
       group: "data-exports",
       cluster: "analytics",
+      duration: 5,
+      cost: 1.8,
       upstream_pipelines: ["analytics-aggregation"],
       links: {
         airflow: "https://airflow.company.com/dags/crm_exports"
@@ -1691,6 +1966,8 @@ const exampleConfig = {
       output_sources: ["amplitude_events"],
       group: "data-exports",
       cluster: "analytics",
+      duration: 3,
+      cost: 0.9,
       upstream_pipelines: ["analytics-aggregation"],
       links: {
         airflow: "https://airflow.company.com/dags/analytics_exports"
@@ -1702,6 +1979,8 @@ const exampleConfig = {
       input_sources: ["daily_metrics", "enriched_users"],
       output_sources: ["executive_summary"],
       schedule: "0 6 * * MON",
+      duration: 120,
+      cost: 65,
       cluster: "analytics",
       upstream_pipelines: ["analytics-aggregation", "user-enrichment"],
       links: {
@@ -2845,6 +3124,620 @@ function generateBlastRadiusDot(analysis) {
 `;
   return dot;
 }
+let cachedCriticalPath = null;
+let cachedCriticalPathHash = null;
+let cachedCostliestPath = null;
+let cachedCostliestPathHash = null;
+function getCachedCriticalPath() {
+  if (!state.currentConfig) return null;
+  const hash = JSON.stringify(state.currentConfig.pipelines?.map((p) => [p.name, p.duration]));
+  if (cachedCriticalPathHash !== hash) {
+    cachedCriticalPathHash = hash;
+    cachedCriticalPath = computeCriticalPath(state.currentConfig.pipelines || []);
+  }
+  return cachedCriticalPath;
+}
+function getCachedCostliestPath() {
+  if (!state.currentConfig) return null;
+  const hash = JSON.stringify(state.currentConfig.pipelines?.map((p) => [p.name, p.cost]));
+  if (cachedCostliestPathHash !== hash) {
+    cachedCostliestPathHash = hash;
+    cachedCostliestPath = computeCostliestPath(state.currentConfig.pipelines || []);
+  }
+  return cachedCostliestPath;
+}
+function getCriticalPathNodes() {
+  const cp = getCachedCriticalPath();
+  if (!cp || !cp.path) return /* @__PURE__ */ new Set();
+  return new Set(cp.path.map((p) => p.name));
+}
+function getCriticalPathEdges() {
+  const cp = getCachedCriticalPath();
+  if (!cp || !cp.path || cp.path.length < 2) return /* @__PURE__ */ new Set();
+  const edges = /* @__PURE__ */ new Set();
+  for (let i = 0; i < cp.path.length - 1; i++) {
+    edges.add(`${cp.path[i].name}|${cp.path[i + 1].name}`);
+  }
+  return edges;
+}
+function getCostliestPathNodes() {
+  const cp = getCachedCostliestPath();
+  if (!cp || !cp.path) return /* @__PURE__ */ new Set();
+  return new Set(cp.path.map((p) => p.name));
+}
+function getCostliestPathEdges() {
+  const cp = getCachedCostliestPath();
+  if (!cp || !cp.path || cp.path.length < 2) return /* @__PURE__ */ new Set();
+  const edges = /* @__PURE__ */ new Set();
+  for (let i = 0; i < cp.path.length - 1; i++) {
+    edges.add(`${cp.path[i].name}|${cp.path[i + 1].name}`);
+  }
+  return edges;
+}
+const COLORS = ["#6b9dc4", "#a88bc4", "#d4a574", "#7cb47c", "#c98b8b", "#6bb5b5", "#a89080", "#8a9aa8"];
+function computeCriticalPath(pipelines) {
+  const pipelineMap = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => pipelineMap.set(p.name, p));
+  const hasDurations = pipelines.some((p) => p.duration !== void 0 && p.duration !== null);
+  if (!hasDurations) return null;
+  const graph = /* @__PURE__ */ new Map();
+  const inDegree = /* @__PURE__ */ new Map();
+  const pipelineNames = new Set(pipelines.map((p) => p.name));
+  pipelines.forEach((p) => {
+    if (!graph.has(p.name)) graph.set(p.name, []);
+    if (!inDegree.has(p.name)) inDegree.set(p.name, 0);
+  });
+  const outputToProducer = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => {
+    p.output_sources?.forEach((ds) => outputToProducer.set(ds, p.name));
+  });
+  pipelines.forEach((p) => {
+    p.upstream_pipelines?.forEach((upstream) => {
+      if (pipelineNames.has(upstream)) {
+        graph.get(upstream).push(p.name);
+        inDegree.set(p.name, inDegree.get(p.name) + 1);
+      }
+    });
+    p.input_sources?.forEach((ds) => {
+      const producer = outputToProducer.get(ds);
+      if (producer && producer !== p.name && !p.upstream_pipelines?.includes(producer)) {
+        graph.get(producer).push(p.name);
+        inDegree.set(p.name, inDegree.get(p.name) + 1);
+      }
+    });
+  });
+  const est = /* @__PURE__ */ new Map();
+  const eft = /* @__PURE__ */ new Map();
+  const predecessor = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => {
+    if (inDegree.get(p.name) === 0) {
+      est.set(p.name, 0);
+      eft.set(p.name, p.duration || 0);
+    }
+  });
+  const queue = pipelines.filter((p) => inDegree.get(p.name) === 0).map((p) => p.name);
+  while (queue.length > 0) {
+    const current2 = queue.shift();
+    graph.get(current2).forEach((neighbor) => {
+      const newEst = eft.get(current2);
+      if (!est.has(neighbor) || newEst > est.get(neighbor)) {
+        est.set(neighbor, newEst);
+        predecessor.set(neighbor, current2);
+      }
+      const neighborPipeline = pipelineMap.get(neighbor);
+      const neighborDuration = neighborPipeline?.duration || 0;
+      eft.set(neighbor, est.get(neighbor) + neighborDuration);
+      inDegree.set(neighbor, inDegree.get(neighbor) - 1);
+      if (inDegree.get(neighbor) === 0) {
+        queue.push(neighbor);
+      }
+    });
+  }
+  let maxEft = 0;
+  let criticalEnd = null;
+  eft.forEach((time, node) => {
+    if (time > maxEft) {
+      maxEft = time;
+      criticalEnd = node;
+    }
+  });
+  if (!criticalEnd) return null;
+  const criticalPath = [];
+  let current = criticalEnd;
+  let totalCost = 0;
+  while (current) {
+    const pipeline = pipelineMap.get(current);
+    const nodeCost = pipeline?.cost || 0;
+    totalCost += nodeCost;
+    criticalPath.unshift({
+      name: current,
+      duration: pipeline?.duration || 0,
+      cost: nodeCost,
+      est: est.get(current) || 0,
+      eft: eft.get(current) || 0
+    });
+    current = predecessor.get(current);
+  }
+  const slack = /* @__PURE__ */ new Map();
+  const criticalNodes = new Set(criticalPath.map((n) => n.name));
+  pipelines.forEach((p) => {
+    if (criticalNodes.has(p.name)) {
+      slack.set(p.name, 0);
+    } else if (est.has(p.name)) {
+      slack.set(p.name, maxEft - eft.get(p.name));
+    }
+  });
+  return {
+    totalDuration: maxEft,
+    totalCost,
+    path: criticalPath,
+    pipelinesWithDuration: pipelines.filter((p) => p.duration !== void 0).length,
+    pipelinesWithCost: pipelines.filter((p) => p.cost !== void 0).length,
+    totalPipelines: pipelines.length,
+    slack
+  };
+}
+function computeCostliestPath(pipelines) {
+  const pipelineMap = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => pipelineMap.set(p.name, p));
+  const hasCosts = pipelines.some((p) => p.cost !== void 0 && p.cost !== null);
+  if (!hasCosts) return null;
+  const graph = /* @__PURE__ */ new Map();
+  const inDegree = /* @__PURE__ */ new Map();
+  const pipelineNames = new Set(pipelines.map((p) => p.name));
+  pipelines.forEach((p) => {
+    if (!graph.has(p.name)) graph.set(p.name, []);
+    if (!inDegree.has(p.name)) inDegree.set(p.name, 0);
+  });
+  const outputToProducer = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => {
+    p.output_sources?.forEach((ds) => outputToProducer.set(ds, p.name));
+  });
+  pipelines.forEach((p) => {
+    p.upstream_pipelines?.forEach((upstream) => {
+      if (pipelineNames.has(upstream)) {
+        graph.get(upstream).push(p.name);
+        inDegree.set(p.name, inDegree.get(p.name) + 1);
+      }
+    });
+    p.input_sources?.forEach((ds) => {
+      const producer = outputToProducer.get(ds);
+      if (producer && producer !== p.name && !p.upstream_pipelines?.includes(producer)) {
+        graph.get(producer).push(p.name);
+        inDegree.set(p.name, inDegree.get(p.name) + 1);
+      }
+    });
+  });
+  const costToNode = /* @__PURE__ */ new Map();
+  const predecessor = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => {
+    if (inDegree.get(p.name) === 0) {
+      costToNode.set(p.name, p.cost || 0);
+    }
+  });
+  const queue = pipelines.filter((p) => inDegree.get(p.name) === 0).map((p) => p.name);
+  const inDegreeCopy = new Map(inDegree);
+  while (queue.length > 0) {
+    const current2 = queue.shift();
+    const currentCost = costToNode.get(current2) || 0;
+    graph.get(current2).forEach((neighbor) => {
+      const neighborPipeline = pipelineMap.get(neighbor);
+      const neighborCost = neighborPipeline?.cost || 0;
+      const newCost = currentCost + neighborCost;
+      if (!costToNode.has(neighbor) || newCost > costToNode.get(neighbor)) {
+        costToNode.set(neighbor, newCost);
+        predecessor.set(neighbor, current2);
+      }
+      inDegreeCopy.set(neighbor, inDegreeCopy.get(neighbor) - 1);
+      if (inDegreeCopy.get(neighbor) === 0) {
+        queue.push(neighbor);
+      }
+    });
+  }
+  let maxCost = 0;
+  let costliestEnd = null;
+  costToNode.forEach((cost, node) => {
+    if (cost > maxCost) {
+      maxCost = cost;
+      costliestEnd = node;
+    }
+  });
+  if (!costliestEnd) return null;
+  const costliestPath = [];
+  let current = costliestEnd;
+  let totalDuration = 0;
+  while (current) {
+    const pipeline = pipelineMap.get(current);
+    totalDuration += pipeline?.duration || 0;
+    costliestPath.unshift({
+      name: current,
+      cost: pipeline?.cost || 0,
+      duration: pipeline?.duration || 0
+    });
+    current = predecessor.get(current);
+  }
+  return {
+    totalCost: maxCost,
+    totalDuration,
+    path: costliestPath,
+    pipelinesWithCost: pipelines.filter((p) => p.cost !== void 0).length,
+    totalPipelines: pipelines.length
+  };
+}
+function detectCycles(pipelines) {
+  const graph = /* @__PURE__ */ new Map();
+  const pipelineNames = /* @__PURE__ */ new Set();
+  pipelines.forEach((p) => {
+    const nodeName = p.group || p.name;
+    pipelineNames.add(nodeName);
+    if (!graph.has(nodeName)) graph.set(nodeName, /* @__PURE__ */ new Set());
+  });
+  pipelines.forEach((p) => {
+    const nodeName = p.group || p.name;
+    p.upstream_pipelines?.forEach((upstream) => {
+      if (pipelineNames.has(upstream)) {
+        if (!graph.has(upstream)) graph.set(upstream, /* @__PURE__ */ new Set());
+        graph.get(upstream).add(nodeName);
+      }
+    });
+  });
+  const cycles = [];
+  const visited = /* @__PURE__ */ new Set();
+  const recStack = /* @__PURE__ */ new Set();
+  function dfs(node, path) {
+    visited.add(node);
+    recStack.add(node);
+    path.push(node);
+    for (const neighbor of graph.get(node) || /* @__PURE__ */ new Set()) {
+      if (!visited.has(neighbor)) {
+        const result = dfs(neighbor, path);
+        if (result) return result;
+      } else if (recStack.has(neighbor)) {
+        const cycleStart = path.indexOf(neighbor);
+        const cycle = path.slice(cycleStart);
+        cycle.push(neighbor);
+        return cycle;
+      }
+    }
+    path.pop();
+    recStack.delete(node);
+    return null;
+  }
+  for (const node of pipelineNames) {
+    if (!visited.has(node)) {
+      const cycle = dfs(node, []);
+      if (cycle) {
+        cycles.push(cycle);
+        visited.clear();
+        recStack.clear();
+        cycle.forEach((n) => visited.add(n));
+      }
+    }
+  }
+  return cycles;
+}
+function computeStats() {
+  if (!state.currentConfig) return null;
+  const pipelines = state.currentConfig.pipelines || [];
+  const datasources = state.currentConfig.datasources || [];
+  const cycles = detectCycles(pipelines);
+  const criticalPath = computeCriticalPath(pipelines);
+  const costliestPath = computeCostliestPath(pipelines);
+  const upstreamCounts = /* @__PURE__ */ new Map();
+  const downstreamCounts = /* @__PURE__ */ new Map();
+  const groups = /* @__PURE__ */ new Set();
+  pipelines.forEach((p) => {
+    if (p.group) groups.add(p.group);
+  });
+  pipelines.forEach((p) => {
+    const nodeName = p.group || p.name;
+    p.input_sources?.forEach((s) => {
+      downstreamCounts.set(s, (downstreamCounts.get(s) || 0) + 1);
+      upstreamCounts.set(nodeName, (upstreamCounts.get(nodeName) || 0) + 1);
+    });
+    p.output_sources?.forEach((s) => {
+      downstreamCounts.set(nodeName, (downstreamCounts.get(nodeName) || 0) + 1);
+      upstreamCounts.set(s, (upstreamCounts.get(s) || 0) + 1);
+    });
+    p.upstream_pipelines?.forEach((u) => {
+      downstreamCounts.set(u, (downstreamCounts.get(u) || 0) + 1);
+      upstreamCounts.set(nodeName, (upstreamCounts.get(nodeName) || 0) + 1);
+    });
+  });
+  const pipelineNames = new Set(pipelines.map((p) => p.name));
+  const allNodes = /* @__PURE__ */ new Set([...upstreamCounts.keys(), ...downstreamCounts.keys()]);
+  const hubs = [...allNodes].map((name) => {
+    let type = "datasource";
+    if (groups.has(name)) type = "group";
+    else if (pipelineNames.has(name)) type = "pipeline";
+    return {
+      name,
+      type,
+      upstream: upstreamCounts.get(name) || 0,
+      downstream: downstreamCounts.get(name) || 0,
+      total: (upstreamCounts.get(name) || 0) + (downstreamCounts.get(name) || 0)
+    };
+  }).sort((a, b) => b.total - a.total).slice(0, 8);
+  const referencedSources = /* @__PURE__ */ new Set();
+  pipelines.forEach((p) => {
+    p.input_sources?.forEach((s) => referencedSources.add(s));
+    p.output_sources?.forEach((s) => referencedSources.add(s));
+  });
+  const orphaned = datasources.filter((ds) => !referencedSources.has(ds.name)).map((ds) => ds.name);
+  const clusterCounts = {};
+  pipelines.forEach((p) => {
+    const cluster = p.cluster || "unclustered";
+    clusterCounts[cluster] = (clusterCounts[cluster] || 0) + 1;
+  });
+  const typeCounts = {};
+  datasources.forEach((ds) => {
+    const type = ds.type || "unknown";
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+  return {
+    counts: {
+      pipelines: pipelines.length,
+      datasources: datasources.length,
+      clusters: Object.keys(clusterCounts).filter((c) => c !== "unclustered").length
+    },
+    cycles,
+    criticalPath,
+    costliestPath,
+    hubs,
+    orphaned,
+    coverage: {
+      schedules: {
+        covered: pipelines.filter((p) => p.schedule).length,
+        total: pipelines.length,
+        missing: pipelines.filter((p) => !p.schedule).map((p) => p.name)
+      },
+      airflow: {
+        covered: pipelines.filter((p) => p.links?.airflow).length,
+        total: pipelines.length,
+        missing: pipelines.filter((p) => !p.links?.airflow).map((p) => p.name)
+      }
+    },
+    distributions: { clusters: clusterCounts, types: typeCounts }
+  };
+}
+function renderStats() {
+  const container = document.getElementById("stats-content");
+  if (!container) return;
+  const stats = computeStats();
+  if (!stats) {
+    container.innerHTML = '<div class="text-muted">Load a configuration to see statistics.</div>';
+    return;
+  }
+  const clusterData = Object.entries(stats.distributions.clusters).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
+  const typeData = Object.entries(stats.distributions.types).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
+  let html = `
+        <div class="stats-summary">
+            <span><strong>${stats.counts.pipelines}</strong> pipelines</span>
+            <span><strong>${stats.counts.datasources}</strong> datasources</span>
+            <span><strong>${stats.counts.clusters}</strong> clusters</span>
+        </div>
+        <div class="stats-row">
+            <div class="chart-box">
+                <div class="chart-title">Pipelines by Cluster</div>
+                <div class="pie-container">
+                    ${renderPieChart(clusterData, 120)}
+                    <div class="pie-legend">${renderPieLegend(clusterData)}</div>
+                </div>
+            </div>
+            <div class="chart-box">
+                <div class="chart-title">Datasources by Type</div>
+                <div class="pie-container">
+                    ${renderPieChart(typeData, 120)}
+                    <div class="pie-legend">${renderPieLegend(typeData)}</div>
+                </div>
+            </div>
+        </div>
+        <div class="stats-row">
+            <div class="stats-section">
+                <div class="section-title">Coverage</div>
+                <div class="coverage-bars">
+                    ${renderCoverageBar("Schedules", stats.coverage.schedules)}
+                    ${renderCoverageBar("Airflow Links", stats.coverage.airflow)}
+                </div>
+            </div>
+            ${stats.hubs.length > 0 ? `
+                <div class="stats-section">
+                    <div class="section-title">Hubs <span class="section-hint">most connected</span></div>
+                    <div class="hub-list">
+                        ${stats.hubs.map(
+    (h, i) => `
+                            <div class="hub-row">
+                                <span class="hub-rank">${i + 1}</span>
+                                <span class="hub-name ${h.type}">${h.name}</span>
+                                <span class="hub-stats">↑${h.upstream} ↓${h.downstream}</span>
+                            </div>
+                        `
+  ).join("")}
+                    </div>
+                </div>
+            ` : ""}
+        </div>`;
+  if (stats.criticalPath) {
+    const cp = stats.criticalPath;
+    const formatDuration = (mins) => {
+      if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const rem = mins % 60;
+        return rem > 0 ? `${hrs}h${rem}m` : `${hrs}h`;
+      }
+      return `${mins}m`;
+    };
+    const formatTime = (mins) => {
+      const hrs = Math.floor(mins / 60);
+      const rem = mins % 60;
+      return `${String(hrs).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
+    };
+    const formatCost = (cost) => cost > 0 ? `$${cost.toFixed(2)}` : "";
+    html += `
+            <div class="stats-section critical-path-section">
+                <div class="section-title">Critical Path</div>
+                <div class="critical-path-summary">
+                    <div class="cp-stat">
+                        <span class="cp-stat-value">${formatDuration(cp.totalDuration)}</span>
+                        <span class="cp-stat-label">duration</span>
+                    </div>
+                    ${cp.totalCost > 0 ? `
+                    <div class="cp-stat">
+                        <span class="cp-stat-value">$${cp.totalCost.toFixed(2)}</span>
+                        <span class="cp-stat-label">path cost</span>
+                    </div>
+                    ` : ""}
+                    <span class="cp-coverage">${cp.pipelinesWithDuration}/${cp.totalPipelines} with duration</span>
+                </div>
+                <div class="critical-path-gantt">
+                    ${cp.path.map(
+      (node) => `
+                        <div class="cp-bar-row">
+                            <span class="cp-bar-label">${node.name}</span>
+                            <div class="cp-bar-track">
+                                <div class="cp-bar-fill" style="left: ${node.est / cp.totalDuration * 100}%; width: ${node.duration / cp.totalDuration * 100}%">
+                                    <span class="cp-bar-duration">${formatDuration(node.duration)}</span>
+                                </div>
+                            </div>
+                            <span class="cp-bar-cost">${formatCost(node.cost)}</span>
+                            <span class="cp-bar-time">${formatTime(node.eft)}</span>
+                        </div>
+                    `
+    ).join("")}
+                </div>
+            </div>`;
+  }
+  if (stats.costliestPath) {
+    const costPath = stats.costliestPath;
+    const critPath = stats.criticalPath;
+    const isDifferent = !critPath || costPath.path.length !== critPath.path.length || costPath.path.some((n, i) => n.name !== critPath.path[i]?.name);
+    if (isDifferent) {
+      const formatDuration = (mins) => {
+        if (mins >= 60) {
+          const hrs = Math.floor(mins / 60);
+          const rem = mins % 60;
+          return rem > 0 ? `${hrs}h${rem}m` : `${hrs}h`;
+        }
+        return `${mins}m`;
+      };
+      html += `
+            <div class="stats-section costliest-path-section">
+                <div class="section-title">Costliest Path</div>
+                <div class="critical-path-summary">
+                    <div class="cp-stat">
+                        <span class="cp-stat-value" style="color: #2e7d32;">$${costPath.totalCost.toFixed(2)}</span>
+                        <span class="cp-stat-label">total cost</span>
+                    </div>
+                    ${costPath.totalDuration > 0 ? `
+                    <div class="cp-stat">
+                        <span class="cp-stat-value" style="color: #2e7d32;">${formatDuration(costPath.totalDuration)}</span>
+                        <span class="cp-stat-label">duration</span>
+                    </div>
+                    ` : ""}
+                    <span class="cp-coverage">${costPath.pipelinesWithCost}/${costPath.totalPipelines} with cost</span>
+                </div>
+                <div class="critical-path-gantt">
+                    ${costPath.path.map((node, i) => {
+        const cumCost = costPath.path.slice(0, i + 1).reduce((sum, n) => sum + n.cost, 0);
+        return `
+                        <div class="cp-bar-row">
+                            <span class="cp-bar-label">${node.name}</span>
+                            <div class="cp-bar-track">
+                                <div class="cp-bar-fill" style="left: 0; width: ${cumCost / costPath.totalCost * 100}%; background: linear-gradient(90deg, #a5d6a7 0%, #66bb6a 100%);">
+                                    <span class="cp-bar-duration" style="color: #1b5e20;">$${node.cost.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <span class="cp-bar-cost">$${cumCost.toFixed(2)}</span>
+                        </div>
+                    `;
+      }).join("")}
+                </div>
+            </div>`;
+    }
+  }
+  if (stats.cycles.length > 0) {
+    html += `
+            <div class="stats-section cycles-warning">
+                <div class="section-title">⚠ Cycles Detected <span class="cycle-count">${stats.cycles.length}</span></div>
+                <div class="section-hint">Circular dependencies in pipeline graph</div>
+                <div class="cycle-list">
+                    ${stats.cycles.map(
+      (cycle, i) => `
+                        <div class="cycle-item">
+                            <span class="cycle-label">#${i + 1}</span>
+                            <span class="cycle-path">${cycle.join(" > ")}</span>
+                        </div>
+                    `
+    ).join("")}
+                </div>
+            </div>`;
+  }
+  const hasMissing = stats.coverage.schedules.missing.length > 0 || stats.coverage.airflow.missing.length > 0 || stats.orphaned.length > 0;
+  if (hasMissing) {
+    html += `
+            <div class="stats-section">
+                <div class="section-title">Needs Attention</div>
+                <div class="missing-scroll">
+                    ${renderMissingBlock("Missing Schedule", stats.coverage.schedules.missing, "pipeline")}
+                    ${renderMissingBlock("Missing Airflow Link", stats.coverage.airflow.missing, "pipeline")}
+                    ${renderMissingBlock("Orphaned", stats.orphaned, "orphan")}
+                </div>
+            </div>`;
+  } else if (stats.cycles.length === 0) {
+    html += `
+            <div class="stats-section all-good">
+                <div class="section-title">✓ All Good</div>
+                <div class="section-hint">No cycles, coverage gaps, or orphaned nodes.</div>
+            </div>`;
+  }
+  container.innerHTML = html;
+}
+function renderCoverageBar(label, data) {
+  const pct = data.total > 0 ? Math.round(data.covered / data.total * 100) : 100;
+  const color = pct >= 80 ? "good" : pct >= 50 ? "okay" : "low";
+  return `<div class="coverage-row">
+        <span class="coverage-label">${label}</span>
+        <div class="coverage-bar-wrap"><div class="coverage-bar ${color}" style="width: ${pct}%"></div></div>
+        <span class="coverage-pct ${color}">${pct}%</span>
+    </div>`;
+}
+function renderMissingBlock(label, items, type) {
+  if (items.length === 0) return "";
+  return `<div class="missing-block">
+        <div class="missing-header">${label} <span class="missing-count">${items.length}</span></div>
+        <div class="missing-names ${type}">${items.join(", ")}</div>
+    </div>`;
+}
+function renderPieChart(data, size = 80) {
+  if (!data?.length) return "";
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  if (total === 0) return "";
+  let currentAngle = -90;
+  let paths = "";
+  data.forEach((d, i) => {
+    const angle = d.value / total * 360;
+    const startRad = currentAngle * Math.PI / 180;
+    const endRad = (currentAngle + angle) * Math.PI / 180;
+    const r = size / 2 - 1, cx = size / 2, cy = size / 2;
+    const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
+    const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
+    const color = COLORS[i % COLORS.length];
+    paths += data.length === 1 ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" />` : `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${angle > 180 ? 1 : 0} 1 ${x2} ${y2} Z" fill="${color}" />`;
+    currentAngle += angle;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>`;
+}
+function renderPieLegend(data) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  return data.map((d, i) => {
+    const pct = total > 0 ? Math.round(d.value / total * 100) : 0;
+    return `<div class="pie-legend-row">
+            <span class="pie-legend-dot" style="background:${COLORS[i % COLORS.length]}"></span>
+            <span class="pie-legend-name">${d.label}</span>
+            <span class="pie-legend-val">${d.value} (${pct}%)</span>
+        </div>`;
+  }).join("");
+}
 let blastRadiusGraphInstance = null;
 function generateGraphvizDot() {
   if (!state.currentConfig) return "";
@@ -3135,11 +4028,53 @@ function updateGraph() {
     if (renderTimeout) clearTimeout(renderTimeout);
     container.style("opacity", 1);
     isRendering = false;
+    applyCriticalPathHighlighting();
+    if (state.showCostLabels) showCostLabels();
     if (pendingUpdate) {
       pendingUpdate = false;
       updateGraph();
     } else {
       setTimeout(() => precomputeAdjacentStates(), 100);
+    }
+  });
+}
+function applyCriticalPathHighlighting() {
+  if (!state.analysisMode) return;
+  let pathNodes, pathEdges, nodeClass, edgeClass;
+  if (state.analysisMode === "critical-path") {
+    pathNodes = getCriticalPathNodes();
+    pathEdges = getCriticalPathEdges();
+    nodeClass = "node-critical-path";
+    edgeClass = "edge-critical-path";
+  } else if (state.analysisMode === "costliest-path") {
+    pathNodes = getCostliestPathNodes();
+    pathEdges = getCostliestPathEdges();
+    nodeClass = "node-costliest-path";
+    edgeClass = "edge-costliest-path";
+  } else {
+    return;
+  }
+  if (pathNodes.size === 0) return;
+  d3.select("#graph").selectAll(".node").each(function() {
+    const node = d3.select(this);
+    const title = node.select("title").text();
+    if (pathNodes.has(title)) {
+      node.classed(nodeClass, true);
+    } else {
+      node.classed("node-dimmed", true);
+    }
+  });
+  d3.select("#graph").selectAll(".edge").each(function() {
+    const edge = d3.select(this);
+    const title = edge.select("title").text();
+    const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/);
+    if (match) {
+      const edgeKey = `${match[1]}|${match[2]}`;
+      if (pathEdges.has(edgeKey)) {
+        edge.classed(edgeClass, true);
+      } else {
+        edge.classed("edge-dimmed", true);
+      }
     }
   });
 }
@@ -3438,26 +4373,16 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   html = `<h5>${nodeData.name}</h5>`;
   html += `<div class="detail-label">Type</div>`;
   html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`;
-  html += `<div class="mt-2 mb-2">
-        <button class="btn btn-sm btn-outline-danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">
-            ◉ Blast Radius
-        </button>
-    </div>`;
+  html += `<div class="node-actions">`;
+  html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">◉ Blast Radius</button>`;
   if (nodeType === "Pipeline Group") {
     const isExpanded = state.expandedGroups.has(nodeName);
-    html += `<div class="mt-2 mb-2">
-            <button class="btn btn-sm btn-outline-warning" onclick="toggleGroup('${nodeName}')">
-                ${isExpanded ? "Collapse Group" : "Expand Group"}
-            </button>
-        </div>`;
+    html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeName}')">${isExpanded ? "Collapse" : "Expand"}</button>`;
   }
   if (nodeType === "Pipeline" && nodeData.group && state.expandedGroups.has(nodeData.group)) {
-    html += `<div class="mt-2 mb-2">
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleGroup('${nodeData.group}')">
-                Collapse Group (${nodeData.group})
-            </button>
-        </div>`;
+    html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeData.group}')">Collapse ${nodeData.group}</button>`;
   }
+  html += `</div>`;
   if (nodeData.description) {
     html += `<div class="detail-label">Description</div>`;
     html += `<div class="detail-value">${nodeData.description}</div>`;
@@ -3465,6 +4390,55 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   if (nodeData.schedule) {
     html += `<div class="detail-label">Schedule</div>`;
     html += `<div class="detail-value"><code class="text-success">${nodeData.schedule}</code></div>`;
+  }
+  if (nodeType === "Pipeline" || nodeType === "Pipeline Group") {
+    const hasDuration = nodeData.duration !== void 0;
+    const hasCost = nodeData.cost !== void 0;
+    if (hasDuration || hasCost) {
+      html += `<div class="detail-label">Runtime</div>`;
+      html += `<div class="detail-value">`;
+      if (hasDuration) {
+        const mins = nodeData.duration;
+        const formatted = mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? mins % 60 + "m" : ""}` : `${mins}m`;
+        html += `<span class="badge me-2" style="background-color: #f8bbd9; color: #880e4f;">${formatted}</span>`;
+      }
+      if (hasCost) {
+        html += `<span class="badge" style="background-color: #e8f5e8; color: #2e7d32;">$${nodeData.cost.toFixed(2)}</span>`;
+      }
+      html += `</div>`;
+    }
+    if (upstream && upstream.length > 0) {
+      const pipelineMap = /* @__PURE__ */ new Map();
+      state.currentConfig.pipelines?.forEach((p) => pipelineMap.set(p.name, p));
+      const seen = /* @__PURE__ */ new Set();
+      let upstreamCost = 0;
+      let upstreamDuration = 0;
+      let upstreamCount = 0;
+      upstream.forEach((u) => {
+        if (seen.has(u.name)) return;
+        seen.add(u.name);
+        const p = pipelineMap.get(u.name);
+        if (p) {
+          upstreamCount++;
+          if (p.cost !== void 0) upstreamCost += p.cost;
+          if (p.duration !== void 0) upstreamDuration += p.duration;
+        }
+      });
+      if (upstreamCount > 0 && (upstreamCost > 0 || upstreamDuration > 0)) {
+        html += `<div class="detail-label">Upstream Total</div>`;
+        html += `<div class="detail-value">`;
+        if (upstreamDuration > 0) {
+          const mins = upstreamDuration;
+          const formatted = mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? mins % 60 + "m" : ""}` : `${mins}m`;
+          html += `<span class="badge me-2" style="background-color: #fce4ec; color: #ad1457;">${formatted}</span>`;
+        }
+        if (upstreamCost > 0) {
+          html += `<span class="badge" style="background-color: #e0f2f1; color: #00695c;">$${upstreamCost.toFixed(2)}</span>`;
+        }
+        html += `<span class="text-muted ms-2" style="font-size: 10px;">(${upstreamCount} pipelines)</span>`;
+        html += `</div>`;
+      }
+    }
   }
   if (nodeData.type) {
     html += `<div class="detail-label">Source Type</div>`;
@@ -3675,6 +4649,7 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
 function clearSelection() {
   state.selectedNode = null;
   clearHighlights();
+  applyCriticalPathHighlighting();
   const col = document.getElementById("node-details-col");
   const graphCol = document.getElementById("graph-col");
   if (col) col.style.display = "none";
@@ -3684,8 +4659,8 @@ function clearSelection() {
   }
 }
 function clearHighlights() {
-  d3.select("#graph").selectAll(".node").classed("node-highlighted node-connected node-dimmed", false);
-  d3.select("#graph").selectAll(".edge").classed("edge-highlighted edge-dimmed", false);
+  d3.select("#graph").selectAll(".node").classed("node-highlighted node-connected node-dimmed node-critical-path node-costliest-path", false);
+  d3.select("#graph").selectAll(".edge").classed("edge-highlighted edge-dimmed edge-critical-path edge-costliest-path", false);
 }
 function fuzzyMatch(text, query) {
   text = text.toLowerCase();
@@ -3854,17 +4829,77 @@ function collapseAllGroups() {
   state.expandedGroups.clear();
   updateGraph();
 }
+function toggleCollapseAll() {
+  const allGroups = getAllGroupNames();
+  const btn = document.getElementById("collapse-all-btn");
+  const allCollapsed = state.expandedGroups.size === 0;
+  if (allCollapsed) {
+    allGroups.forEach((g) => state.expandedGroups.add(g));
+    btn.classList.remove("active");
+    btn.textContent = "Collapse All";
+  } else {
+    state.expandedGroups.clear();
+    btn.classList.add("active");
+    btn.textContent = "Expand All";
+  }
+  updateGraph();
+}
+function getAllGroupNames() {
+  if (!state.currentConfig?.pipelines) return [];
+  const groups = /* @__PURE__ */ new Set();
+  state.currentConfig.pipelines.forEach((p) => {
+    if (p.group) groups.add(p.group);
+  });
+  return Array.from(groups);
+}
 function togglePipelinesOnly() {
   state.pipelinesOnlyView = !state.pipelinesOnlyView;
   const btn = document.getElementById("pipelines-only-btn");
-  if (state.pipelinesOnlyView) {
-    btn.classList.remove("btn-outline-secondary");
-    btn.classList.add("btn-secondary");
-  } else {
-    btn.classList.remove("btn-secondary");
-    btn.classList.add("btn-outline-secondary");
-  }
+  btn.classList.toggle("active", state.pipelinesOnlyView);
   updateGraph();
+}
+function setAnalysisMode(mode) {
+  state.analysisMode = mode || null;
+  clearCriticalPathHighlighting();
+  applyCriticalPathHighlighting();
+}
+function toggleAnalysisMode(mode, checkbox) {
+  if (checkbox.checked) {
+    setAnalysisMode(mode);
+  } else {
+    setAnalysisMode(null);
+  }
+}
+function toggleCostLabels(show) {
+  state.showCostLabels = show;
+  if (show) {
+    showCostLabels();
+  } else {
+    hideCostLabels();
+  }
+}
+function showCostLabels() {
+  const pipelines = state.currentConfig?.pipelines || [];
+  const pipelineMap = /* @__PURE__ */ new Map();
+  pipelines.forEach((p) => pipelineMap.set(p.name, p));
+  d3.select("#graph").selectAll(".node").each(function() {
+    const node = d3.select(this);
+    const title = node.select("title").text();
+    const pipeline = pipelineMap.get(title);
+    if (pipeline?.cost !== void 0) {
+      const bbox = this.getBBox();
+      const cost = pipeline.cost;
+      const costText = cost >= 1 ? `$${cost.toFixed(0)}` : `$${cost.toFixed(2)}`;
+      node.append("text").attr("class", "cost-label").attr("x", bbox.x + bbox.width / 2).attr("y", bbox.y - 4).attr("text-anchor", "middle").attr("font-size", "10px").attr("font-weight", "600").attr("fill", "#2e7d32").text(costText);
+    }
+  });
+}
+function hideCostLabels() {
+  d3.select("#graph").selectAll(".cost-label").remove();
+}
+function clearCriticalPathHighlighting() {
+  d3.select("#graph").selectAll(".node").classed("node-critical-path node-costliest-path node-dimmed", false);
+  d3.select("#graph").selectAll(".edge").classed("edge-critical-path edge-costliest-path edge-dimmed", false);
 }
 function toggleGroup(groupName) {
   if (state.expandedGroups.has(groupName)) {
@@ -5186,279 +6221,6 @@ function copyBackfillToClipboard(event) {
     }
   });
 }
-const COLORS = ["#6b9dc4", "#a88bc4", "#d4a574", "#7cb47c", "#c98b8b", "#6bb5b5", "#a89080", "#8a9aa8"];
-function detectCycles(pipelines) {
-  const graph = /* @__PURE__ */ new Map();
-  const pipelineNames = /* @__PURE__ */ new Set();
-  pipelines.forEach((p) => {
-    const nodeName = p.group || p.name;
-    pipelineNames.add(nodeName);
-    if (!graph.has(nodeName)) graph.set(nodeName, /* @__PURE__ */ new Set());
-  });
-  pipelines.forEach((p) => {
-    const nodeName = p.group || p.name;
-    p.upstream_pipelines?.forEach((upstream) => {
-      if (pipelineNames.has(upstream)) {
-        if (!graph.has(upstream)) graph.set(upstream, /* @__PURE__ */ new Set());
-        graph.get(upstream).add(nodeName);
-      }
-    });
-  });
-  const cycles = [];
-  const visited = /* @__PURE__ */ new Set();
-  const recStack = /* @__PURE__ */ new Set();
-  function dfs(node, path) {
-    visited.add(node);
-    recStack.add(node);
-    path.push(node);
-    for (const neighbor of graph.get(node) || /* @__PURE__ */ new Set()) {
-      if (!visited.has(neighbor)) {
-        const result = dfs(neighbor, path);
-        if (result) return result;
-      } else if (recStack.has(neighbor)) {
-        const cycleStart = path.indexOf(neighbor);
-        const cycle = path.slice(cycleStart);
-        cycle.push(neighbor);
-        return cycle;
-      }
-    }
-    path.pop();
-    recStack.delete(node);
-    return null;
-  }
-  for (const node of pipelineNames) {
-    if (!visited.has(node)) {
-      const cycle = dfs(node, []);
-      if (cycle) {
-        cycles.push(cycle);
-        visited.clear();
-        recStack.clear();
-        cycle.forEach((n) => visited.add(n));
-      }
-    }
-  }
-  return cycles;
-}
-function computeStats() {
-  if (!state.currentConfig) return null;
-  const pipelines = state.currentConfig.pipelines || [];
-  const datasources = state.currentConfig.datasources || [];
-  const cycles = detectCycles(pipelines);
-  const upstreamCounts = /* @__PURE__ */ new Map();
-  const downstreamCounts = /* @__PURE__ */ new Map();
-  const groups = /* @__PURE__ */ new Set();
-  pipelines.forEach((p) => {
-    if (p.group) groups.add(p.group);
-  });
-  pipelines.forEach((p) => {
-    const nodeName = p.group || p.name;
-    p.input_sources?.forEach((s) => {
-      downstreamCounts.set(s, (downstreamCounts.get(s) || 0) + 1);
-      upstreamCounts.set(nodeName, (upstreamCounts.get(nodeName) || 0) + 1);
-    });
-    p.output_sources?.forEach((s) => {
-      downstreamCounts.set(nodeName, (downstreamCounts.get(nodeName) || 0) + 1);
-      upstreamCounts.set(s, (upstreamCounts.get(s) || 0) + 1);
-    });
-    p.upstream_pipelines?.forEach((u) => {
-      downstreamCounts.set(u, (downstreamCounts.get(u) || 0) + 1);
-      upstreamCounts.set(nodeName, (upstreamCounts.get(nodeName) || 0) + 1);
-    });
-  });
-  const pipelineNames = new Set(pipelines.map((p) => p.name));
-  const allNodes = /* @__PURE__ */ new Set([...upstreamCounts.keys(), ...downstreamCounts.keys()]);
-  const hubs = [...allNodes].map((name) => {
-    let type = "datasource";
-    if (groups.has(name)) type = "group";
-    else if (pipelineNames.has(name)) type = "pipeline";
-    return {
-      name,
-      type,
-      upstream: upstreamCounts.get(name) || 0,
-      downstream: downstreamCounts.get(name) || 0,
-      total: (upstreamCounts.get(name) || 0) + (downstreamCounts.get(name) || 0)
-    };
-  }).sort((a, b) => b.total - a.total).slice(0, 8);
-  const referencedSources = /* @__PURE__ */ new Set();
-  pipelines.forEach((p) => {
-    p.input_sources?.forEach((s) => referencedSources.add(s));
-    p.output_sources?.forEach((s) => referencedSources.add(s));
-  });
-  const orphaned = datasources.filter((ds) => !referencedSources.has(ds.name)).map((ds) => ds.name);
-  const clusterCounts = {};
-  pipelines.forEach((p) => {
-    const cluster = p.cluster || "unclustered";
-    clusterCounts[cluster] = (clusterCounts[cluster] || 0) + 1;
-  });
-  const typeCounts = {};
-  datasources.forEach((ds) => {
-    const type = ds.type || "unknown";
-    typeCounts[type] = (typeCounts[type] || 0) + 1;
-  });
-  return {
-    counts: {
-      pipelines: pipelines.length,
-      datasources: datasources.length,
-      clusters: Object.keys(clusterCounts).filter((c) => c !== "unclustered").length
-    },
-    cycles,
-    hubs,
-    orphaned,
-    coverage: {
-      schedules: {
-        covered: pipelines.filter((p) => p.schedule).length,
-        total: pipelines.length,
-        missing: pipelines.filter((p) => !p.schedule).map((p) => p.name)
-      },
-      airflow: {
-        covered: pipelines.filter((p) => p.links?.airflow).length,
-        total: pipelines.length,
-        missing: pipelines.filter((p) => !p.links?.airflow).map((p) => p.name)
-      }
-    },
-    distributions: { clusters: clusterCounts, types: typeCounts }
-  };
-}
-function renderStats() {
-  const container = document.getElementById("stats-content");
-  if (!container) return;
-  const stats = computeStats();
-  if (!stats) {
-    container.innerHTML = '<div class="text-muted">Load a configuration to see statistics.</div>';
-    return;
-  }
-  const clusterData = Object.entries(stats.distributions.clusters).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
-  const typeData = Object.entries(stats.distributions.types).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
-  let html = `
-        <div class="stats-summary">
-            <span><strong>${stats.counts.pipelines}</strong> pipelines</span>
-            <span><strong>${stats.counts.datasources}</strong> datasources</span>
-            <span><strong>${stats.counts.clusters}</strong> clusters</span>
-        </div>
-        <div class="stats-row">
-            <div class="chart-box">
-                <div class="chart-title">Pipelines by Cluster</div>
-                <div class="pie-container">
-                    ${renderPieChart(clusterData, 120)}
-                    <div class="pie-legend">${renderPieLegend(clusterData)}</div>
-                </div>
-            </div>
-            <div class="chart-box">
-                <div class="chart-title">Datasources by Type</div>
-                <div class="pie-container">
-                    ${renderPieChart(typeData, 120)}
-                    <div class="pie-legend">${renderPieLegend(typeData)}</div>
-                </div>
-            </div>
-        </div>
-        <div class="stats-row">
-            <div class="stats-section">
-                <div class="section-title">Coverage</div>
-                <div class="coverage-bars">
-                    ${renderCoverageBar("Schedules", stats.coverage.schedules)}
-                    ${renderCoverageBar("Airflow Links", stats.coverage.airflow)}
-                </div>
-            </div>
-            ${stats.hubs.length > 0 ? `
-                <div class="stats-section">
-                    <div class="section-title">Hubs <span class="section-hint">most connected</span></div>
-                    <div class="hub-list">
-                        ${stats.hubs.map(
-    (h, i) => `
-                            <div class="hub-row">
-                                <span class="hub-rank">${i + 1}</span>
-                                <span class="hub-name ${h.type}">${h.name}</span>
-                                <span class="hub-stats">↑${h.upstream} ↓${h.downstream}</span>
-                            </div>
-                        `
-  ).join("")}
-                    </div>
-                </div>
-            ` : ""}
-        </div>`;
-  if (stats.cycles.length > 0) {
-    html += `
-            <div class="stats-section cycles-warning">
-                <div class="section-title">⚠ Cycles Detected <span class="cycle-count">${stats.cycles.length}</span></div>
-                <div class="section-hint">Circular dependencies in pipeline graph</div>
-                <div class="cycle-list">
-                    ${stats.cycles.map(
-      (cycle, i) => `
-                        <div class="cycle-item">
-                            <span class="cycle-label">#${i + 1}</span>
-                            <span class="cycle-path">${cycle.join(" > ")}</span>
-                        </div>
-                    `
-    ).join("")}
-                </div>
-            </div>`;
-  }
-  const hasMissing = stats.coverage.schedules.missing.length > 0 || stats.coverage.airflow.missing.length > 0 || stats.orphaned.length > 0;
-  if (hasMissing) {
-    html += `
-            <div class="stats-section">
-                <div class="section-title">Needs Attention</div>
-                <div class="missing-scroll">
-                    ${renderMissingBlock("Missing Schedule", stats.coverage.schedules.missing, "pipeline")}
-                    ${renderMissingBlock("Missing Airflow Link", stats.coverage.airflow.missing, "pipeline")}
-                    ${renderMissingBlock("Orphaned", stats.orphaned, "orphan")}
-                </div>
-            </div>`;
-  } else if (stats.cycles.length === 0) {
-    html += `
-            <div class="stats-section all-good">
-                <div class="section-title">✓ All Good</div>
-                <div class="section-hint">No cycles, coverage gaps, or orphaned nodes.</div>
-            </div>`;
-  }
-  container.innerHTML = html;
-}
-function renderCoverageBar(label, data) {
-  const pct = data.total > 0 ? Math.round(data.covered / data.total * 100) : 100;
-  const color = pct >= 80 ? "good" : pct >= 50 ? "okay" : "low";
-  return `<div class="coverage-row">
-        <span class="coverage-label">${label}</span>
-        <div class="coverage-bar-wrap"><div class="coverage-bar ${color}" style="width: ${pct}%"></div></div>
-        <span class="coverage-pct ${color}">${pct}%</span>
-    </div>`;
-}
-function renderMissingBlock(label, items, type) {
-  if (items.length === 0) return "";
-  return `<div class="missing-block">
-        <div class="missing-header">${label} <span class="missing-count">${items.length}</span></div>
-        <div class="missing-names ${type}">${items.join(", ")}</div>
-    </div>`;
-}
-function renderPieChart(data, size = 80) {
-  if (!data?.length) return "";
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-  if (total === 0) return "";
-  let currentAngle = -90;
-  let paths = "";
-  data.forEach((d, i) => {
-    const angle = d.value / total * 360;
-    const startRad = currentAngle * Math.PI / 180;
-    const endRad = (currentAngle + angle) * Math.PI / 180;
-    const r = size / 2 - 1, cx = size / 2, cy = size / 2;
-    const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
-    const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
-    const color = COLORS[i % COLORS.length];
-    paths += data.length === 1 ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" />` : `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${angle > 180 ? 1 : 0} 1 ${x2} ${y2} Z" fill="${color}" />`;
-    currentAngle += angle;
-  });
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>`;
-}
-function renderPieLegend(data) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-  return data.map((d, i) => {
-    const pct = total > 0 ? Math.round(d.value / total * 100) : 0;
-    return `<div class="pie-legend-row">
-            <span class="pie-legend-dot" style="background:${COLORS[i % COLORS.length]}"></span>
-            <span class="pie-legend-name">${d.label}</span>
-            <span class="pie-legend-val">${d.value} (${pct}%)</span>
-        </div>`;
-  }).join("");
-}
 function loadExample() {
   document.getElementById("json-input").value = JSON.stringify(exampleConfig, null, 2);
   loadJson();
@@ -5667,8 +6429,12 @@ window.filterDatasources = filterDatasources;
 window.clearSelection = clearSelection;
 window.resetGraph = resetGraph;
 window.collapseAllGroups = collapseAllGroups;
+window.toggleCollapseAll = toggleCollapseAll;
 window.toggleGroup = toggleGroup;
 window.togglePipelinesOnly = togglePipelinesOnly;
+window.setAnalysisMode = setAnalysisMode;
+window.toggleAnalysisMode = toggleAnalysisMode;
+window.toggleCostLabels = toggleCostLabels;
 window.searchNodes = searchNodes;
 window.selectSearchResult = selectSearchResult;
 window.showBlastRadius = showBlastRadius;
@@ -6285,6 +7051,40 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                             your graph. LLMs can query your lineage.</span
                                         >
                                     </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M3 12h4l3-9 4 18 3-9h4" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Find critical path</strong> via
+                                            PERT analysis. Know your pipeline's true bottleneck.</span
+                                        >
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            style="flex-shrink: 0; margin-top: 2px"
+                                        >
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                                        </svg>
+                                        <span
+                                            ><strong style="color: var(--text-primary)">Track spend</strong> per node
+                                            and path. See where your compute budget goes.</span
+                                        >
+                                    </div>
                                 </div>
                             </div>
 
@@ -6478,34 +7278,40 @@ jq -s '{
                                     <div id="graph-col" class="col-md-12">
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        onclick="togglePipelinesOnly()"
-                                                        id="pipelines-only-btn"
-                                                    >
-                                                        Pipelines Only
-                                                    </button>
-                                                </div>
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        onclick="collapseAllGroups()"
-                                                    >
-                                                        Collapse All
-                                                    </button>
-                                                </div>
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-warning"
-                                                        onclick="clearSelection()"
-                                                    >
-                                                        Clear Selection
-                                                    </button>
-                                                </div>
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="resetGraph()">
-                                                    Reset
+                                                <button
+                                                    class="graph-ctrl-btn"
+                                                    onclick="togglePipelinesOnly()"
+                                                    id="pipelines-only-btn"
+                                                >
+                                                    Pipelines Only
                                                 </button>
+                                                <button
+                                                    class="graph-ctrl-btn active"
+                                                    onclick="toggleCollapseAll()"
+                                                    id="collapse-all-btn"
+                                                >
+                                                    Expand All
+                                                </button>
+                                                <button class="graph-ctrl-btn" onclick="clearSelection()">Clear</button>
+                                                <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
+                                                <div class="analysis-toggle ms-auto">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="cp-toggle"
+                                                        onchange="toggleAnalysisMode('critical-path', this)"
+                                                    />
+                                                    <label for="cp-toggle"
+                                                        ><span class="cp-indicator"></span>Critical Path</label
+                                                    >
+                                                    <input
+                                                        type="checkbox"
+                                                        id="cost-toggle"
+                                                        onchange="toggleCostLabels(this.checked)"
+                                                    />
+                                                    <label for="cost-toggle"
+                                                        ><span class="cost-indicator"></span>Show Costs</label
+                                                    >
+                                                </div>
                                             </div>
                                             <div id="graph">
                                                 <div class="graph-loading text-center py-5 text-muted">
@@ -6857,52 +7663,6 @@ jq -s '
 ' *.json > merged.json</code></pre>
                             </div>
 
-                            <div class="merge-section">
-                                <h6>Merge from Multiple Git Repos</h6>
-                                <p>Pull configs from different repos and merge:</p>
-                                <pre class="merge-code"><code>#!/bin/bash
-# Fetch configs from multiple repos
-curl -s https://raw.githubusercontent.com/org/repo-a/main/pipeviz.json > /tmp/a.json
-curl -s https://raw.githubusercontent.com/org/repo-b/main/pipeviz.json > /tmp/b.json
-
-# Merge them
-jq -s '{
-  pipelines: [.[].pipelines[]] | unique_by(.name),
-  datasources: [.[].datasources[]] | unique_by(.name)
-}' /tmp/a.json /tmp/b.json > combined.json</code></pre>
-                            </div>
-
-                            <div class="merge-section">
-                                <h6>Validate After Merge</h6>
-                                <p>Check for duplicate names or missing references:</p>
-                                <pre class="merge-code"><code># Find duplicate pipeline names
-jq '.pipelines | group_by(.name) | map(select(length > 1)) | .[].name' combined.json
-
-# Find datasources referenced but not defined
-jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]] 
-    | unique 
-    - [.datasources[].name] 
-    | if length > 0 then "Missing: " + (. | join(", ")) else "All good!" end' combined.json</code></pre>
-                            </div>
-
-                            <div class="merge-section">
-                                <h6>CI/CD Integration</h6>
-                                <p>Add to your pipeline to auto-generate and deploy:</p>
-                                <pre class="merge-code"><code># .github/workflows/pipeviz.yml
-- name: Merge Pipeviz configs
-  run: |
-    jq -s '{
-      pipelines: [.[].pipelines[]] | unique_by(.name),
-      datasources: [.[].datasources[]] | unique_by(.name)
-    }' services/*/pipeviz.json > docs/pipeviz.json
-
-- name: Deploy to GitHub Pages
-  uses: peaceiris/actions-gh-pages@v3
-  with:
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-    publish_dir: ./docs</code></pre>
-                            </div>
-
                             <style>
                                 .merge-section {
                                     margin-bottom: 1.5rem;
@@ -7086,6 +7846,18 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
                                         <td>No</td>
                                         <td>name to URL</td>
                                     </tr>
+                                    <tr>
+                                        <td><code>duration</code></td>
+                                        <td>number</td>
+                                        <td>No</td>
+                                        <td>Runtime in minutes (for critical path)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>cost</code></td>
+                                        <td>number</td>
+                                        <td>No</td>
+                                        <td>Cost per run (for spend analysis)</td>
+                                    </tr>
                                 </table>
                                 <pre class="spec-pre">
 {
@@ -7097,6 +7869,8 @@ jq '[.pipelines[].input_sources[], .pipelines[].output_sources[]]
   "cluster": "user-processing",
   "group": "etl-jobs",
   "schedule": "Every 2 hours",
+  "duration": 45,
+  "cost": 12.50,
   "tags": ["user-data", "ml"],
   "links": {
     "airflow": "https://...",

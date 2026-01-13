@@ -1,6 +1,305 @@
 import { state } from './state.js'
 
+// Cache critical path results per config
+let cachedCriticalPath = null
+let cachedCriticalPathHash = null
+let cachedCostliestPath = null
+let cachedCostliestPathHash = null
+
+function getCachedCriticalPath() {
+    if (!state.currentConfig) return null
+    const hash = JSON.stringify(state.currentConfig.pipelines?.map((p) => [p.name, p.duration]))
+    if (cachedCriticalPathHash !== hash) {
+        cachedCriticalPathHash = hash
+        cachedCriticalPath = computeCriticalPath(state.currentConfig.pipelines || [])
+    }
+    return cachedCriticalPath
+}
+
+function getCachedCostliestPath() {
+    if (!state.currentConfig) return null
+    const hash = JSON.stringify(state.currentConfig.pipelines?.map((p) => [p.name, p.cost]))
+    if (cachedCostliestPathHash !== hash) {
+        cachedCostliestPathHash = hash
+        cachedCostliestPath = computeCostliestPath(state.currentConfig.pipelines || [])
+    }
+    return cachedCostliestPath
+}
+
+// Export critical path nodes for graph highlighting
+export function getCriticalPathNodes() {
+    const cp = getCachedCriticalPath()
+    if (!cp || !cp.path) return new Set()
+    return new Set(cp.path.map((p) => p.name))
+}
+
+// Export critical path edges for graph highlighting
+export function getCriticalPathEdges() {
+    const cp = getCachedCriticalPath()
+    if (!cp || !cp.path || cp.path.length < 2) return new Set()
+
+    const edges = new Set()
+    for (let i = 0; i < cp.path.length - 1; i++) {
+        edges.add(`${cp.path[i].name}|${cp.path[i + 1].name}`)
+    }
+    return edges
+}
+
+// Export costliest path nodes for graph highlighting
+export function getCostliestPathNodes() {
+    const cp = getCachedCostliestPath()
+    if (!cp || !cp.path) return new Set()
+    return new Set(cp.path.map((p) => p.name))
+}
+
+// Export costliest path edges for graph highlighting
+export function getCostliestPathEdges() {
+    const cp = getCachedCostliestPath()
+    if (!cp || !cp.path || cp.path.length < 2) return new Set()
+
+    const edges = new Set()
+    for (let i = 0; i < cp.path.length - 1; i++) {
+        edges.add(`${cp.path[i].name}|${cp.path[i + 1].name}`)
+    }
+    return edges
+}
+
 const COLORS = ['#6b9dc4', '#a88bc4', '#d4a574', '#7cb47c', '#c98b8b', '#6bb5b5', '#a89080', '#8a9aa8']
+
+function computeCriticalPath(pipelines) {
+    const pipelineMap = new Map()
+    pipelines.forEach((p) => pipelineMap.set(p.name, p))
+
+    const hasDurations = pipelines.some((p) => p.duration !== undefined && p.duration !== null)
+    if (!hasDurations) return null
+
+    const graph = new Map() // node -> [downstream nodes]
+    const inDegree = new Map()
+    const pipelineNames = new Set(pipelines.map((p) => p.name))
+
+    pipelines.forEach((p) => {
+        if (!graph.has(p.name)) graph.set(p.name, [])
+        if (!inDegree.has(p.name)) inDegree.set(p.name, 0)
+    })
+
+    const outputToProducer = new Map()
+    pipelines.forEach((p) => {
+        p.output_sources?.forEach((ds) => outputToProducer.set(ds, p.name))
+    })
+
+    pipelines.forEach((p) => {
+        // Direct upstream_pipelines dependencies
+        p.upstream_pipelines?.forEach((upstream) => {
+            if (pipelineNames.has(upstream)) {
+                graph.get(upstream).push(p.name)
+                inDegree.set(p.name, inDegree.get(p.name) + 1)
+            }
+        })
+        // Datasource-based dependencies
+        p.input_sources?.forEach((ds) => {
+            const producer = outputToProducer.get(ds)
+            if (producer && producer !== p.name && !p.upstream_pipelines?.includes(producer)) {
+                graph.get(producer).push(p.name)
+                inDegree.set(p.name, inDegree.get(p.name) + 1)
+            }
+        })
+    })
+
+    // EST = earliest start time, EFT = earliest finish time
+    const est = new Map()
+    const eft = new Map()
+    const predecessor = new Map()
+
+    pipelines.forEach((p) => {
+        if (inDegree.get(p.name) === 0) {
+            est.set(p.name, 0)
+            eft.set(p.name, p.duration || 0)
+        }
+    })
+
+    // Kahn's algorithm - topological sort via BFS
+    // Start with nodes that have no dependencies (inDegree = 0)
+    const queue = pipelines.filter((p) => inDegree.get(p.name) === 0).map((p) => p.name)
+    const processed = []
+
+    while (queue.length > 0) {
+        const current = queue.shift()
+        processed.push(current)
+
+        graph.get(current).forEach((neighbor) => {
+            // Propagate: neighbor can't start until current finishes
+            const newEst = eft.get(current)
+            if (!est.has(neighbor) || newEst > est.get(neighbor)) {
+                est.set(neighbor, newEst)
+                predecessor.set(neighbor, current) // track which path gave max EST
+            }
+            const neighborPipeline = pipelineMap.get(neighbor)
+            const neighborDuration = neighborPipeline?.duration || 0
+            eft.set(neighbor, est.get(neighbor) + neighborDuration)
+
+            // Decrement inDegree; when 0, all deps satisfied -> ready to process
+            inDegree.set(neighbor, inDegree.get(neighbor) - 1)
+            if (inDegree.get(neighbor) === 0) {
+                queue.push(neighbor)
+            }
+        })
+    }
+
+    // Find node with max EFT (end of critical path)
+    let maxEft = 0
+    let criticalEnd = null
+    eft.forEach((time, node) => {
+        if (time > maxEft) {
+            maxEft = time
+            criticalEnd = node
+        }
+    })
+
+    if (!criticalEnd) return null
+
+    const criticalPath = []
+    let current = criticalEnd
+    let totalCost = 0
+    while (current) {
+        const pipeline = pipelineMap.get(current)
+        const nodeCost = pipeline?.cost || 0
+        totalCost += nodeCost
+        criticalPath.unshift({
+            name: current,
+            duration: pipeline?.duration || 0,
+            cost: nodeCost,
+            est: est.get(current) || 0,
+            eft: eft.get(current) || 0
+        })
+        current = predecessor.get(current)
+    }
+
+    const slack = new Map()
+    const criticalNodes = new Set(criticalPath.map((n) => n.name))
+
+    pipelines.forEach((p) => {
+        if (criticalNodes.has(p.name)) {
+            slack.set(p.name, 0)
+        } else if (est.has(p.name)) {
+            // Simplified slack calculation
+            slack.set(p.name, maxEft - eft.get(p.name))
+        }
+    })
+
+    return {
+        totalDuration: maxEft,
+        totalCost,
+        path: criticalPath,
+        pipelinesWithDuration: pipelines.filter((p) => p.duration !== undefined).length,
+        pipelinesWithCost: pipelines.filter((p) => p.cost !== undefined).length,
+        totalPipelines: pipelines.length,
+        slack
+    }
+}
+
+function computeCostliestPath(pipelines) {
+    const pipelineMap = new Map()
+    pipelines.forEach((p) => pipelineMap.set(p.name, p))
+
+    const hasCosts = pipelines.some((p) => p.cost !== undefined && p.cost !== null)
+    if (!hasCosts) return null
+
+    const graph = new Map()
+    const inDegree = new Map()
+    const pipelineNames = new Set(pipelines.map((p) => p.name))
+
+    pipelines.forEach((p) => {
+        if (!graph.has(p.name)) graph.set(p.name, [])
+        if (!inDegree.has(p.name)) inDegree.set(p.name, 0)
+    })
+
+    const outputToProducer = new Map()
+    pipelines.forEach((p) => {
+        p.output_sources?.forEach((ds) => outputToProducer.set(ds, p.name))
+    })
+
+    pipelines.forEach((p) => {
+        p.upstream_pipelines?.forEach((upstream) => {
+            if (pipelineNames.has(upstream)) {
+                graph.get(upstream).push(p.name)
+                inDegree.set(p.name, inDegree.get(p.name) + 1)
+            }
+        })
+        p.input_sources?.forEach((ds) => {
+            const producer = outputToProducer.get(ds)
+            if (producer && producer !== p.name && !p.upstream_pipelines?.includes(producer)) {
+                graph.get(producer).push(p.name)
+                inDegree.set(p.name, inDegree.get(p.name) + 1)
+            }
+        })
+    })
+
+    const costToNode = new Map()
+    const predecessor = new Map()
+
+    pipelines.forEach((p) => {
+        if (inDegree.get(p.name) === 0) {
+            costToNode.set(p.name, p.cost || 0)
+        }
+    })
+
+    const queue = pipelines.filter((p) => inDegree.get(p.name) === 0).map((p) => p.name)
+    const inDegreeCopy = new Map(inDegree)
+
+    while (queue.length > 0) {
+        const current = queue.shift()
+        const currentCost = costToNode.get(current) || 0
+
+        graph.get(current).forEach((neighbor) => {
+            const neighborPipeline = pipelineMap.get(neighbor)
+            const neighborCost = neighborPipeline?.cost || 0
+            const newCost = currentCost + neighborCost
+
+            if (!costToNode.has(neighbor) || newCost > costToNode.get(neighbor)) {
+                costToNode.set(neighbor, newCost)
+                predecessor.set(neighbor, current)
+            }
+
+            inDegreeCopy.set(neighbor, inDegreeCopy.get(neighbor) - 1)
+            if (inDegreeCopy.get(neighbor) === 0) {
+                queue.push(neighbor)
+            }
+        })
+    }
+
+    let maxCost = 0
+    let costliestEnd = null
+    costToNode.forEach((cost, node) => {
+        if (cost > maxCost) {
+            maxCost = cost
+            costliestEnd = node
+        }
+    })
+
+    if (!costliestEnd) return null
+
+    const costliestPath = []
+    let current = costliestEnd
+    let totalDuration = 0
+    while (current) {
+        const pipeline = pipelineMap.get(current)
+        totalDuration += pipeline?.duration || 0
+        costliestPath.unshift({
+            name: current,
+            cost: pipeline?.cost || 0,
+            duration: pipeline?.duration || 0
+        })
+        current = predecessor.get(current)
+    }
+
+    return {
+        totalCost: maxCost,
+        totalDuration,
+        path: costliestPath,
+        pipelinesWithCost: pipelines.filter((p) => p.cost !== undefined).length,
+        totalPipelines: pipelines.length
+    }
+}
 
 function detectCycles(pipelines) {
     const graph = new Map()
@@ -69,6 +368,8 @@ export function computeStats() {
     const pipelines = state.currentConfig.pipelines || []
     const datasources = state.currentConfig.datasources || []
     const cycles = detectCycles(pipelines)
+    const criticalPath = computeCriticalPath(pipelines)
+    const costliestPath = computeCostliestPath(pipelines)
 
     const upstreamCounts = new Map()
     const downstreamCounts = new Map()
@@ -138,6 +439,8 @@ export function computeStats() {
             clusters: Object.keys(clusterCounts).filter((c) => c !== 'unclustered').length
         },
         cycles,
+        criticalPath,
+        costliestPath,
         hubs,
         orphaned,
         coverage: {
@@ -226,6 +529,124 @@ export function renderStats() {
                     : ''
             }
         </div>`
+
+    if (stats.criticalPath) {
+        const cp = stats.criticalPath
+        const formatDuration = (mins) => {
+            if (mins >= 60) {
+                const hrs = Math.floor(mins / 60)
+                const rem = mins % 60
+                return rem > 0 ? `${hrs}h${rem}m` : `${hrs}h`
+            }
+            return `${mins}m`
+        }
+        const formatTime = (mins) => {
+            const hrs = Math.floor(mins / 60)
+            const rem = mins % 60
+            return `${String(hrs).padStart(2, '0')}:${String(rem).padStart(2, '0')}`
+        }
+        const formatCost = (cost) => (cost > 0 ? `$${cost.toFixed(2)}` : '')
+        html += `
+            <div class="stats-section critical-path-section">
+                <div class="section-title">Critical Path</div>
+                <div class="critical-path-summary">
+                    <div class="cp-stat">
+                        <span class="cp-stat-value">${formatDuration(cp.totalDuration)}</span>
+                        <span class="cp-stat-label">duration</span>
+                    </div>
+                    ${
+                        cp.totalCost > 0
+                            ? `
+                    <div class="cp-stat">
+                        <span class="cp-stat-value">$${cp.totalCost.toFixed(2)}</span>
+                        <span class="cp-stat-label">path cost</span>
+                    </div>
+                    `
+                            : ''
+                    }
+                    <span class="cp-coverage">${cp.pipelinesWithDuration}/${cp.totalPipelines} with duration</span>
+                </div>
+                <div class="critical-path-gantt">
+                    ${cp.path
+                        .map(
+                            (node) => `
+                        <div class="cp-bar-row">
+                            <span class="cp-bar-label">${node.name}</span>
+                            <div class="cp-bar-track">
+                                <div class="cp-bar-fill" style="left: ${(node.est / cp.totalDuration) * 100}%; width: ${(node.duration / cp.totalDuration) * 100}%">
+                                    <span class="cp-bar-duration">${formatDuration(node.duration)}</span>
+                                </div>
+                            </div>
+                            <span class="cp-bar-cost">${formatCost(node.cost)}</span>
+                            <span class="cp-bar-time">${formatTime(node.eft)}</span>
+                        </div>
+                    `
+                        )
+                        .join('')}
+                </div>
+            </div>`
+    }
+
+    // Costliest Path - only show if different from critical path
+    if (stats.costliestPath) {
+        const costPath = stats.costliestPath
+        const critPath = stats.criticalPath
+        // Check if costliest path is different from critical path
+        const isDifferent =
+            !critPath ||
+            costPath.path.length !== critPath.path.length ||
+            costPath.path.some((n, i) => n.name !== critPath.path[i]?.name)
+
+        if (isDifferent) {
+            const formatDuration = (mins) => {
+                if (mins >= 60) {
+                    const hrs = Math.floor(mins / 60)
+                    const rem = mins % 60
+                    return rem > 0 ? `${hrs}h${rem}m` : `${hrs}h`
+                }
+                return `${mins}m`
+            }
+            html += `
+            <div class="stats-section costliest-path-section">
+                <div class="section-title">Costliest Path</div>
+                <div class="critical-path-summary">
+                    <div class="cp-stat">
+                        <span class="cp-stat-value" style="color: #2e7d32;">$${costPath.totalCost.toFixed(2)}</span>
+                        <span class="cp-stat-label">total cost</span>
+                    </div>
+                    ${
+                        costPath.totalDuration > 0
+                            ? `
+                    <div class="cp-stat">
+                        <span class="cp-stat-value" style="color: #2e7d32;">${formatDuration(costPath.totalDuration)}</span>
+                        <span class="cp-stat-label">duration</span>
+                    </div>
+                    `
+                            : ''
+                    }
+                    <span class="cp-coverage">${costPath.pipelinesWithCost}/${costPath.totalPipelines} with cost</span>
+                </div>
+                <div class="critical-path-gantt">
+                    ${costPath.path
+                        .map((node, i) => {
+                            const cumCost = costPath.path.slice(0, i + 1).reduce((sum, n) => sum + n.cost, 0)
+                            return `
+                        <div class="cp-bar-row">
+                            <span class="cp-bar-label">${node.name}</span>
+                            <div class="cp-bar-track">
+                                <div class="cp-bar-fill" style="left: 0; width: ${(cumCost / costPath.totalCost) * 100}%; background: linear-gradient(90deg, #a5d6a7 0%, #66bb6a 100%);">
+                                    <span class="cp-bar-duration" style="color: #1b5e20;">$${node.cost.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <span class="cp-bar-cost">$${cumCost.toFixed(2)}</span>
+                        </div>
+                    `
+                        })
+                        .join('')}
+                </div>
+            </div>`
+        }
+    }
 
     if (stats.cycles.length > 0) {
         html += `

@@ -14,8 +14,12 @@ import {
     clearSelection,
     resetGraph,
     collapseAllGroups,
+    toggleCollapseAll,
     toggleGroup,
     togglePipelinesOnly,
+    setAnalysisMode,
+    toggleAnalysisMode,
+    toggleCostLabels,
     searchNodes,
     selectSearchResult,
     showBlastRadius
@@ -50,8 +54,12 @@ window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection
 window.resetGraph = resetGraph
 window.collapseAllGroups = collapseAllGroups
+window.toggleCollapseAll = toggleCollapseAll
 window.toggleGroup = toggleGroup
 window.togglePipelinesOnly = togglePipelinesOnly
+window.setAnalysisMode = setAnalysisMode
+window.toggleAnalysisMode = toggleAnalysisMode
+window.toggleCostLabels = toggleCostLabels
 window.searchNodes = searchNodes
 window.selectSearchResult = selectSearchResult
 window.showBlastRadius = showBlastRadius

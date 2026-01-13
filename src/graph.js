@@ -1,6 +1,7 @@
 import { state, getConfigHash, getViewStateKey, clearViewStateCache, addToViewCache } from './state.js'
 import { renderAttributeGraph } from './attributes.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
+import { getCriticalPathEdges, getCriticalPathNodes, getCostliestPathEdges, getCostliestPathNodes } from './stats.js'
 
 let blastRadiusGraphInstance = null
 
@@ -373,12 +374,67 @@ export function updateGraph() {
             container.style('opacity', 1)
             isRendering = false
 
+            applyCriticalPathHighlighting()
+            if (state.showCostLabels) showCostLabels()
+
             // If there's a pending update, do it now
             if (pendingUpdate) {
                 pendingUpdate = false
                 updateGraph()
             } else {
                 setTimeout(() => precomputeAdjacentStates(), 100)
+            }
+        })
+}
+
+function applyCriticalPathHighlighting() {
+    if (!state.analysisMode) return
+
+    let pathNodes, pathEdges, nodeClass, edgeClass
+
+    if (state.analysisMode === 'critical-path') {
+        pathNodes = getCriticalPathNodes()
+        pathEdges = getCriticalPathEdges()
+        nodeClass = 'node-critical-path'
+        edgeClass = 'edge-critical-path'
+    } else if (state.analysisMode === 'costliest-path') {
+        pathNodes = getCostliestPathNodes()
+        pathEdges = getCostliestPathEdges()
+        nodeClass = 'node-costliest-path'
+        edgeClass = 'edge-costliest-path'
+    } else {
+        return
+    }
+
+    if (pathNodes.size === 0) return
+
+    // Highlight path nodes, dim others
+    d3.select('#graph')
+        .selectAll('.node')
+        .each(function () {
+            const node = d3.select(this)
+            const title = node.select('title').text()
+            if (pathNodes.has(title)) {
+                node.classed(nodeClass, true)
+            } else {
+                node.classed('node-dimmed', true)
+            }
+        })
+
+    // Highlight path edges, dim others
+    d3.select('#graph')
+        .selectAll('.edge')
+        .each(function () {
+            const edge = d3.select(this)
+            const title = edge.select('title').text()
+            const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/)
+            if (match) {
+                const edgeKey = `${match[1]}|${match[2]}`
+                if (pathEdges.has(edgeKey)) {
+                    edge.classed(edgeClass, true)
+                } else {
+                    edge.classed('edge-dimmed', true)
+                }
             }
         })
 }
@@ -737,29 +793,19 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html += `<div class="detail-label">Type</div>`
     html += `<div class="detail-value"><span class="badge bg-secondary">${nodeType}</span></div>`
 
-    // Blast Radius button - always show for any node
-    html += `<div class="mt-2 mb-2">
-        <button class="btn btn-sm btn-outline-danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">
-            ◉ Blast Radius
-        </button>
-    </div>`
+    // Action buttons
+    html += `<div class="node-actions">`
+    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">◉ Blast Radius</button>`
 
     if (nodeType === 'Pipeline Group') {
         const isExpanded = state.expandedGroups.has(nodeName)
-        html += `<div class="mt-2 mb-2">
-            <button class="btn btn-sm btn-outline-warning" onclick="toggleGroup('${nodeName}')">
-                ${isExpanded ? 'Collapse Group' : 'Expand Group'}
-            </button>
-        </div>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeName}')">${isExpanded ? 'Collapse' : 'Expand'}</button>`
     }
 
     if (nodeType === 'Pipeline' && nodeData.group && state.expandedGroups.has(nodeData.group)) {
-        html += `<div class="mt-2 mb-2">
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleGroup('${nodeData.group}')">
-                Collapse Group (${nodeData.group})
-            </button>
-        </div>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeData.group}')">Collapse ${nodeData.group}</button>`
     }
+    html += `</div>`
 
     if (nodeData.description) {
         html += `<div class="detail-label">Description</div>`
@@ -769,6 +815,66 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     if (nodeData.schedule) {
         html += `<div class="detail-label">Schedule</div>`
         html += `<div class="detail-value"><code class="text-success">${nodeData.schedule}</code></div>`
+    }
+
+    // Cost and Duration section for pipelines
+    if (nodeType === 'Pipeline' || nodeType === 'Pipeline Group') {
+        const hasDuration = nodeData.duration !== undefined
+        const hasCost = nodeData.cost !== undefined
+
+        if (hasDuration || hasCost) {
+            html += `<div class="detail-label">Runtime</div>`
+            html += `<div class="detail-value">`
+            if (hasDuration) {
+                const mins = nodeData.duration
+                const formatted =
+                    mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? (mins % 60) + 'm' : ''}` : `${mins}m`
+                html += `<span class="badge me-2" style="background-color: #f8bbd9; color: #880e4f;">${formatted}</span>`
+            }
+            if (hasCost) {
+                html += `<span class="badge" style="background-color: #e8f5e8; color: #2e7d32;">$${nodeData.cost.toFixed(2)}</span>`
+            }
+            html += `</div>`
+        }
+
+        // Compute upstream cost (sum of all upstream pipeline costs, deduplicated)
+        if (upstream && upstream.length > 0) {
+            const pipelineMap = new Map()
+            state.currentConfig.pipelines?.forEach((p) => pipelineMap.set(p.name, p))
+
+            // Deduplicate by name - each pipeline counted only once
+            const seen = new Set()
+            let upstreamCost = 0
+            let upstreamDuration = 0
+            let upstreamCount = 0
+
+            upstream.forEach((u) => {
+                if (seen.has(u.name)) return
+                seen.add(u.name)
+                const p = pipelineMap.get(u.name)
+                if (p) {
+                    upstreamCount++
+                    if (p.cost !== undefined) upstreamCost += p.cost
+                    if (p.duration !== undefined) upstreamDuration += p.duration
+                }
+            })
+
+            if (upstreamCount > 0 && (upstreamCost > 0 || upstreamDuration > 0)) {
+                html += `<div class="detail-label">Upstream Total</div>`
+                html += `<div class="detail-value">`
+                if (upstreamDuration > 0) {
+                    const mins = upstreamDuration
+                    const formatted =
+                        mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? (mins % 60) + 'm' : ''}` : `${mins}m`
+                    html += `<span class="badge me-2" style="background-color: #fce4ec; color: #ad1457;">${formatted}</span>`
+                }
+                if (upstreamCost > 0) {
+                    html += `<span class="badge" style="background-color: #e0f2f1; color: #00695c;">$${upstreamCost.toFixed(2)}</span>`
+                }
+                html += `<span class="text-muted ms-2" style="font-size: 10px;">(${upstreamCount} pipelines)</span>`
+                html += `</div>`
+            }
+        }
     }
 
     if (nodeData.type) {
@@ -1027,6 +1133,8 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 export function clearSelection() {
     state.selectedNode = null
     clearHighlights()
+    // Reapply critical path if toggle is on
+    applyCriticalPathHighlighting()
     const col = document.getElementById('node-details-col')
     const graphCol = document.getElementById('graph-col')
     if (col) col.style.display = 'none'
@@ -1037,8 +1145,12 @@ export function clearSelection() {
 }
 
 export function clearHighlights() {
-    d3.select('#graph').selectAll('.node').classed('node-highlighted node-connected node-dimmed', false)
-    d3.select('#graph').selectAll('.edge').classed('edge-highlighted edge-dimmed', false)
+    d3.select('#graph')
+        .selectAll('.node')
+        .classed('node-highlighted node-connected node-dimmed node-critical-path node-costliest-path', false)
+    d3.select('#graph')
+        .selectAll('.edge')
+        .classed('edge-highlighted edge-dimmed edge-critical-path edge-costliest-path', false)
 }
 
 export function fuzzyMatch(text, query) {
@@ -1254,17 +1366,108 @@ export function collapseAllGroups() {
     updateGraph()
 }
 
+export function toggleCollapseAll() {
+    const allGroups = getAllGroupNames()
+    const btn = document.getElementById('collapse-all-btn')
+
+    // If all groups are collapsed (expandedGroups is empty or smaller than total), expand all
+    // If all/most are expanded, collapse all
+    const allCollapsed = state.expandedGroups.size === 0
+
+    if (allCollapsed) {
+        // Expand all
+        allGroups.forEach((g) => state.expandedGroups.add(g))
+        btn.classList.remove('active')
+        btn.textContent = 'Collapse All'
+    } else {
+        // Collapse all
+        state.expandedGroups.clear()
+        btn.classList.add('active')
+        btn.textContent = 'Expand All'
+    }
+    updateGraph()
+}
+
+function getAllGroupNames() {
+    if (!state.currentConfig?.pipelines) return []
+    const groups = new Set()
+    state.currentConfig.pipelines.forEach((p) => {
+        if (p.group) groups.add(p.group)
+    })
+    return Array.from(groups)
+}
+
 export function togglePipelinesOnly() {
     state.pipelinesOnlyView = !state.pipelinesOnlyView
     const btn = document.getElementById('pipelines-only-btn')
-    if (state.pipelinesOnlyView) {
-        btn.classList.remove('btn-outline-secondary')
-        btn.classList.add('btn-secondary')
-    } else {
-        btn.classList.remove('btn-secondary')
-        btn.classList.add('btn-outline-secondary')
-    }
+    btn.classList.toggle('active', state.pipelinesOnlyView)
     updateGraph()
+}
+
+export function setAnalysisMode(mode) {
+    state.analysisMode = mode || null
+    // Clear any existing highlighting first
+    clearCriticalPathHighlighting()
+    // Apply new highlighting (no re-render needed, just CSS)
+    applyCriticalPathHighlighting()
+}
+
+export function toggleAnalysisMode(mode, checkbox) {
+    if (checkbox.checked) {
+        setAnalysisMode(mode)
+    } else {
+        setAnalysisMode(null)
+    }
+}
+
+export function toggleCostLabels(show) {
+    state.showCostLabels = show
+    if (show) {
+        showCostLabels()
+    } else {
+        hideCostLabels()
+    }
+}
+
+function showCostLabels() {
+    const pipelines = state.currentConfig?.pipelines || []
+    const pipelineMap = new Map()
+    pipelines.forEach((p) => pipelineMap.set(p.name, p))
+
+    d3.select('#graph')
+        .selectAll('.node')
+        .each(function () {
+            const node = d3.select(this)
+            const title = node.select('title').text()
+            const pipeline = pipelineMap.get(title)
+
+            if (pipeline?.cost !== undefined) {
+                // Get the node's bounding box
+                const bbox = this.getBBox()
+                const cost = pipeline.cost
+                const costText = cost >= 1 ? `$${cost.toFixed(0)}` : `$${cost.toFixed(2)}`
+
+                // Add cost label above the node
+                node.append('text')
+                    .attr('class', 'cost-label')
+                    .attr('x', bbox.x + bbox.width / 2)
+                    .attr('y', bbox.y - 4)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-size', '10px')
+                    .attr('font-weight', '600')
+                    .attr('fill', '#2e7d32')
+                    .text(costText)
+            }
+        })
+}
+
+function hideCostLabels() {
+    d3.select('#graph').selectAll('.cost-label').remove()
+}
+
+function clearCriticalPathHighlighting() {
+    d3.select('#graph').selectAll('.node').classed('node-critical-path node-costliest-path node-dimmed', false)
+    d3.select('#graph').selectAll('.edge').classed('edge-critical-path edge-costliest-path edge-dimmed', false)
 }
 
 export function toggleGroup(groupName) {

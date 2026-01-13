@@ -4,6 +4,8 @@ export const state = {
     graphviz: null,
     groupedView: true,
     pipelinesOnlyView: false,
+    analysisMode: null, // null, 'critical-path'
+    showCostLabels: false,
     expandedGroups: new Set(),
     selectedNode: null,
     // Cached lineage maps for performance
@@ -77,6 +79,8 @@ export const exampleConfig = {
             input_sources: ['raw_users', 'user_events'],
             output_sources: ['enriched_users'],
             schedule: 'Every 2 hours',
+            duration: 45,
+            cost: 18.5,
             tags: ['user-data', 'ml', 'enrichment'],
             cluster: 'user-processing',
             links: {
@@ -92,6 +96,8 @@ export const exampleConfig = {
             input_sources: ['raw_orders', 'inventory'],
             output_sources: ['processed_orders', 'order_audit'],
             schedule: 'Every 15 minutes',
+            duration: 12,
+            cost: 4.2,
             tags: ['orders', 'real-time', 'validation'],
             cluster: 'real-time',
             links: {
@@ -107,6 +113,8 @@ export const exampleConfig = {
             input_sources: ['enriched_users', 'processed_orders', 'user_events'],
             output_sources: ['daily_metrics', 'user_cohorts'],
             schedule: 'Daily at 1:00 AM',
+            duration: 90,
+            cost: 42.0,
             tags: ['analytics', 'aggregation', 'daily'],
             cluster: 'analytics',
             links: {
@@ -122,6 +130,8 @@ export const exampleConfig = {
             output_sources: ['salesforce_users'],
             group: 'data-exports',
             cluster: 'analytics',
+            duration: 8,
+            cost: 2.1,
             upstream_pipelines: ['analytics-aggregation'],
             links: {
                 airflow: 'https://airflow.company.com/dags/crm_exports'
@@ -134,6 +144,8 @@ export const exampleConfig = {
             output_sources: ['hubspot_contacts'],
             group: 'data-exports',
             cluster: 'analytics',
+            duration: 5,
+            cost: 1.8,
             upstream_pipelines: ['analytics-aggregation'],
             links: {
                 airflow: 'https://airflow.company.com/dags/crm_exports'
@@ -146,6 +158,8 @@ export const exampleConfig = {
             output_sources: ['amplitude_events'],
             group: 'data-exports',
             cluster: 'analytics',
+            duration: 3,
+            cost: 0.9,
             upstream_pipelines: ['analytics-aggregation'],
             links: {
                 airflow: 'https://airflow.company.com/dags/analytics_exports'
@@ -157,6 +171,8 @@ export const exampleConfig = {
             input_sources: ['daily_metrics', 'enriched_users'],
             output_sources: ['executive_summary'],
             schedule: '0 6 * * MON',
+            duration: 120,
+            cost: 65.0,
             cluster: 'analytics',
             upstream_pipelines: ['analytics-aggregation', 'user-enrichment'],
             links: {
