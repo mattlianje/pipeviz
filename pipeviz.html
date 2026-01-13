@@ -151,9 +151,11 @@
             }
             .table .col-name {
                 width: 200px;
+                font-size: 0.85em;
             }
             .table .col-desc {
                 width: 250px;
+                font-size: 0.8em;
             }
             .table .col-schedule {
                 width: 100px;
@@ -168,7 +170,15 @@
                 width: 160px;
             }
             .table .col-links {
-                width: 100px;
+                width: 140px;
+            }
+            .links-scroll {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3px;
+            }
+            .links-scroll a {
+                white-space: nowrap;
             }
             .table .col-owner {
                 width: 180px;
@@ -284,6 +294,30 @@
                 flex-wrap: wrap;
                 gap: 6px;
                 margin: 10px 0;
+            }
+            .format-toggle {
+                display: flex;
+                gap: 4px;
+            }
+            .export-format-btn.active,
+            .backfill-view-btn.active {
+                background: #e3f2fd;
+                border-color: #2196f3;
+                color: #1565c0;
+            }
+            [data-theme='dark'] .export-format-btn.active,
+            [data-theme='dark'] .backfill-view-btn.active {
+                background: rgba(33, 150, 243, 0.2);
+                color: #90caf9;
+            }
+            .backfill-view-btn.danger.active {
+                background: #fbe9e7;
+                border-color: #c98b8b;
+                color: #8b5a5a;
+            }
+            [data-theme='dark'] .backfill-view-btn.danger.active {
+                background: rgba(201, 139, 139, 0.15);
+                color: #e0a0a0;
             }
             #pipelines-only-btn.active,
             #collapse-all-btn.active {
@@ -2851,7 +2885,7 @@ function showDatasourceInAttributePanel(ds) {
     html += `<div class="links-section">`;
     html += `<div class="detail-label">Links</div>`;
     Object.entries(ds.links).forEach(([name, url]) => {
-      html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`;
+      html += `<a href="${url}" target="_blank" class="graph-ctrl-btn link-btn">${name}</a>`;
     });
     html += `</div>`;
   }
@@ -4482,11 +4516,11 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   }
   if (nodeData.links && Object.keys(nodeData.links).length) {
     html += `<div class="links-section">`;
-    html += `<div class="detail-label">Links</div>`;
+    html += `<div class="detail-label">Links</div><div class="node-actions">`;
     Object.entries(nodeData.links).forEach(([name, url]) => {
-      html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`;
+      html += `<a href="${url}" target="_blank" class="graph-ctrl-btn link-btn">${name}</a>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   }
   const pipelineNames = new Set((state.currentConfig.pipelines || []).map((p) => p.name));
   {
@@ -5129,9 +5163,9 @@ function renderPipelines() {
     const tags = pipeline.tags?.map(
       (t) => `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
     ).join("") || "";
-    const links = pipeline.links ? Object.entries(pipeline.links).map(
-      ([name, url]) => `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
-    ).join("") : "";
+    const links = pipeline.links ? `<div class="links-scroll">${Object.entries(pipeline.links).map(
+      ([name, url]) => `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
+    ).join("")}</div>` : "";
     html += `
             <tr class="pipeline-row"
                 data-name="${pipeline.name.toLowerCase()}"
@@ -5216,9 +5250,9 @@ function renderDatasources() {
     const tags = ds.tags?.map(
       (t) => `<span class="badge me-1 mb-1" style="background-color: #fff3cd; color: #856404; font-size: 0.85em;">${t}</span>`
     ).join("") || "";
-    const links = ds.links ? Object.entries(ds.links).map(
-      ([name, url]) => `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
-    ).join("") : "";
+    const links = ds.links ? `<div class="links-scroll">${Object.entries(ds.links).map(
+      ([name, url]) => `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
+    ).join("")}</div>` : "";
     html += `
             <tr class="datasource-row"
                 data-name="${ds.name.toLowerCase()}"
@@ -7192,18 +7226,11 @@ jq -s '{
                                     style="display: none"
                                     onchange="loadFromFile(event)"
                                 />
-                                <button
-                                    class="btn btn-outline-secondary btn-sm"
-                                    onclick="document.getElementById('file-input').click()"
-                                >
+                                <button class="graph-ctrl-btn" onclick="document.getElementById('file-input').click()">
                                     Browse
                                 </button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="loadExample()">
-                                    Load Example
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="generateShareableUrl()">
-                                    Share URL
-                                </button>
+                                <button class="graph-ctrl-btn" onclick="loadExample()">Load Example</button>
+                                <button class="graph-ctrl-btn" onclick="generateShareableUrl()">Share URL</button>
                                 <span style="color: var(--text-muted); font-size: 12px; margin-left: auto"
                                     >Auto-load: <code style="font-size: 11px">?url=your-json-url</code></span
                                 >
@@ -7365,18 +7392,10 @@ jq -s '{
                                     <div id="attribute-graph-col" class="col-md-12">
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
-                                                <div class="btn-group me-2">
-                                                    <button
-                                                        class="btn btn-sm btn-outline-warning"
-                                                        onclick="clearAttributeSelection()"
-                                                    >
-                                                        Clear Selection
-                                                    </button>
-                                                </div>
-                                                <button
-                                                    class="btn btn-sm btn-outline-secondary"
-                                                    onclick="resetAttributeGraph()"
-                                                >
+                                                <button class="graph-ctrl-btn" onclick="clearAttributeSelection()">
+                                                    Clear
+                                                </button>
+                                                <button class="graph-ctrl-btn" onclick="resetAttributeGraph()">
                                                     Reset
                                                 </button>
                                             </div>
@@ -7413,23 +7432,23 @@ jq -s '{
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h5 class="mb-0">Export</h5>
-                                    <div class="btn-group btn-group-sm">
+                                    <div class="format-toggle">
                                         <button
-                                            class="btn btn-outline-secondary export-format-btn active"
+                                            class="graph-ctrl-btn export-format-btn active"
                                             data-format="json"
                                             onclick="setExportFormat('json')"
                                         >
                                             JSON
                                         </button>
                                         <button
-                                            class="btn btn-outline-secondary export-format-btn"
+                                            class="graph-ctrl-btn export-format-btn"
                                             data-format="mermaid"
                                             onclick="setExportFormat('mermaid')"
                                         >
                                             Mermaid
                                         </button>
                                         <button
-                                            class="btn btn-outline-secondary export-format-btn"
+                                            class="graph-ctrl-btn export-format-btn"
                                             data-format="dot"
                                             onclick="setExportFormat('dot')"
                                         >
@@ -7492,21 +7511,21 @@ Load a configuration to see the graph export...</pre
                                                 </div>
                                             </div>
                                             <button
-                                                class="btn btn-outline-secondary backfill-view-btn active"
+                                                class="graph-ctrl-btn backfill-view-btn active"
                                                 data-view="pipeline"
                                                 onclick="setBackfillView('pipeline')"
                                             >
                                                 Run Order
                                             </button>
                                             <button
-                                                class="btn btn-outline-secondary backfill-view-btn"
+                                                class="graph-ctrl-btn backfill-view-btn"
                                                 data-view="airflow"
                                                 onclick="setBackfillView('airflow')"
                                             >
                                                 Airflow DAGs
                                             </button>
                                             <button
-                                                class="btn btn-outline-secondary backfill-view-btn"
+                                                class="graph-ctrl-btn backfill-view-btn danger"
                                                 data-view="blast"
                                                 onclick="setBackfillView('blast')"
                                             >

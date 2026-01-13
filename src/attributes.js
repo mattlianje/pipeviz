@@ -878,7 +878,7 @@ export function showDatasourceInAttributePanel(ds) {
         html += `<div class="links-section">`
         html += `<div class="detail-label">Links</div>`
         Object.entries(ds.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`
+            html += `<a href="${url}" target="_blank" class="graph-ctrl-btn link-btn">${name}</a>`
         })
         html += `</div>`
     }

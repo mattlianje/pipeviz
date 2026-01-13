@@ -938,11 +938,11 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 
     if (nodeData.links && Object.keys(nodeData.links).length) {
         html += `<div class="links-section">`
-        html += `<div class="detail-label">Links</div>`
+        html += `<div class="detail-label">Links</div><div class="node-actions">`
         Object.entries(nodeData.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary link-btn">${name}</a>`
+            html += `<a href="${url}" target="_blank" class="graph-ctrl-btn link-btn">${name}</a>`
         })
-        html += `</div>`
+        html += `</div></div>`
     }
 
     const pipelineNames = new Set((state.currentConfig.pipelines || []).map((p) => p.name))

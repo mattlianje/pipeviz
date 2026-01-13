@@ -50,12 +50,12 @@ export function renderPipelines() {
                 .join('') || ''
 
         const links = pipeline.links
-            ? Object.entries(pipeline.links)
+            ? `<div class="links-scroll">${Object.entries(pipeline.links)
                   .map(
                       ([name, url]) =>
-                          `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                          `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
                   )
-                  .join('')
+                  .join('')}</div>`
             : ''
 
         html += `
@@ -165,12 +165,12 @@ export function renderDatasources() {
                 .join('') || ''
 
         const links = ds.links
-            ? Object.entries(ds.links)
+            ? `<div class="links-scroll">${Object.entries(ds.links)
                   .map(
                       ([name, url]) =>
-                          `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary me-1 mb-1" style="font-size: 0.75em; padding: 2px 6px;">${name}</a>`
+                          `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
                   )
-                  .join('')
+                  .join('')}</div>`
             : ''
 
         html += `
