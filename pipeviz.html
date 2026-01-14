@@ -4008,7 +4008,7 @@ function renderGraph() {
 function initializeGraph() {
   try {
     document.getElementById("graph").innerHTML = "";
-    state.graphviz = d3.select("#graph").graphviz().width(document.getElementById("graph").clientWidth).height(500).fit(true).on("renderEnd", setupGraphInteractivity);
+    state.graphviz = d3.select("#graph").graphviz().width(document.getElementById("graph").clientWidth).height(500).fit(true);
     updateGraph();
   } catch (error) {
     console.error("Graphviz initialization error:", error);
@@ -4062,6 +4062,7 @@ function updateGraph() {
     if (renderTimeout) clearTimeout(renderTimeout);
     container.style("opacity", 1);
     isRendering = false;
+    setupGraphInteractivity(true);
     applyCriticalPathHighlighting();
     if (state.showCostLabels) showCostLabels();
     if (pendingUpdate) {
@@ -4146,10 +4147,10 @@ function precomputeAdjacentStates() {
   }
   processNext();
 }
-function setupGraphInteractivity() {
+function setupGraphInteractivity(forceRebuild = false) {
   const viewKey = getViewStateKey();
   let cached = state.viewStateCache.get(viewKey);
-  if (cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
+  if (!forceRebuild && cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
     state.cachedUpstreamMap = cached.lineage.upstreamMap;
     state.cachedDownstreamMap = cached.lineage.downstreamMap;
     state.cachedLineage = cached.lineage.nodeLineage;
