@@ -306,7 +306,6 @@ export function initializeGraph() {
             .width(document.getElementById('graph').clientWidth)
             .height(500)
             .fit(true)
-            .on('renderEnd', setupGraphInteractivity)
         updateGraph()
     } catch (error) {
         console.error('Graphviz initialization error:', error)
@@ -373,6 +372,9 @@ export function updateGraph() {
             if (renderTimeout) clearTimeout(renderTimeout)
             container.style('opacity', 1)
             isRendering = false
+
+            // Rebuild lineage from the new graph edges (force rebuild to ensure we read current DOM)
+            setupGraphInteractivity(true)
 
             applyCriticalPathHighlighting()
             if (state.showCostLabels) showCostLabels()
@@ -491,13 +493,14 @@ function precomputeAdjacentStates() {
     processNext()
 }
 
-export function setupGraphInteractivity() {
+export function setupGraphInteractivity(forceRebuild = false) {
     const viewKey = getViewStateKey()
     let cached = state.viewStateCache.get(viewKey)
 
     // Check if we have cached lineage data for this view state
     // Also verify the cache has actual data (not empty from initEnd)
-    if (cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
+    // Skip cache if forceRebuild is true (e.g., after a transition completes)
+    if (!forceRebuild && cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
         // Restore cached lineage maps
         state.cachedUpstreamMap = cached.lineage.upstreamMap
         state.cachedDownstreamMap = cached.lineage.downstreamMap
