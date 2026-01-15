@@ -22,7 +22,8 @@ import {
     toggleCostLabels,
     searchNodes,
     selectSearchResult,
-    showBlastRadius
+    showBlastRadius,
+    selectNodeFromHash
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -41,7 +42,8 @@ import {
     setBackfillView,
     toggleBackfillPicker,
     clearBackfillSelection,
-    filterBackfillPipelines
+    filterBackfillPipelines,
+    restorePlannerStateFromHash
 } from './export.js'
 import { renderStats } from './stats.js'
 
@@ -79,12 +81,15 @@ window.setBackfillView = setBackfillView
 window.toggleBackfillPicker = toggleBackfillPicker
 window.clearBackfillSelection = clearBackfillSelection
 window.filterBackfillPipelines = filterBackfillPipelines
+window.selectNodeFromHash = selectNodeFromHash
+window.restorePlannerStateFromHash = restorePlannerStateFromHash
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
     setupTabs()
     activateTabFromHash()
     document.getElementById('stats-tab')?.addEventListener('shown.bs.tab', renderStats)
+    document.getElementById('backfill-tab')?.addEventListener('shown.bs.tab', restorePlannerStateFromHash)
 })
 
 window.addEventListener('load', () => {
@@ -94,4 +99,10 @@ window.addEventListener('load', () => {
     renderSplashGraph()
 })
 
-window.addEventListener('hashchange', activateTabFromHash)
+window.addEventListener('hashchange', () => {
+    activateTabFromHash()
+    // Also try to select node from hash (handles back/forward navigation)
+    selectNodeFromHash()
+    // Also try to restore planner state from hash
+    restorePlannerStateFromHash()
+})

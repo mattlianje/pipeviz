@@ -707,6 +707,9 @@
             .backfill-pipeline-picker {
                 position: relative;
             }
+            .backfill-view-btn + .backfill-view-btn {
+                margin-left: 4px;
+            }
             @media (max-width: 768px) {
                 .backfill-view-btn {
                     font-size: 11px !important;
@@ -3772,6 +3775,80 @@ function renderPieLegend(data) {
         </div>`;
   }).join("");
 }
+function setupTabs() {
+  document.querySelectorAll("#dashboardTabs button").forEach((tab) => {
+    tab.addEventListener("shown.bs.tab", function(e) {
+      const tabs = document.getElementById("dashboardTabs");
+      const tabName = e.target.id.replace("-tab", "");
+      if (e.target.id === "home-tab") {
+        tabs.classList.add("hidden-on-home");
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      } else {
+        tabs.classList.remove("hidden-on-home");
+        const nodeParam = getNodeFromHash();
+        const newHash = nodeParam ? `${tabName}&node=${encodeURIComponent(nodeParam)}` : tabName;
+        history.replaceState(null, "", "#" + newHash);
+      }
+    });
+  });
+}
+function parseHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return { tab: null, node: null, view: null, pipelines: null };
+  const parts = hash.split("&");
+  let tab = null;
+  let node = null;
+  let view = null;
+  let pipelines = null;
+  parts.forEach((part) => {
+    if (part.startsWith("node=")) {
+      node = decodeURIComponent(part.slice(5));
+    } else if (part.startsWith("view=")) {
+      view = decodeURIComponent(part.slice(5));
+    } else if (part.startsWith("pipelines=")) {
+      pipelines = decodeURIComponent(part.slice(10)).split(",").filter((p) => p);
+    } else if (!part.includes("=")) {
+      tab = part;
+    }
+  });
+  return { tab, node, view, pipelines };
+}
+function getNodeFromHash() {
+  return parseHash().node;
+}
+function getPlannerStateFromHash() {
+  const { view, pipelines } = parseHash();
+  return { view, pipelines };
+}
+function updateHashWithNode(nodeName) {
+  const { tab } = parseHash();
+  const currentTab = tab || "graph";
+  if (nodeName) {
+    history.replaceState(null, "", `#${currentTab}&node=${encodeURIComponent(nodeName)}`);
+  } else {
+    history.replaceState(null, "", `#${currentTab}`);
+  }
+}
+function updateHashWithPlannerState(view, pipelines) {
+  const currentTab = "backfill";
+  let hash = `#${currentTab}`;
+  if (view) {
+    hash += `&view=${encodeURIComponent(view)}`;
+  }
+  if (pipelines && pipelines.length > 0) {
+    hash += `&pipelines=${pipelines.map((p) => encodeURIComponent(p)).join(",")}`;
+  }
+  history.replaceState(null, "", hash);
+}
+function activateTabFromHash() {
+  const { tab, node } = parseHash();
+  if (tab) {
+    const tabEl = document.getElementById(tab + "-tab");
+    if (tabEl) {
+      tabEl.click();
+    }
+  }
+}
 let blastRadiusGraphInstance = null;
 function generateGraphvizDot() {
   if (!state.currentConfig) return "";
@@ -4244,6 +4321,22 @@ function setupGraphInteractivity(forceRebuild = false) {
       clearSelection();
     }
   });
+  selectNodeFromHash();
+}
+function selectNodeFromHash() {
+  const nodeName = getNodeFromHash();
+  if (!nodeName) return;
+  let found = false;
+  d3.select("#graph").selectAll(".node").each(function() {
+    const nodeTitle = d3.select(this).select("title").text();
+    if (nodeTitle === nodeName) {
+      found = true;
+      selectNode(nodeName, this);
+    }
+  });
+  if (!found && state.currentConfig) {
+    showNodeDetails(nodeName);
+  }
 }
 function showNodeTooltip(event, nodeName) {
   const tooltip = document.getElementById("node-tooltip");
@@ -4322,6 +4415,7 @@ function selectNode(nodeName, nodeElement) {
   state.selectedNode = nodeName;
   clearHighlights();
   d3.select(nodeElement).classed("node-highlighted", true);
+  updateHashWithNode(nodeName);
   const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] };
   const upstream = lineage.upstream;
   const downstream = lineage.downstream;
@@ -4685,6 +4779,7 @@ function clearSelection() {
   state.selectedNode = null;
   clearHighlights();
   applyCriticalPathHighlighting();
+  updateHashWithNode(null);
   const col = document.getElementById("node-details-col");
   const graphCol = document.getElementById("graph-col");
   if (col) col.style.display = "none";
@@ -5107,30 +5202,6 @@ function initTheme() {
   if (saved === "dark") {
     document.documentElement.setAttribute("data-theme", "dark");
     document.getElementById("theme-toggle").textContent = "🌙";
-  }
-}
-function setupTabs() {
-  document.querySelectorAll("#dashboardTabs button").forEach((tab) => {
-    tab.addEventListener("shown.bs.tab", function(e) {
-      const tabs = document.getElementById("dashboardTabs");
-      const tabName = e.target.id.replace("-tab", "");
-      if (e.target.id === "home-tab") {
-        tabs.classList.add("hidden-on-home");
-        history.replaceState(null, "", window.location.pathname + window.location.search);
-      } else {
-        tabs.classList.remove("hidden-on-home");
-        history.replaceState(null, "", "#" + tabName);
-      }
-    });
-  });
-}
-function activateTabFromHash() {
-  const hash = window.location.hash.slice(1);
-  if (hash) {
-    const tab = document.getElementById(hash + "-tab");
-    if (tab) {
-      tab.click();
-    }
   }
 }
 function renderPipelines() {
@@ -5862,6 +5933,7 @@ function handlePipelineCheckChange(e) {
   updatePickerButton();
   updatePickerCount();
   updateBackfillPlan();
+  updateHashWithPlannerState(currentBackfillView, selectedBackfillPipelines);
 }
 function filterBackfillPipelines(query) {
   const list = document.getElementById("backfill-picker-list");
@@ -5908,7 +5980,7 @@ function closePickerOnClickOutside(e) {
 function clearBackfillSelection() {
   const list = document.getElementById("backfill-picker-list");
   if (list) {
-    list.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+    list.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach((cb) => {
       cb.checked = false;
     });
   }
@@ -5916,6 +5988,7 @@ function clearBackfillSelection() {
   updatePickerButton();
   updatePickerCount();
   updateBackfillPlan();
+  updateHashWithPlannerState(currentBackfillView, []);
 }
 function updatePickerButton() {
   const btn = document.getElementById("backfill-picker-btn");
@@ -5985,7 +6058,7 @@ const VIEW_HINTS = {
   airflow: "Maps pipelines to Airflow DAGs",
   blast: "Select a node to see all downstream dependencies affected by changes"
 };
-function setBackfillView(view) {
+function setBackfillView(view, skipHashUpdate = false) {
   currentBackfillView = view;
   document.querySelectorAll(".backfill-view-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -6004,6 +6077,9 @@ function setBackfillView(view) {
   populateBackfillSelect();
   updatePickerButton();
   updateBackfillPlan();
+  if (!skipHashUpdate) {
+    updateHashWithPlannerState(view, selectedBackfillPipelines);
+  }
   const dropdown = document.getElementById("backfill-picker-dropdown");
   if (dropdown && !dropdown.classList.contains("show")) {
     dropdown.classList.add("show");
@@ -6256,6 +6332,33 @@ function copyBackfillToClipboard(event) {
     }
   });
 }
+function restorePlannerStateFromHash() {
+  const { view, pipelines } = getPlannerStateFromHash();
+  if (view && ["pipeline", "airflow", "blast"].includes(view)) {
+    setBackfillView(view, true);
+  }
+  if (pipelines && pipelines.length > 0) {
+    const list = document.getElementById("backfill-picker-list");
+    if (!list) return;
+    const isBlastMode = currentBackfillView === "blast";
+    pipelines.forEach((pipelineName) => {
+      const input = list.querySelector(`input[value="${pipelineName}"]`);
+      if (input) {
+        input.checked = true;
+        if (isBlastMode) {
+          selectedBackfillPipelines = [pipelineName];
+        } else {
+          if (!selectedBackfillPipelines.includes(pipelineName)) {
+            selectedBackfillPipelines.push(pipelineName);
+          }
+        }
+      }
+    });
+    updatePickerButton();
+    updatePickerCount();
+    updateBackfillPlan();
+  }
+}
 function loadExample() {
   document.getElementById("json-input").value = JSON.stringify(exampleConfig, null, 2);
   loadJson();
@@ -6489,11 +6592,14 @@ window.setBackfillView = setBackfillView;
 window.toggleBackfillPicker = toggleBackfillPicker;
 window.clearBackfillSelection = clearBackfillSelection;
 window.filterBackfillPipelines = filterBackfillPipelines;
+window.selectNodeFromHash = selectNodeFromHash;
+window.restorePlannerStateFromHash = restorePlannerStateFromHash;
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   setupTabs();
   activateTabFromHash();
   document.getElementById("stats-tab")?.addEventListener("shown.bs.tab", renderStats);
+  document.getElementById("backfill-tab")?.addEventListener("shown.bs.tab", restorePlannerStateFromHash);
 });
 window.addEventListener("load", () => {
   setupDragDrop();
@@ -6501,7 +6607,11 @@ window.addEventListener("load", () => {
   loadFromUrl();
   renderSplashGraph();
 });
-window.addEventListener("hashchange", activateTabFromHash);</script>
+window.addEventListener("hashchange", () => {
+  activateTabFromHash();
+  selectNodeFromHash();
+  restorePlannerStateFromHash();
+});</script>
     </head>
     <body>
         <div class="container-fluid py-4">
@@ -6971,7 +7081,7 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                     "
                                 >
                                     Each pipeline declares what it reads and writes. Pipeviz stitches these into a
-                                    complete graph. From there:
+                                    complete graph. From there, you get some superpowers for free:
                                 </p>
                                 <div class="superpowers-grid">
                                     <div style="display: flex; gap: 0.5rem; align-items: flex-start">
@@ -7121,37 +7231,6 @@ window.addEventListener("hashchange", activateTabFromHash);</script>
                                         >
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Merging configs -->
-                            <div style="margin-bottom: 2rem">
-                                <div
-                                    style="
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                        margin-bottom: 0.5rem;
-                                        color: var(--text-muted);
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.5px;
-                                    "
-                                >
-                                    Merging configs
-                                </div>
-                                <pre
-                                    style="
-                                        background: var(--bg-code);
-                                        padding: 0.75rem;
-                                        font-size: 12px;
-                                        margin: 0;
-                                        overflow-x: auto;
-                                        color: var(--text-primary);
-                                    "
-                                ><span style="color: var(--text-muted);"># each team versions their own pipeviz.json</span>
-<span style="color: var(--text-muted);"># merge for org-wide view</span>
-jq -s '{
-  pipelines: map(.pipelines // []) | add,
-  datasources: map(.datasources // []) | add
-}' team-*.json > pipeviz.json</pre>
                             </div>
 
                             <!-- Motivation -->

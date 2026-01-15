@@ -707,6 +707,9 @@
             .backfill-pipeline-picker {
                 position: relative;
             }
+            .backfill-view-btn + .backfill-view-btn {
+                margin-left: 4px;
+            }
             @media (max-width: 768px) {
                 .backfill-view-btn {
                     font-size: 11px !important;
@@ -2274,7 +2277,7 @@
                                     "
                                 >
                                     Each pipeline declares what it reads and writes. Pipeviz stitches these into a
-                                    complete graph. From there:
+                                    complete graph. From there, you get some superpowers for free:
                                 </p>
                                 <div class="superpowers-grid">
                                     <div style="display: flex; gap: 0.5rem; align-items: flex-start">
@@ -2424,37 +2427,6 @@
                                         >
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Merging configs -->
-                            <div style="margin-bottom: 2rem">
-                                <div
-                                    style="
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                        margin-bottom: 0.5rem;
-                                        color: var(--text-muted);
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.5px;
-                                    "
-                                >
-                                    Merging configs
-                                </div>
-                                <pre
-                                    style="
-                                        background: var(--bg-code);
-                                        padding: 0.75rem;
-                                        font-size: 12px;
-                                        margin: 0;
-                                        overflow-x: auto;
-                                        color: var(--text-primary);
-                                    "
-                                ><span style="color: var(--text-muted);"># each team versions their own pipeviz.json</span>
-<span style="color: var(--text-muted);"># merge for org-wide view</span>
-jq -s '{
-  pipelines: map(.pipelines // []) | add,
-  datasources: map(.datasources // []) | add
-}' team-*.json > pipeviz.json</pre>
                             </div>
 
                             <!-- Motivation -->

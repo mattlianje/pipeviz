@@ -1,6 +1,7 @@
 import { state } from './state.js'
 import { generateGraphvizDot } from './graph.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
+import { updateHashWithPlannerState, getPlannerStateFromHash } from './tabs.js'
 
 const WAVE_COLORS = [
     { fill: '#e8f5e9', border: '#81c784', text: '#495057' },
@@ -535,6 +536,9 @@ function handlePipelineCheckChange(e) {
     updatePickerButton()
     updatePickerCount()
     updateBackfillPlan()
+
+    // Update URL hash
+    updateHashWithPlannerState(currentBackfillView, selectedBackfillPipelines)
 }
 
 export function filterBackfillPipelines(query) {
@@ -588,7 +592,7 @@ function closePickerOnClickOutside(e) {
 export function clearBackfillSelection() {
     const list = document.getElementById('backfill-picker-list')
     if (list) {
-        list.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        list.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach((cb) => {
             cb.checked = false
         })
     }
@@ -596,6 +600,9 @@ export function clearBackfillSelection() {
     updatePickerButton()
     updatePickerCount()
     updateBackfillPlan()
+
+    // Update URL hash
+    updateHashWithPlannerState(currentBackfillView, [])
 }
 
 function updatePickerButton() {
@@ -674,7 +681,7 @@ const VIEW_HINTS = {
     blast: 'Select a node to see all downstream dependencies affected by changes'
 }
 
-export function setBackfillView(view) {
+export function setBackfillView(view, skipHashUpdate = false) {
     currentBackfillView = view
 
     document.querySelectorAll('.backfill-view-btn').forEach((btn) => {
@@ -697,6 +704,11 @@ export function setBackfillView(view) {
     populateBackfillSelect()
     updatePickerButton()
     updateBackfillPlan()
+
+    // Update URL hash
+    if (!skipHashUpdate) {
+        updateHashWithPlannerState(view, selectedBackfillPipelines)
+    }
 
     // Show picker dropdown when view is clicked
     const dropdown = document.getElementById('backfill-picker-dropdown')
@@ -1012,4 +1024,39 @@ export function copyBackfillToClipboard(event) {
             }, 1500)
         }
     })
+}
+
+export function restorePlannerStateFromHash() {
+    const { view, pipelines } = getPlannerStateFromHash()
+
+    // Set the view if specified (without updating hash since we're restoring from it)
+    if (view && ['pipeline', 'airflow', 'blast'].includes(view)) {
+        setBackfillView(view, true)
+    }
+
+    // Select the pipelines if specified
+    if (pipelines && pipelines.length > 0) {
+        const list = document.getElementById('backfill-picker-list')
+        if (!list) return
+
+        const isBlastMode = currentBackfillView === 'blast'
+
+        pipelines.forEach((pipelineName) => {
+            const input = list.querySelector(`input[value="${pipelineName}"]`)
+            if (input) {
+                input.checked = true
+                if (isBlastMode) {
+                    selectedBackfillPipelines = [pipelineName]
+                } else {
+                    if (!selectedBackfillPipelines.includes(pipelineName)) {
+                        selectedBackfillPipelines.push(pipelineName)
+                    }
+                }
+            }
+        })
+
+        updatePickerButton()
+        updatePickerCount()
+        updateBackfillPlan()
+    }
 }

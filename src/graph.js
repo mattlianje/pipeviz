@@ -2,6 +2,7 @@ import { state, getConfigHash, getViewStateKey, clearViewStateCache, addToViewCa
 import { renderAttributeGraph } from './attributes.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
 import { getCriticalPathEdges, getCriticalPathNodes, getCostliestPathEdges, getCostliestPathNodes } from './stats.js'
+import { updateHashWithNode, getNodeFromHash } from './tabs.js'
 
 let blastRadiusGraphInstance = null
 
@@ -619,6 +620,31 @@ export function setupGraphInteractivity(forceRebuild = false) {
             clearSelection()
         }
     })
+
+    // Check for node in URL hash and select it
+    selectNodeFromHash()
+}
+
+export function selectNodeFromHash() {
+    const nodeName = getNodeFromHash()
+    if (!nodeName) return
+
+    // Find and select the node in the graph
+    let found = false
+    d3.select('#graph')
+        .selectAll('.node')
+        .each(function () {
+            const nodeTitle = d3.select(this).select('title').text()
+            if (nodeTitle === nodeName) {
+                found = true
+                selectNode(nodeName, this)
+            }
+        })
+
+    // If node not found in graph (maybe it's a datasource not currently shown), show details anyway
+    if (!found && state.currentConfig) {
+        showNodeDetails(nodeName)
+    }
 }
 
 export function showNodeTooltip(event, nodeName) {
@@ -692,6 +718,9 @@ export function selectNode(nodeName, nodeElement) {
     state.selectedNode = nodeName
     clearHighlights()
     d3.select(nodeElement).classed('node-highlighted', true)
+
+    // Update URL with selected node
+    updateHashWithNode(nodeName)
 
     const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
     const upstream = lineage.upstream
@@ -1138,6 +1167,8 @@ export function clearSelection() {
     clearHighlights()
     // Reapply critical path if toggle is on
     applyCriticalPathHighlighting()
+    // Clear node from URL
+    updateHashWithNode(null)
     const col = document.getElementById('node-details-col')
     const graphCol = document.getElementById('graph-col')
     if (col) col.style.display = 'none'
