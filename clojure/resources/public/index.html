@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeviz</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        header p { color: var(--text-secondary); }
+
+        #drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        #drop-zone:hover {
+            border-color: var(--text-secondary);
+            background: var(--bg-secondary);
+        }
+
+        #drop-zone.dragover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+
+        #file-input { display: none; }
+
+        #graph {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-height: 500px;
+            background: var(--bg-secondary);
+        }
+
+        #graph svg { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pipeviz</h1>
+            <p>Data pipeline visualization</p>
+        </header>
+
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <p>Drop a pipeviz.json here or click to select</p>
+            <input type="file" id="file-input" accept=".json">
+        </div>
+
+        <div id="graph"></div>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+</html>
