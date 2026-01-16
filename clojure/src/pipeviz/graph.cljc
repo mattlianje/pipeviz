@@ -1,5 +1,5 @@
 (ns pipeviz.graph
-  "Pure business logic for graph operations - no DOM, no JS interop"
+  "Core logic for Pipeviz graph operations ... no DOM no JS interop"
   (:require [clojure.string :as str]))
 
 ;; Example config
