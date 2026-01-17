@@ -23,7 +23,8 @@ import {
     searchNodes,
     selectSearchResult,
     showBlastRadius,
-    selectNodeFromHash
+    selectNodeFromHash,
+    restoreBlastRadiusFromHash
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -83,6 +84,7 @@ window.clearBackfillSelection = clearBackfillSelection
 window.filterBackfillPipelines = filterBackfillPipelines
 window.selectNodeFromHash = selectNodeFromHash
 window.restorePlannerStateFromHash = restorePlannerStateFromHash
+window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
@@ -105,4 +107,6 @@ window.addEventListener('hashchange', () => {
     selectNodeFromHash()
     // Also try to restore planner state from hash
     restorePlannerStateFromHash()
+    // Also try to restore blast radius from hash
+    restoreBlastRadiusFromHash()
 })

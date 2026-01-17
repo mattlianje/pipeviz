@@ -19,13 +19,14 @@ export function setupTabs() {
 
 export function parseHash() {
     const hash = window.location.hash.slice(1)
-    if (!hash) return { tab: null, node: null, view: null, pipelines: null }
+    if (!hash) return { tab: null, node: null, view: null, pipelines: null, blast: null }
 
     const parts = hash.split('&')
     let tab = null
     let node = null
     let view = null
     let pipelines = null
+    let blast = null
 
     parts.forEach((part) => {
         if (part.startsWith('node=')) {
@@ -36,12 +37,14 @@ export function parseHash() {
             pipelines = decodeURIComponent(part.slice(10))
                 .split(',')
                 .filter((p) => p)
+        } else if (part.startsWith('blast=')) {
+            blast = decodeURIComponent(part.slice(6))
         } else if (!part.includes('=')) {
             tab = part
         }
     })
 
-    return { tab, node, view, pipelines }
+    return { tab, node, view, pipelines, blast }
 }
 
 export function getNodeFromHash() {
@@ -51,6 +54,33 @@ export function getNodeFromHash() {
 export function getPlannerStateFromHash() {
     const { view, pipelines } = parseHash()
     return { view, pipelines }
+}
+
+export function getBlastFromHash() {
+    return parseHash().blast
+}
+
+export function updateHashWithBlast(nodeName) {
+    const { tab, node } = parseHash()
+    const currentTab = tab || 'graph'
+    let hash = `#${currentTab}`
+    if (node) {
+        hash += `&node=${encodeURIComponent(node)}`
+    }
+    if (nodeName) {
+        hash += `&blast=${encodeURIComponent(nodeName)}`
+    }
+    history.replaceState(null, '', hash)
+}
+
+export function clearBlastFromHash() {
+    const { tab, node } = parseHash()
+    const currentTab = tab || 'graph'
+    let hash = `#${currentTab}`
+    if (node) {
+        hash += `&node=${encodeURIComponent(node)}`
+    }
+    history.replaceState(null, '', hash)
 }
 
 export function updateHashWithNode(nodeName) {

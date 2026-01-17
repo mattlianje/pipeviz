@@ -2,7 +2,7 @@ import { state, getConfigHash, getViewStateKey, clearViewStateCache, addToViewCa
 import { renderAttributeGraph } from './attributes.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
 import { getCriticalPathEdges, getCriticalPathNodes, getCostliestPathEdges, getCostliestPathNodes } from './stats.js'
-import { updateHashWithNode, getNodeFromHash } from './tabs.js'
+import { updateHashWithNode, getNodeFromHash, updateHashWithBlast, clearBlastFromHash, getBlastFromHash } from './tabs.js'
 
 let blastRadiusGraphInstance = null
 
@@ -623,6 +623,9 @@ export function setupGraphInteractivity(forceRebuild = false) {
 
     // Check for node in URL hash and select it
     selectNodeFromHash()
+
+    // Check for blast radius in URL hash and show it
+    restoreBlastRadiusFromHash()
 }
 
 export function selectNodeFromHash() {
@@ -644,6 +647,13 @@ export function selectNodeFromHash() {
     // If node not found in graph (maybe it's a datasource not currently shown), show details anyway
     if (!found && state.currentConfig) {
         showNodeDetails(nodeName)
+    }
+}
+
+export function restoreBlastRadiusFromHash() {
+    const blastNode = getBlastFromHash()
+    if (blastNode && state.currentConfig) {
+        showBlastRadius(blastNode)
     }
 }
 
@@ -1521,6 +1531,19 @@ export function showBlastRadius(nodeName) {
     const nodeNameEl = document.getElementById('blast-radius-node-name')
 
     if (!modal || !graphContainer || !summaryContainer) return
+
+    // Update URL with blast parameter
+    updateHashWithBlast(nodeName)
+
+    // Clear blast param when modal is hidden
+    modal.addEventListener(
+        'hidden.bs.modal',
+        function onHidden() {
+            modal.removeEventListener('hidden.bs.modal', onHidden)
+            clearBlastFromHash()
+        },
+        { once: true }
+    )
 
     // Reset the graph container completely to avoid zoom issues
     graphContainer.innerHTML = ''
