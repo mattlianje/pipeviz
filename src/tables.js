@@ -1,4 +1,5 @@
 import { state } from './state.js'
+import { formatSchedule } from './cron.js'
 
 export function renderPipelines() {
     if (!state.currentConfig || !state.currentConfig.pipelines) return
@@ -66,7 +67,7 @@ export function renderPipelines() {
                 data-tags="${(pipeline.tags || []).join(',').toLowerCase()}">
                 <td class="col-name"><div><strong>${pipeline.name}</strong></div></td>
                 <td class="col-desc"><div>${pipeline.description || ''}</div></td>
-                <td class="col-schedule"><div><code class="text-success">${pipeline.schedule || ''}</code></div></td>
+                <td class="col-schedule"><div><code class="text-success">${formatSchedule(pipeline.schedule) || ''}</code></div></td>
                 <td class="col-sources"><div>${inputSources}</div></td>
                 <td class="col-sources"><div>${outputSources}</div></td>
                 <td class="col-cluster"><div>${cluster}</div></td>

@@ -379,6 +379,68 @@
                 background: #66bb6a;
                 box-shadow: 0 0 6px #66bb6a;
             }
+            .overflow-menu-container {
+                position: relative;
+            }
+            .overflow-menu-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+                font-family: inherit;
+                line-height: 1;
+            }
+            .overflow-menu-btn:hover {
+                border-color: var(--text-muted);
+                color: var(--text-primary);
+            }
+            .overflow-menu {
+                display: none;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                margin-top: 4px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                z-index: 100;
+                min-width: 160px;
+            }
+            .overflow-menu.show {
+                display: block;
+            }
+            .overflow-menu-item {
+                display: block;
+                padding: 8px 12px;
+                font-size: 11px;
+                color: var(--text-primary);
+                cursor: pointer;
+                border: none;
+                background: none;
+                width: 100%;
+                text-align: left;
+            }
+            .overflow-menu-item:hover {
+                background: var(--bg-secondary);
+            }
+            .overflow-menu-item.active {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            [data-theme='dark'] .overflow-menu-item.active {
+                background: rgba(33, 150, 243, 0.2);
+                color: #90caf9;
+            }
+            .overflow-menu-divider {
+                height: 1px;
+                background: var(--border-color);
+                margin: 4px 0;
+            }
             #graph svg {
                 width: 100%;
                 height: 500px;
@@ -1248,7 +1310,7 @@
             [data-theme='dark'] #graph .node text,
             [data-theme='dark'] #splash-graph .node text,
             [data-theme='dark'] #attribute-graph .node text {
-                fill: #000;
+                fill: #1a1a1a !important;
             }
             /* Preserve schedule magenta color in nodes */
             [data-theme='dark'] #graph .node text[fill='#d63384'],
@@ -3604,7 +3666,7 @@ function renderStats() {
       }
       return `${mins}m`;
     };
-    const formatTime = (mins) => {
+    const formatTime2 = (mins) => {
       const hrs = Math.floor(mins / 60);
       const rem = mins % 60;
       return `${String(hrs).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
@@ -3637,7 +3699,7 @@ function renderStats() {
                                 </div>
                             </div>
                             <span class="cp-bar-cost">${formatCost(node.cost)}</span>
-                            <span class="cp-bar-time">${formatTime(node.eft)}</span>
+                            <span class="cp-bar-time">${formatTime2(node.eft)}</span>
                         </div>
                     `
     ).join("")}
@@ -3794,12 +3856,13 @@ function setupTabs() {
 }
 function parseHash() {
   const hash = window.location.hash.slice(1);
-  if (!hash) return { tab: null, node: null, view: null, pipelines: null };
+  if (!hash) return { tab: null, node: null, view: null, pipelines: null, blast: null };
   const parts = hash.split("&");
   let tab = null;
   let node = null;
   let view = null;
   let pipelines = null;
+  let blast = null;
   parts.forEach((part) => {
     if (part.startsWith("node=")) {
       node = decodeURIComponent(part.slice(5));
@@ -3807,11 +3870,13 @@ function parseHash() {
       view = decodeURIComponent(part.slice(5));
     } else if (part.startsWith("pipelines=")) {
       pipelines = decodeURIComponent(part.slice(10)).split(",").filter((p) => p);
+    } else if (part.startsWith("blast=")) {
+      blast = decodeURIComponent(part.slice(6));
     } else if (!part.includes("=")) {
       tab = part;
     }
   });
-  return { tab, node, view, pipelines };
+  return { tab, node, view, pipelines, blast };
 }
 function getNodeFromHash() {
   return parseHash().node;
@@ -3819,6 +3884,30 @@ function getNodeFromHash() {
 function getPlannerStateFromHash() {
   const { view, pipelines } = parseHash();
   return { view, pipelines };
+}
+function getBlastFromHash() {
+  return parseHash().blast;
+}
+function updateHashWithBlast(nodeName) {
+  const { tab, node } = parseHash();
+  const currentTab = tab || "graph";
+  let hash = `#${currentTab}`;
+  if (node) {
+    hash += `&node=${encodeURIComponent(node)}`;
+  }
+  if (nodeName) {
+    hash += `&blast=${encodeURIComponent(nodeName)}`;
+  }
+  history.replaceState(null, "", hash);
+}
+function clearBlastFromHash() {
+  const { tab, node } = parseHash();
+  const currentTab = tab || "graph";
+  let hash = `#${currentTab}`;
+  if (node) {
+    hash += `&node=${encodeURIComponent(node)}`;
+  }
+  history.replaceState(null, "", hash);
 }
 function updateHashWithNode(nodeName) {
   const { tab } = parseHash();
@@ -3848,6 +3937,124 @@ function activateTabFromHash() {
       tabEl.click();
     }
   }
+}
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
+function isCron(str) {
+  if (!str || typeof str !== "string") return false;
+  const parts = str.trim().split(/\s+/);
+  return parts.length === 5 && parts.every((p) => /^[\d,\-\*\/A-Za-z]+$/.test(p));
+}
+function parseField(field, max, names = null) {
+  if (field === "*") return null;
+  if (field.startsWith("*/")) {
+    return { every: parseInt(field.slice(2), 10) };
+  }
+  if (field.includes("-") && !field.includes(",")) {
+    const [start, end] = field.split("-");
+    const startVal = names ? parseNamedValue(start, names) : parseInt(start, 10);
+    const endVal = names ? parseNamedValue(end, names) : parseInt(end, 10);
+    return { range: [startVal, endVal] };
+  }
+  if (field.includes(",")) {
+    const values = field.split(",").map((v) => names ? parseNamedValue(v, names) : parseInt(v, 10));
+    return { list: values };
+  }
+  const val = names ? parseNamedValue(field, names) : parseInt(field, 10);
+  return { value: val };
+}
+function parseNamedValue(val, names) {
+  const upper = val.toUpperCase();
+  const idx = names.findIndex((n) => n.toUpperCase().startsWith(upper));
+  return idx !== -1 ? idx : parseInt(val, 10);
+}
+function formatTime(hour, minute) {
+  const h = hour % 12 || 12;
+  const ampm = hour < 12 ? "AM" : "PM";
+  const m = minute.toString().padStart(2, "0");
+  return m === "00" ? `${h} ${ampm}` : `${h}:${m} ${ampm}`;
+}
+function formatOrdinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function cronToHuman(schedule) {
+  if (!schedule) return "";
+  if (!isCron(schedule)) return schedule;
+  const parts = schedule.trim().split(/\s+/);
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  const minParsed = parseField(minute);
+  const hourParsed = parseField(hour);
+  const domParsed = parseField(dayOfMonth);
+  const monthParsed = parseField(month, 12, MONTHS);
+  const dowParsed = parseField(dayOfWeek, 6, DAYS_SHORT);
+  let result = "";
+  if (minParsed?.every && !hourParsed && !domParsed && !monthParsed && !dowParsed) {
+    return `Every ${minParsed.every} minutes`;
+  }
+  if (hourParsed?.every && (minute === "0" || minute === "*") && !domParsed && !monthParsed && !dowParsed) {
+    return `Every ${hourParsed.every} hours`;
+  }
+  let timeStr = "";
+  if (hourParsed?.value !== void 0 && minParsed?.value !== void 0) {
+    timeStr = formatTime(hourParsed.value, minParsed.value);
+  } else if (hourParsed?.value !== void 0 && !minParsed) {
+    timeStr = formatTime(hourParsed.value, 0);
+  } else if (minParsed?.value !== void 0 && minute !== "0") {
+    timeStr = `:${minParsed.value.toString().padStart(2, "0")}`;
+  }
+  if (dowParsed && !domParsed && !monthParsed) {
+    if (dowParsed.range) {
+      const [start, end] = dowParsed.range;
+      if (start === 1 && end === 5) {
+        result = "Weekdays";
+      } else if (start === 0 && end === 6) {
+        result = "Daily";
+      } else {
+        result = `${DAYS[start]}-${DAYS[end]}`;
+      }
+    } else if (dowParsed.list) {
+      result = dowParsed.list.map((d) => DAYS_SHORT[d]).join(", ");
+    } else if (dowParsed.value !== void 0) {
+      result = DAYS[dowParsed.value] + "s";
+    }
+    if (timeStr) result += ` at ${timeStr}`;
+    return result;
+  }
+  if (domParsed && !dowParsed) {
+    if (domParsed.value !== void 0) {
+      result = formatOrdinal(domParsed.value) + " of ";
+      if (monthParsed?.value !== void 0) {
+        result += MONTHS[monthParsed.value - 1];
+      } else {
+        result += "each month";
+      }
+    }
+    if (timeStr) result += ` at ${timeStr}`;
+    return result;
+  }
+  if (!domParsed && !dowParsed && !monthParsed && timeStr) {
+    return `Daily at ${timeStr}`;
+  }
+  return schedule;
+}
+function formatSchedule(schedule) {
+  return cronToHuman(schedule);
 }
 let blastRadiusGraphInstance = null;
 function generateGraphvizDot() {
@@ -3983,7 +4190,8 @@ ${"    ".repeat(depth + 2)}fontname="Arial";
         const pipeline = item.node;
         const isGroup = pipeline._isGroup;
         const memberCount = pipeline._members?.length || 0;
-        const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : pipeline.schedule ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` : `"${pipeline.name}"`;
+        const scheduleDisplay = formatSchedule(pipeline.schedule);
+        const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : scheduleDisplay ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>` : `"${pipeline.name}"`;
         const fillColor = isGroup ? "#e0f2f1" : "#e3f2fd";
         const borderColor = isGroup ? "#00897b" : "#1976d2";
         const penWidth = isGroup ? "2" : "1";
@@ -4017,7 +4225,8 @@ ${"    ".repeat(depth + 3)}fontname="Arial", fontsize=10];
       const pipeline = item.node;
       const isGroup = pipeline._isGroup;
       const memberCount = pipeline._members?.length || 0;
-      const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : pipeline.schedule ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>` : `"${pipeline.name}"`;
+      const scheduleDisplay = formatSchedule(pipeline.schedule);
+      const label = isGroup ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>` : scheduleDisplay ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>` : `"${pipeline.name}"`;
       const fillColor = isGroup ? "#e0f2f1" : "#e3f2fd";
       const borderColor = isGroup ? "#00897b" : "#1976d2";
       const penWidth = isGroup ? "2" : "1";
@@ -4322,6 +4531,7 @@ function setupGraphInteractivity(forceRebuild = false) {
     }
   });
   selectNodeFromHash();
+  restoreBlastRadiusFromHash();
 }
 function selectNodeFromHash() {
   const nodeName = getNodeFromHash();
@@ -4336,6 +4546,12 @@ function selectNodeFromHash() {
   });
   if (!found && state.currentConfig) {
     showNodeDetails(nodeName);
+  }
+}
+function restoreBlastRadiusFromHash() {
+  const blastNode = getBlastFromHash();
+  if (blastNode && state.currentConfig) {
+    showBlastRadius(blastNode);
   }
 }
 function showNodeTooltip(event, nodeName) {
@@ -4363,7 +4579,7 @@ Members: ${groupMembers.map((p) => p.name).join(", ")}`;
     if (pipeline.description) content += `
 Description: ${pipeline.description}`;
     if (pipeline.schedule) content += `
-Schedule: ${pipeline.schedule}`;
+Schedule: ${formatSchedule(pipeline.schedule)}`;
     if (pipeline.cluster) content += `
 Cluster: ${pipeline.cluster}`;
     if (pipeline.tags && pipeline.tags.length > 0) content += `
@@ -4518,7 +4734,7 @@ function showNodeDetails(nodeName, upstream = [], downstream = []) {
   }
   if (nodeData.schedule) {
     html += `<div class="detail-label">Schedule</div>`;
-    html += `<div class="detail-value"><code class="text-success">${nodeData.schedule}</code></div>`;
+    html += `<div class="detail-value"><code class="text-success">${formatSchedule(nodeData.schedule)}</code></div>`;
   }
   if (nodeType === "Pipeline" || nodeType === "Pipeline Group") {
     const hasDuration = nodeData.duration !== void 0;
@@ -5046,6 +5262,15 @@ function showBlastRadius(nodeName) {
   const summaryContainer = document.getElementById("blast-radius-summary");
   const nodeNameEl = document.getElementById("blast-radius-node-name");
   if (!modal || !graphContainer || !summaryContainer) return;
+  updateHashWithBlast(nodeName);
+  modal.addEventListener(
+    "hidden.bs.modal",
+    function onHidden() {
+      modal.removeEventListener("hidden.bs.modal", onHidden);
+      clearBlastFromHash();
+    },
+    { once: true }
+  );
   graphContainer.innerHTML = "";
   blastRadiusGraphInstance = null;
   nodeNameEl.textContent = nodeName;
@@ -5182,6 +5407,44 @@ function showBlastRadius(nodeName) {
   );
   bsModal.show();
 }
+function toggleOverflowMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById("graph-overflow-menu");
+  menu.classList.toggle("show");
+  updateOverflowMenuState();
+}
+function updateOverflowMenuState() {
+  const pipelinesOnlyBtn = document.getElementById("pipelines-only-btn");
+  const cpMenuItem = document.getElementById("cp-menu-item");
+  const costMenuItem = document.getElementById("cost-menu-item");
+  if (pipelinesOnlyBtn) {
+    pipelinesOnlyBtn.classList.toggle("active", state.pipelinesOnlyView);
+  }
+  if (cpMenuItem) {
+    cpMenuItem.classList.toggle("active", state.analysisMode === "critical-path");
+  }
+  if (costMenuItem) {
+    costMenuItem.classList.toggle("active", state.showCostLabels);
+  }
+}
+function toggleAnalysisModeFromMenu(mode) {
+  if (state.analysisMode === mode) {
+    setAnalysisMode(null);
+  } else {
+    setAnalysisMode(mode);
+  }
+  updateOverflowMenuState();
+}
+function toggleCostLabelsFromMenu() {
+  toggleCostLabels(!state.showCostLabels);
+  updateOverflowMenuState();
+}
+document.addEventListener("click", function(e) {
+  const menu = document.getElementById("graph-overflow-menu");
+  if (menu && !e.target.closest(".overflow-menu-container")) {
+    menu.classList.remove("show");
+  }
+});
 function toggleTheme() {
   const html = document.documentElement;
   const btn = document.getElementById("theme-toggle");
@@ -5246,7 +5509,7 @@ function renderPipelines() {
                 data-tags="${(pipeline.tags || []).join(",").toLowerCase()}">
                 <td class="col-name"><div><strong>${pipeline.name}</strong></div></td>
                 <td class="col-desc"><div>${pipeline.description || ""}</div></td>
-                <td class="col-schedule"><div><code class="text-success">${pipeline.schedule || ""}</code></div></td>
+                <td class="col-schedule"><div><code class="text-success">${formatSchedule(pipeline.schedule) || ""}</code></div></td>
                 <td class="col-sources"><div>${inputSources}</div></td>
                 <td class="col-sources"><div>${outputSources}</div></td>
                 <td class="col-cluster"><div>${cluster}</div></td>
@@ -6594,6 +6857,11 @@ window.clearBackfillSelection = clearBackfillSelection;
 window.filterBackfillPipelines = filterBackfillPipelines;
 window.selectNodeFromHash = selectNodeFromHash;
 window.restorePlannerStateFromHash = restorePlannerStateFromHash;
+window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash;
+window.toggleOverflowMenu = toggleOverflowMenu;
+window.updateOverflowMenuState = updateOverflowMenuState;
+window.toggleAnalysisModeFromMenu = toggleAnalysisModeFromMenu;
+window.toggleCostLabelsFromMenu = toggleCostLabelsFromMenu;
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   setupTabs();
@@ -6611,6 +6879,7 @@ window.addEventListener("hashchange", () => {
   activateTabFromHash();
   selectNodeFromHash();
   restorePlannerStateFromHash();
+  restoreBlastRadiusFromHash();
 });</script>
     </head>
     <body>
@@ -6621,9 +6890,9 @@ window.addEventListener("hashchange", () => {
                         <a
                             href="https://github.com/mattlianje/pipeviz"
                             target="_blank"
-                            style="color: var(--text-muted); font-size: 13px; text-decoration: none"
+                            style="color: var(--text-muted); font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;"
                             title="GitHub"
-                            >github</a
+                            ><svg height="14" width="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a
                         >
                         <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">
                             ☀️
@@ -7386,38 +7655,47 @@ window.addEventListener("hashchange", () => {
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
                                                 <button
-                                                    class="graph-ctrl-btn"
-                                                    onclick="togglePipelinesOnly()"
-                                                    id="pipelines-only-btn"
-                                                >
-                                                    Pipelines Only
-                                                </button>
-                                                <button
                                                     class="graph-ctrl-btn active"
                                                     onclick="toggleCollapseAll()"
                                                     id="collapse-all-btn"
                                                 >
                                                     Expand All
                                                 </button>
-                                                <button class="graph-ctrl-btn" onclick="clearSelection()">Clear</button>
                                                 <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
-                                                <div class="analysis-toggle ms-auto">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="cp-toggle"
-                                                        onchange="toggleAnalysisMode('critical-path', this)"
-                                                    />
-                                                    <label for="cp-toggle"
-                                                        ><span class="cp-indicator"></span>Critical Path</label
+                                                <div class="overflow-menu-container ms-auto">
+                                                    <button
+                                                        class="overflow-menu-btn"
+                                                        onclick="toggleOverflowMenu(event)"
                                                     >
-                                                    <input
-                                                        type="checkbox"
-                                                        id="cost-toggle"
-                                                        onchange="toggleCostLabels(this.checked)"
-                                                    />
-                                                    <label for="cost-toggle"
-                                                        ><span class="cost-indicator"></span>Show Costs</label
-                                                    >
+                                                        ⋯
+                                                    </button>
+                                                    <div class="overflow-menu" id="graph-overflow-menu">
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="pipelines-only-btn"
+                                                            onclick="
+                                                                togglePipelinesOnly()
+                                                                updateOverflowMenuState()
+                                                            "
+                                                        >
+                                                            Pipelines Only
+                                                        </button>
+                                                        <div class="overflow-menu-divider"></div>
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="cp-menu-item"
+                                                            onclick="toggleAnalysisModeFromMenu('critical-path')"
+                                                        >
+                                                            Critical Path
+                                                        </button>
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="cost-menu-item"
+                                                            onclick="toggleCostLabelsFromMenu()"
+                                                        >
+                                                            Show Costs
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div id="graph">
@@ -7472,9 +7750,6 @@ window.addEventListener("hashchange", () => {
                                     <div id="attribute-graph-col" class="col-md-12">
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
-                                                <button class="graph-ctrl-btn" onclick="clearAttributeSelection()">
-                                                    Clear
-                                                </button>
                                                 <button class="graph-ctrl-btn" onclick="resetAttributeGraph()">
                                                     Reset
                                                 </button>

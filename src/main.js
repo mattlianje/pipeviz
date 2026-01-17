@@ -24,7 +24,11 @@ import {
     selectSearchResult,
     showBlastRadius,
     selectNodeFromHash,
-    restoreBlastRadiusFromHash
+    restoreBlastRadiusFromHash,
+    toggleOverflowMenu,
+    updateOverflowMenuState,
+    toggleAnalysisModeFromMenu,
+    toggleCostLabelsFromMenu
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -85,6 +89,10 @@ window.filterBackfillPipelines = filterBackfillPipelines
 window.selectNodeFromHash = selectNodeFromHash
 window.restorePlannerStateFromHash = restorePlannerStateFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
+window.toggleOverflowMenu = toggleOverflowMenu
+window.updateOverflowMenuState = updateOverflowMenuState
+window.toggleAnalysisModeFromMenu = toggleAnalysisModeFromMenu
+window.toggleCostLabelsFromMenu = toggleCostLabelsFromMenu
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
