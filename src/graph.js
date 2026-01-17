@@ -2,7 +2,8 @@ import { state, getConfigHash, getViewStateKey, clearViewStateCache, addToViewCa
 import { renderAttributeGraph } from './attributes.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
 import { getCriticalPathEdges, getCriticalPathNodes, getCostliestPathEdges, getCostliestPathNodes } from './stats.js'
-import { updateHashWithNode, getNodeFromHash } from './tabs.js'
+import { updateHashWithNode, getNodeFromHash, updateHashWithBlast, clearBlastFromHash, getBlastFromHash } from './tabs.js'
+import { formatSchedule } from './cron.js'
 
 let blastRadiusGraphInstance = null
 
@@ -181,10 +182,11 @@ ${'    '.repeat(depth + 2)}fontname="Arial";
                 const pipeline = item.node
                 const isGroup = pipeline._isGroup
                 const memberCount = pipeline._members?.length || 0
+                const scheduleDisplay = formatSchedule(pipeline.schedule)
                 const label = isGroup
                     ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
-                    : pipeline.schedule
-                      ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>`
+                    : scheduleDisplay
+                      ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
                       : `"${pipeline.name}"`
                 const fillColor = isGroup ? '#e0f2f1' : '#e3f2fd'
                 const borderColor = isGroup ? '#00897b' : '#1976d2'
@@ -223,10 +225,11 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
             const pipeline = item.node
             const isGroup = pipeline._isGroup
             const memberCount = pipeline._members?.length || 0
+            const scheduleDisplay = formatSchedule(pipeline.schedule)
             const label = isGroup
                 ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
-                : pipeline.schedule
-                  ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${pipeline.schedule}</I></FONT>>`
+                : scheduleDisplay
+                  ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
                   : `"${pipeline.name}"`
             const fillColor = isGroup ? '#e0f2f1' : '#e3f2fd'
             const borderColor = isGroup ? '#00897b' : '#1976d2'
@@ -623,6 +626,9 @@ export function setupGraphInteractivity(forceRebuild = false) {
 
     // Check for node in URL hash and select it
     selectNodeFromHash()
+
+    // Check for blast radius in URL hash and show it
+    restoreBlastRadiusFromHash()
 }
 
 export function selectNodeFromHash() {
@@ -644,6 +650,13 @@ export function selectNodeFromHash() {
     // If node not found in graph (maybe it's a datasource not currently shown), show details anyway
     if (!found && state.currentConfig) {
         showNodeDetails(nodeName)
+    }
+}
+
+export function restoreBlastRadiusFromHash() {
+    const blastNode = getBlastFromHash()
+    if (blastNode && state.currentConfig) {
+        showBlastRadius(blastNode)
     }
 }
 
@@ -671,7 +684,7 @@ export function showNodeTooltip(event, nodeName) {
     if (pipeline) {
         content = `${pipeline.name}`
         if (pipeline.description) content += `\nDescription: ${pipeline.description}`
-        if (pipeline.schedule) content += `\nSchedule: ${pipeline.schedule}`
+        if (pipeline.schedule) content += `\nSchedule: ${formatSchedule(pipeline.schedule)}`
         if (pipeline.cluster) content += `\nCluster: ${pipeline.cluster}`
         if (pipeline.tags && pipeline.tags.length > 0) content += `\nTags: ${pipeline.tags.join(', ')}`
         if (pipeline.input_sources && pipeline.input_sources.length > 0)
@@ -846,7 +859,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 
     if (nodeData.schedule) {
         html += `<div class="detail-label">Schedule</div>`
-        html += `<div class="detail-value"><code class="text-success">${nodeData.schedule}</code></div>`
+        html += `<div class="detail-value"><code class="text-success">${formatSchedule(nodeData.schedule)}</code></div>`
     }
 
     // Cost and Duration section for pipelines
@@ -1522,6 +1535,19 @@ export function showBlastRadius(nodeName) {
 
     if (!modal || !graphContainer || !summaryContainer) return
 
+    // Update URL with blast parameter
+    updateHashWithBlast(nodeName)
+
+    // Clear blast param when modal is hidden
+    modal.addEventListener(
+        'hidden.bs.modal',
+        function onHidden() {
+            modal.removeEventListener('hidden.bs.modal', onHidden)
+            clearBlastFromHash()
+        },
+        { once: true }
+    )
+
     // Reset the graph container completely to avoid zoom issues
     graphContainer.innerHTML = ''
     blastRadiusGraphInstance = null
@@ -1700,3 +1726,49 @@ export function showBlastRadius(nodeName) {
 
     bsModal.show()
 }
+
+// Overflow menu functions
+export function toggleOverflowMenu(event) {
+    event.stopPropagation()
+    const menu = document.getElementById('graph-overflow-menu')
+    menu.classList.toggle('show')
+    updateOverflowMenuState()
+}
+
+export function updateOverflowMenuState() {
+    const pipelinesOnlyBtn = document.getElementById('pipelines-only-btn')
+    const cpMenuItem = document.getElementById('cp-menu-item')
+    const costMenuItem = document.getElementById('cost-menu-item')
+
+    if (pipelinesOnlyBtn) {
+        pipelinesOnlyBtn.classList.toggle('active', state.pipelinesOnlyView)
+    }
+    if (cpMenuItem) {
+        cpMenuItem.classList.toggle('active', state.analysisMode === 'critical-path')
+    }
+    if (costMenuItem) {
+        costMenuItem.classList.toggle('active', state.showCostLabels)
+    }
+}
+
+export function toggleAnalysisModeFromMenu(mode) {
+    if (state.analysisMode === mode) {
+        setAnalysisMode(null)
+    } else {
+        setAnalysisMode(mode)
+    }
+    updateOverflowMenuState()
+}
+
+export function toggleCostLabelsFromMenu() {
+    toggleCostLabels(!state.showCostLabels)
+    updateOverflowMenuState()
+}
+
+// Close overflow menu when clicking outside
+document.addEventListener('click', function (e) {
+    const menu = document.getElementById('graph-overflow-menu')
+    if (menu && !e.target.closest('.overflow-menu-container')) {
+        menu.classList.remove('show')
+    }
+})

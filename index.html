@@ -379,6 +379,68 @@
                 background: #66bb6a;
                 box-shadow: 0 0 6px #66bb6a;
             }
+            .overflow-menu-container {
+                position: relative;
+            }
+            .overflow-menu-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--text-secondary);
+                transition: all 0.15s;
+                font-family: inherit;
+                line-height: 1;
+            }
+            .overflow-menu-btn:hover {
+                border-color: var(--text-muted);
+                color: var(--text-primary);
+            }
+            .overflow-menu {
+                display: none;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                margin-top: 4px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 3px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                z-index: 100;
+                min-width: 160px;
+            }
+            .overflow-menu.show {
+                display: block;
+            }
+            .overflow-menu-item {
+                display: block;
+                padding: 8px 12px;
+                font-size: 11px;
+                color: var(--text-primary);
+                cursor: pointer;
+                border: none;
+                background: none;
+                width: 100%;
+                text-align: left;
+            }
+            .overflow-menu-item:hover {
+                background: var(--bg-secondary);
+            }
+            .overflow-menu-item.active {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            [data-theme='dark'] .overflow-menu-item.active {
+                background: rgba(33, 150, 243, 0.2);
+                color: #90caf9;
+            }
+            .overflow-menu-divider {
+                height: 1px;
+                background: var(--border-color);
+                margin: 4px 0;
+            }
             #graph svg {
                 width: 100%;
                 height: 500px;
@@ -1248,7 +1310,7 @@
             [data-theme='dark'] #graph .node text,
             [data-theme='dark'] #splash-graph .node text,
             [data-theme='dark'] #attribute-graph .node text {
-                fill: #000;
+                fill: #1a1a1a !important;
             }
             /* Preserve schedule magenta color in nodes */
             [data-theme='dark'] #graph .node text[fill='#d63384'],
@@ -1817,9 +1879,9 @@
                         <a
                             href="https://github.com/mattlianje/pipeviz"
                             target="_blank"
-                            style="color: var(--text-muted); font-size: 13px; text-decoration: none"
+                            style="color: var(--text-muted); font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;"
                             title="GitHub"
-                            >github</a
+                            ><svg height="14" width="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a
                         >
                         <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="theme-toggle">
                             ☀️
@@ -2582,38 +2644,47 @@
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
                                                 <button
-                                                    class="graph-ctrl-btn"
-                                                    onclick="togglePipelinesOnly()"
-                                                    id="pipelines-only-btn"
-                                                >
-                                                    Pipelines Only
-                                                </button>
-                                                <button
                                                     class="graph-ctrl-btn active"
                                                     onclick="toggleCollapseAll()"
                                                     id="collapse-all-btn"
                                                 >
                                                     Expand All
                                                 </button>
-                                                <button class="graph-ctrl-btn" onclick="clearSelection()">Clear</button>
                                                 <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
-                                                <div class="analysis-toggle ms-auto">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="cp-toggle"
-                                                        onchange="toggleAnalysisMode('critical-path', this)"
-                                                    />
-                                                    <label for="cp-toggle"
-                                                        ><span class="cp-indicator"></span>Critical Path</label
+                                                <div class="overflow-menu-container ms-auto">
+                                                    <button
+                                                        class="overflow-menu-btn"
+                                                        onclick="toggleOverflowMenu(event)"
                                                     >
-                                                    <input
-                                                        type="checkbox"
-                                                        id="cost-toggle"
-                                                        onchange="toggleCostLabels(this.checked)"
-                                                    />
-                                                    <label for="cost-toggle"
-                                                        ><span class="cost-indicator"></span>Show Costs</label
-                                                    >
+                                                        ⋯
+                                                    </button>
+                                                    <div class="overflow-menu" id="graph-overflow-menu">
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="pipelines-only-btn"
+                                                            onclick="
+                                                                togglePipelinesOnly()
+                                                                updateOverflowMenuState()
+                                                            "
+                                                        >
+                                                            Pipelines Only
+                                                        </button>
+                                                        <div class="overflow-menu-divider"></div>
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="cp-menu-item"
+                                                            onclick="toggleAnalysisModeFromMenu('critical-path')"
+                                                        >
+                                                            Critical Path
+                                                        </button>
+                                                        <button
+                                                            class="overflow-menu-item"
+                                                            id="cost-menu-item"
+                                                            onclick="toggleCostLabelsFromMenu()"
+                                                        >
+                                                            Show Costs
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div id="graph">
@@ -2668,9 +2739,6 @@
                                     <div id="attribute-graph-col" class="col-md-12">
                                         <div class="graph-container position-relative">
                                             <div class="graph-controls">
-                                                <button class="graph-ctrl-btn" onclick="clearAttributeSelection()">
-                                                    Clear
-                                                </button>
                                                 <button class="graph-ctrl-btn" onclick="resetAttributeGraph()">
                                                     Reset
                                                 </button>
