@@ -1,11 +1,27 @@
-.PHONY: dev build clean install repl bundle
+.PHONY: dev build clean install repl bundle server server-dev test fmt
 
 SHELL := /bin/bash
 NVM = source $(HOME)/.nvm/nvm.sh; nvm use --silent &&
 
-# Development with hot reload
+# Development with hot reload (frontend only)
 dev:
 	$(NVM) npx shadow-cljs watch app
+
+# Run API server
+server:
+	clj -M:server
+
+# Run API server with config file
+server-dev:
+	clj -M:server 3000 resources/example.json
+
+# Run tests
+test:
+	clj -M:test
+
+# Format Clojure code
+fmt:
+	clj -M:fmt
 
 # Build release version
 build: install
