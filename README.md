@@ -191,27 +191,17 @@ jq -s '{
 - Mermaid export
 - MCP-ready JSON graph for LLM tooling
 
-## API Server
+## API
 
-There's an optional Clojure server if you want programmatic access to the graph...
+There's an optional Clojure web-server if you want programmatic access to the graph...
 
 This is especially useful for cases where you want to let other people routinely "get answers" from your graph ("what would break if?", "what is
 downstream of that?") without poking digging into a UI.
 
-```bash
-cd clojure
-clj -M -m pipeviz.server.main 3000 path/to/config.json
-```
 
-```
-GET  /api/config              # current config
-POST /api/config              # set config (JSON body)
-GET  /api/dot                 # DOT graph
-GET  /api/lineage?node=X      # lineage for node
-GET  /api/provenance?node=X   # attribute provenance
-```
-
-Wire it into CI. Point an LLM agent at it. Build custom tooling. The graph is just JSON.
+<p align="center">
+  <img src="pix/swagger-demo.png" width="600">
+</p>
 
 ## Why Clojure?
 

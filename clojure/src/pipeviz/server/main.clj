@@ -66,7 +66,7 @@
                            :downstream (cond->> (graph/downstream-of cfg node) depth (take depth) true vec)}))
                     (error 400 "Missing 'node' parameter")))))
 
-(defn- handle-get-provenance [req]
+(defn- handle-get-attribute-lineage [req]
        (require-config
         (fn [cfg]
             (if-let [node (get-in req [:params :node])]
@@ -78,28 +78,90 @@
                                  (error 404 (str "Attribute not found: " node))))
                     (error 400 "Missing 'node' parameter")))))
 
-(defn- handle-api-docs [_]
-       (json-response
-        {:endpoints
-         [{:path "/health" :method "GET" :desc "Health check"}
-          {:path "/api/config" :method "GET" :desc "Get current config"}
-          {:path "/api/config" :method "POST" :desc "Set config (JSON body)"}
-          {:path "/api/dot" :method "GET" :desc "Get DOT graph"}
-          {:path "/api/lineage" :method "GET" :desc "Get lineage"
-           :params "node (required), depth (optional)"}
-          {:path "/api/provenance" :method "GET" :desc "Get attribute provenance"
-           :params "node=datasource__attr, depth (optional)"}]}))
+(defn- handle-get-blast-radius [req]
+       (require-config
+        (fn [cfg]
+            (if-let [node (get-in req [:params :node])]
+                    (if-let [result (graph/generate-blast-radius-analysis cfg node)]
+                            (json-response result)
+                            (error 404 (str "Node not found: " node)))
+                    (error 400 "Missing 'node' parameter")))))
+
+(defn- handle-get-backfill [req]
+       (require-config
+        (fn [cfg]
+            (if-let [nodes-param (get-in req [:params :nodes])]
+                    (let [nodes (clojure.string/split nodes-param #",")]
+                         (try
+                          (json-response (graph/generate-backfill-analysis cfg nodes))
+                          (catch Exception e
+                                 (error 400 (.getMessage e)))))
+                    (error 400 "Missing 'nodes' parameter (comma-separated pipeline names)")))))
+
+(defn- handle-get-stats [_]
+       (require-config #(json-response (graph/compute-stats %))))
+
+(defn- handle-search [req]
+       (require-config
+        (fn [cfg]
+            (if-let [q (get-in req [:params :q])]
+                    (json-response {:query q :results (or (graph/search-nodes cfg q) [])})
+                    (error 400 "Missing 'q' parameter")))))
+
+(defn- handle-export-json [_]
+       (require-config #(json-response (graph/generate-graph-export %))))
+
+(defn- text-response [s content-type]
+       (-> (resp/response s)
+           (resp/content-type content-type)))
+
+(defn- handle-export-mermaid [_]
+       (require-config #(text-response (graph/generate-mermaid-export %) "text/plain")))
+
+(defn- handle-get-attribute-dot [_]
+       (require-config #(dot-response (graph/generate-attribute-dot %))))
+
+(defn- html-response [s]
+       (-> (resp/response s)
+           (resp/content-type "text/html")))
+
+(def ^:private swagger-ui-html
+     "<!DOCTYPE html>
+<html><head>
+  <title>Pipeviz API</title>
+  <link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist@5/swagger-ui.css\">
+</head><body>
+  <div id=\"swagger-ui\"></div>
+  <script src=\"https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>
+  <script>SwaggerUIBundle({url:'/api/openapi.json',dom_id:'#swagger-ui',deepLinking:true});</script>
+</body></html>")
+
+(defn- handle-swagger-ui [_]
+       (html-response swagger-ui-html))
+
+(defn- handle-openapi-spec [_]
+       (if-let [resource (io/resource "openapi.json")]
+               (json-response (json/read-str (slurp resource)))
+               (error 404 "OpenAPI spec not found")))
 
 ;; Router
 (defn router [{:keys [request-method uri] :as req}]
       (case [request-method uri]
-            [:get "/health"]         (handle-health req)
-            [:get "/api"]            (handle-api-docs req)
-            [:get "/api/config"]     (handle-get-config req)
-            [:post "/api/config"]    (handle-set-config req)
-            [:get "/api/dot"]        (handle-get-dot req)
-            [:get "/api/lineage"]    (handle-get-lineage req)
-            [:get "/api/provenance"] (handle-get-provenance req)
+            [:get "/health"]                (handle-health req)
+            [:get "/api"]                   (handle-swagger-ui req)
+            [:get "/api/openapi.json"]      (handle-openapi-spec req)
+            [:get "/api/config"]            (handle-get-config req)
+            [:post "/api/config"]           (handle-set-config req)
+            [:get "/api/dot"]               (handle-get-dot req)
+            [:get "/api/attribute-dot"]     (handle-get-attribute-dot req)
+            [:get "/api/lineage"]           (handle-get-lineage req)
+            [:get "/api/attribute-lineage"] (handle-get-attribute-lineage req)
+            [:get "/api/blast-radius"]      (handle-get-blast-radius req)
+            [:get "/api/backfill"]          (handle-get-backfill req)
+            [:get "/api/stats"]             (handle-get-stats req)
+            [:get "/api/search"]            (handle-search req)
+            [:get "/api/export/json"]       (handle-export-json req)
+            [:get "/api/export/mermaid"]    (handle-export-mermaid req)
             (error 404 "Not found")))
 
 (def app
@@ -116,6 +178,6 @@
                              (println "Loaded config from" config-file))
                          (println "Warning: could not load" config-file)))
            (println (str "Pipeviz server running on http://localhost:" port))
-           (println "GET /api for endpoint docs")
+           (println (str "Swagger UI: http://localhost:" port "/api"))
            (http/run-server app {:port port})
            @(promise)))

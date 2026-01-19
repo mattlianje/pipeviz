@@ -1,0 +1,744 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pipeviz API",
+    "description": "API for visualizing and querying data pipeline lineage, blast radius analysis, backfill planning, and more.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {"name": "System", "description": "Health and system endpoints"},
+    {"name": "Configuration", "description": "Config management"},
+    {"name": "Graph", "description": "DOT graph generation"},
+    {"name": "Lineage", "description": "Pipeline and attribute lineage"},
+    {"name": "Analysis", "description": "Blast radius, backfill, and stats"},
+    {"name": "Search", "description": "Fuzzy search"},
+    {"name": "Export", "description": "Export to various formats"}
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "getHealth",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Server health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ok"},
+                    "config-loaded": {"type": "boolean", "example": true}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "summary": "Get current config",
+        "operationId": "getConfig",
+        "tags": ["Configuration"],
+        "responses": {
+          "200": {
+            "description": "Current pipeline configuration",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Config"},
+                "example": {
+                  "pipelines": [
+                    {
+                      "name": "user-enrichment",
+                      "description": "Enriches user data with events",
+                      "input_sources": ["raw_users", "user_events"],
+                      "output_sources": ["enriched_users"],
+                      "schedule": "0 */2 * * *",
+                      "cluster": "user-processing"
+                    },
+                    {
+                      "name": "analytics-agg",
+                      "input_sources": ["enriched_users"],
+                      "output_sources": ["daily_metrics"],
+                      "upstream_pipelines": ["user-enrichment"],
+                      "schedule": "0 1 * * *",
+                      "cluster": "analytics"
+                    }
+                  ],
+                  "datasources": [
+                    {
+                      "name": "raw_users",
+                      "type": "postgres",
+                      "cluster": "user-processing",
+                      "attributes": [
+                        {"name": "id"},
+                        {"name": "email"},
+                        {"name": "created_at"}
+                      ]
+                    },
+                    {
+                      "name": "enriched_users",
+                      "type": "snowflake",
+                      "cluster": "user-processing",
+                      "attributes": [
+                        {"name": "user_id", "from": "raw_users::id"},
+                        {"name": "email", "from": "raw_users::email"},
+                        {"name": "event_count", "from": "user_events::event_id"}
+                      ]
+                    }
+                  ],
+                  "clusters": [
+                    {"name": "user-processing"},
+                    {"name": "analytics"}
+                  ]
+                }
+              }
+            }
+          },
+          "404": {"description": "No config loaded"}
+        }
+      },
+      "post": {
+        "summary": "Set config",
+        "operationId": "setConfig",
+        "tags": ["Configuration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/Config"},
+              "example": {
+                "pipelines": [
+                  {
+                    "name": "etl-job",
+                    "input_sources": ["raw_events"],
+                    "output_sources": ["cleaned_events"],
+                    "schedule": "0 0 * * *"
+                  }
+                ],
+                "datasources": [
+                  {"name": "raw_events", "type": "s3"},
+                  {"name": "cleaned_events", "type": "snowflake"}
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Config loaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ok"},
+                    "pipelines": {"type": "integer", "example": 1}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Invalid config"}
+        }
+      }
+    },
+    "/api/dot": {
+      "get": {
+        "summary": "Get DOT graph",
+        "description": "Returns the full pipeline graph in GraphViz DOT format",
+        "operationId": "getDot",
+        "tags": ["Graph"],
+        "responses": {
+          "200": {
+            "description": "GraphViz DOT representation",
+            "content": {
+              "text/vnd.graphviz": {
+                "schema": {"type": "string"},
+                "example": "digraph G {\n  rankdir=LR\n  \"raw_events\" [shape=ellipse]\n  \"etl-job\" [shape=box]\n  \"raw_events\" -> \"etl-job\"\n}"
+              }
+            }
+          },
+          "404": {"description": "No config loaded"}
+        }
+      }
+    },
+    "/api/attribute-dot": {
+      "get": {
+        "summary": "Get attribute-level DOT graph",
+        "description": "Returns column/attribute-level lineage graph in GraphViz DOT format",
+        "operationId": "getAttributeDot",
+        "tags": ["Graph"],
+        "responses": {
+          "200": {
+            "description": "GraphViz DOT representation of attribute lineage",
+            "content": {"text/vnd.graphviz": {"schema": {"type": "string"}}}
+          },
+          "404": {"description": "No config loaded"}
+        }
+      }
+    },
+    "/api/lineage": {
+      "get": {
+        "summary": "Get datasource lineage",
+        "description": "Returns upstream and downstream datasources/pipelines for a given node",
+        "operationId": "getLineage",
+        "tags": ["Lineage"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "query",
+            "required": true,
+            "description": "Pipeline or datasource name",
+            "schema": {"type": "string"},
+            "example": "analytics-agg"
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "Maximum traversal depth",
+            "schema": {"type": "integer"},
+            "example": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lineage information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "node": {"type": "string"},
+                    "upstream": {"type": "array", "items": {"type": "string"}},
+                    "downstream": {"type": "array", "items": {"type": "string"}}
+                  }
+                },
+                "example": {
+                  "node": "analytics-agg",
+                  "upstream": ["user-enrichment"],
+                  "downstream": ["weekly-rollup"]
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing node parameter"},
+          "404": {"description": "No config loaded"}
+        }
+      }
+    },
+    "/api/attribute-lineage": {
+      "get": {
+        "summary": "Get attribute-level lineage",
+        "description": "Returns column/attribute-level upstream and downstream lineage. Attributes are referenced as datasource__attribute (double underscore).",
+        "operationId": "getAttributeLineage",
+        "tags": ["Lineage"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "query",
+            "required": true,
+            "description": "Attribute identifier (format: datasource__attribute)",
+            "schema": {"type": "string"},
+            "example": "enriched_users__user_id"
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "Maximum traversal depth",
+            "schema": {"type": "integer"},
+            "example": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attribute lineage information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "attribute": {"type": "string"},
+                    "name": {"type": "string"},
+                    "full-name": {"type": "string"},
+                    "datasource": {"type": "string"},
+                    "upstream": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {"type": "array", "items": {"type": "object"}}
+                      }
+                    },
+                    "downstream": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {"type": "array", "items": {"type": "object"}}
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "attribute": "enriched_users__user_id",
+                  "name": "user_id",
+                  "full-name": "enriched_users::user_id",
+                  "datasource": "enriched_users",
+                  "upstream": {
+                    "attributes": [
+                      {"id": "raw_users__id", "name": "id", "full-name": "raw_users::id", "depth": 1}
+                    ]
+                  },
+                  "downstream": {
+                    "attributes": [
+                      {"id": "daily_metrics__active_users", "name": "active_users", "depth": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing node parameter"},
+          "404": {"description": "Attribute not found or no config loaded"}
+        }
+      }
+    },
+    "/api/blast-radius": {
+      "get": {
+        "summary": "Get blast radius for a node",
+        "description": "Returns all downstream nodes that would be affected if the given node fails or changes. Useful for impact analysis before making changes.",
+        "operationId": "getBlastRadius",
+        "tags": ["Analysis"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "query",
+            "required": true,
+            "description": "Pipeline, datasource, or group name",
+            "schema": {"type": "string"},
+            "example": "user-enrichment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blast radius analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "source": {"type": "string"},
+                    "source-type": {"type": "string", "enum": ["pipeline", "datasource", "group"]},
+                    "total-affected": {"type": "integer"},
+                    "max-depth": {"type": "integer"},
+                    "downstream": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {"type": "string"},
+                          "type": {"type": "string"},
+                          "depth": {"type": "integer"}
+                        }
+                      }
+                    },
+                    "by-depth": {"type": "object"},
+                    "edges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source": {"type": "string"},
+                          "target": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "source": "user-enrichment",
+                  "source-type": "pipeline",
+                  "total-affected": 5,
+                  "max-depth": 3,
+                  "downstream": [
+                    {"name": "enriched_users", "type": "datasource", "depth": 1},
+                    {"name": "analytics-agg", "type": "pipeline", "depth": 2},
+                    {"name": "daily_metrics", "type": "datasource", "depth": 3}
+                  ],
+                  "by-depth": {
+                    "1": [{"name": "enriched_users", "type": "datasource", "depth": 1}],
+                    "2": [{"name": "analytics-agg", "type": "pipeline", "depth": 2}]
+                  },
+                  "edges": [
+                    {"source": "user-enrichment", "target": "enriched_users"},
+                    {"source": "enriched_users", "target": "analytics-agg"}
+                  ]
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing node parameter"},
+          "404": {"description": "Node not found or no config loaded"}
+        }
+      }
+    },
+    "/api/backfill": {
+      "get": {
+        "summary": "Get backfill execution plan",
+        "description": "Given a set of pipelines, returns the optimal execution order in waves (topologically sorted). Pipelines in the same wave can run in parallel.",
+        "operationId": "getBackfill",
+        "tags": ["Analysis"],
+        "parameters": [
+          {
+            "name": "nodes",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated list of pipeline names to backfill",
+            "schema": {"type": "string"},
+            "example": "user-enrichment,analytics-agg"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backfill execution plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": {"type": "array", "items": {"type": "string"}},
+                    "total-downstream-pipelines": {"type": "integer"},
+                    "total-waves": {"type": "integer"},
+                    "max-parallelism": {"type": "integer"},
+                    "waves": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wave": {"type": "integer"},
+                          "parallel-count": {"type": "integer"},
+                          "pipelines": {"type": "array", "items": {"type": "object"}}
+                        }
+                      }
+                    },
+                    "edges": {"type": "array", "items": {"type": "object"}}
+                  }
+                },
+                "example": {
+                  "nodes": ["user-enrichment", "analytics-agg"],
+                  "total-downstream-pipelines": 1,
+                  "total-waves": 2,
+                  "max-parallelism": 1,
+                  "waves": [
+                    {"wave": 0, "parallel-count": 1, "pipelines": [{"name": "user-enrichment", "schedule": "Every 2 hours"}]},
+                    {"wave": 1, "parallel-count": 1, "pipelines": [{"name": "analytics-agg", "schedule": "Daily at 1 AM"}]}
+                  ],
+                  "edges": [{"source": "user-enrichment", "target": "analytics-agg"}]
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing nodes parameter or invalid pipeline names (backfill only works for pipelines)"}
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "summary": "Get pipeline statistics",
+        "description": "Returns comprehensive statistics including counts, dependency cycles, hub nodes (most connected), orphaned datasources, and coverage metrics.",
+        "operationId": "getStats",
+        "tags": ["Analysis"],
+        "responses": {
+          "200": {
+            "description": "Pipeline statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "pipelines": {"type": "integer"},
+                        "datasources": {"type": "integer"},
+                        "clusters": {"type": "integer"}
+                      }
+                    },
+                    "cycles": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                    "hubs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {"type": "string"},
+                          "type": {"type": "string"},
+                          "upstream": {"type": "integer"},
+                          "downstream": {"type": "integer"},
+                          "total": {"type": "integer"}
+                        }
+                      }
+                    },
+                    "orphaned": {"type": "array", "items": {"type": "string"}},
+                    "coverage": {"type": "object"},
+                    "distributions": {"type": "object"}
+                  }
+                },
+                "example": {
+                  "counts": {"pipelines": 7, "datasources": 12, "clusters": 4},
+                  "cycles": [],
+                  "hubs": [
+                    {"name": "enriched_users", "type": "datasource", "upstream": 1, "downstream": 3, "total": 4},
+                    {"name": "analytics-agg", "type": "pipeline", "upstream": 2, "downstream": 2, "total": 4}
+                  ],
+                  "orphaned": [],
+                  "coverage": {
+                    "schedules": {"covered": 5, "total": 7, "missing": ["export-job", "adhoc-report"]},
+                    "airflow": {"covered": 6, "total": 7, "missing": ["adhoc-report"]}
+                  },
+                  "distributions": {
+                    "clusters": {"user-processing": 2, "analytics": 4, "unclustered": 1},
+                    "types": {"snowflake": 8, "postgres": 2, "s3": 2}
+                  }
+                }
+              }
+            }
+          },
+          "404": {"description": "No config loaded"}
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Fuzzy search nodes",
+        "description": "Search for pipelines and datasources by name or description using fuzzy matching. Returns up to 8 results sorted by relevance.",
+        "operationId": "searchNodes",
+        "tags": ["Search"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query",
+            "schema": {"type": "string"},
+            "example": "user"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query": {"type": "string"},
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {"type": "string"},
+                          "type": {"type": "string", "enum": ["pipeline", "datasource"]},
+                          "score": {"type": "number"}
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "query": "user",
+                  "results": [
+                    {"name": "raw_users", "type": "datasource", "score": 1.5},
+                    {"name": "enriched_users", "type": "datasource", "score": 1.2},
+                    {"name": "user-enrichment", "type": "pipeline", "score": 1.0}
+                  ]
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing q parameter"}
+        }
+      }
+    },
+    "/api/export/json": {
+      "get": {
+        "summary": "Export graph as JSON",
+        "description": "Export the full pipeline graph as a structured JSON with nodes, edges, and metadata. Useful for integration with other tools.",
+        "operationId": "exportJson",
+        "tags": ["Export"],
+        "responses": {
+          "200": {
+            "description": "Graph export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": {"type": "array", "items": {"type": "object"}},
+                    "edges": {"type": "array", "items": {"type": "object"}},
+                    "clusters": {"type": "array"},
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "node_count": {"type": "integer"},
+                        "edge_count": {"type": "integer"},
+                        "pipeline_count": {"type": "integer"},
+                        "datasource_count": {"type": "integer"}
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "nodes": [
+                    {"id": "user-enrichment", "type": "pipeline", "cluster": "user-processing"},
+                    {"id": "raw_users", "type": "datasource"}
+                  ],
+                  "edges": [
+                    {"source": "raw_users", "target": "user-enrichment", "type": "data_flow"},
+                    {"source": "user-enrichment", "target": "enriched_users", "type": "data_flow"}
+                  ],
+                  "clusters": [{"id": "user-processing"}],
+                  "meta": {"node_count": 10, "edge_count": 12, "pipeline_count": 3, "datasource_count": 7}
+                }
+              }
+            }
+          },
+          "404": {"description": "No config loaded"}
+        }
+      }
+    },
+    "/api/export/mermaid": {
+      "get": {
+        "summary": "Export graph as Mermaid",
+        "description": "Export the pipeline graph in Mermaid flowchart format. Can be embedded in markdown or rendered with Mermaid.js.",
+        "operationId": "exportMermaid",
+        "tags": ["Export"],
+        "responses": {
+          "200": {
+            "description": "Mermaid flowchart",
+            "content": {
+              "text/plain": {
+                "schema": {"type": "string"},
+                "example": "flowchart LR\n    %% Nodes\n    raw_users[(\"raw_users\")]\n    user_enrichment[[\"user-enrichment\"]]\n    enriched_users[(\"enriched_users\")]\n\n    %% Edges\n    raw_users --> user_enrichment\n    user_enrichment --> enriched_users\n\n    %% Styling\n    classDef pipeline fill:#fff3e0,stroke:#e65100\n    classDef datasource fill:#e3f2fd,stroke:#1565c0\n    class user_enrichment pipeline\n    class raw_users,enriched_users datasource"
+              }
+            }
+          },
+          "404": {"description": "No config loaded"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Config": {
+        "type": "object",
+        "description": "Pipeline configuration with pipelines, datasources, and clusters defined at the top level",
+        "properties": {
+          "pipelines": {"type": "array", "items": {"$ref": "#/components/schemas/Pipeline"}},
+          "datasources": {"type": "array", "items": {"$ref": "#/components/schemas/Datasource"}},
+          "clusters": {"type": "array", "items": {"$ref": "#/components/schemas/Cluster"}}
+        },
+        "example": {
+          "pipelines": [
+            {
+              "name": "etl-job",
+              "input_sources": ["raw_events"],
+              "output_sources": ["cleaned_events"],
+              "schedule": "0 0 * * *"
+            }
+          ],
+          "datasources": [
+            {"name": "raw_events", "type": "s3"},
+            {"name": "cleaned_events", "type": "snowflake"}
+          ]
+        }
+      },
+      "Pipeline": {
+        "type": "object",
+        "description": "A data pipeline that reads from input_sources and writes to output_sources",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string", "description": "Unique pipeline identifier"},
+          "description": {"type": "string"},
+          "schedule": {"type": "string", "description": "Cron expression or human-readable schedule"},
+          "cluster": {"type": "string", "description": "Visual grouping in the graph"},
+          "group": {"type": "string", "description": "Logical grouping of related pipelines"},
+          "input_sources": {"type": "array", "items": {"type": "string"}, "description": "Datasources this pipeline reads from"},
+          "output_sources": {"type": "array", "items": {"type": "string"}, "description": "Datasources this pipeline writes to"},
+          "upstream_pipelines": {"type": "array", "items": {"type": "string"}, "description": "Pipelines that must run before this one"},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "links": {"type": "object", "description": "External links (e.g., {\"airflow\": \"https://...\"})"}
+        },
+        "example": {
+          "name": "user-enrichment",
+          "description": "Enriches user data with event counts",
+          "input_sources": ["raw_users", "user_events"],
+          "output_sources": ["enriched_users"],
+          "schedule": "0 */2 * * *",
+          "cluster": "user-processing",
+          "tags": ["user-data", "ml"],
+          "links": {"airflow": "https://airflow.example.com/dags/user_enrichment"}
+        }
+      },
+      "Datasource": {
+        "type": "object",
+        "description": "A data source or sink (table, file, API, etc.)",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string", "description": "Unique datasource identifier"},
+          "description": {"type": "string"},
+          "type": {"type": "string", "description": "Storage type (e.g., postgres, snowflake, s3, api)"},
+          "cluster": {"type": "string"},
+          "attributes": {"type": "array", "items": {"$ref": "#/components/schemas/Attribute"}, "description": "Column/field definitions with optional lineage"}
+        },
+        "example": {
+          "name": "enriched_users",
+          "type": "snowflake",
+          "cluster": "user-processing",
+          "attributes": [
+            {"name": "user_id", "from": "raw_users::id"},
+            {"name": "full_name", "from": ["raw_users::first_name", "raw_users::last_name"]},
+            {"name": "event_count", "from": "user_events::event_id"}
+          ]
+        }
+      },
+      "Attribute": {
+        "type": "object",
+        "description": "A column/field with optional lineage via 'from' (format: datasource::column)",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "type": {"type": "string"},
+          "from": {
+            "description": "Source attribute(s) in format datasource::attribute",
+            "oneOf": [
+              {"type": "string", "example": "raw_users::id"},
+              {"type": "array", "items": {"type": "string"}, "example": ["raw_users::first_name", "raw_users::last_name"]}
+            ]
+          },
+          "attributes": {"type": "array", "items": {"$ref": "#/components/schemas/Attribute"}, "description": "Nested attributes for structs"}
+        },
+        "example": {"name": "user_id", "from": "raw_users::id"}
+      },
+      "Cluster": {
+        "type": "object",
+        "description": "Visual grouping for organizing pipelines and datasources in the graph",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "parent": {"type": "string", "description": "Parent cluster for nested grouping"}
+        },
+        "example": {"name": "analytics", "description": "Analytics pipelines"}
+      }
+    }
+  }
+}

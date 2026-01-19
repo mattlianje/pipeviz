@@ -7,7 +7,7 @@
  :paths ["src" "resources"]
 
  :aliases
- {:server {:main-opts ["-m" "pipeviz.server"]}
+ {:server {:main-opts ["-m" "pipeviz.server.main"]}
   :dev {:extra-deps {nrepl/nrepl {:mvn/version "1.3.0"}}}
   :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
