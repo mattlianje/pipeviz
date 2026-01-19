@@ -8,7 +8,7 @@
 ;; Ensure d3-graphviz side-effects load
 (def ^:private _ d3-graphviz)
 
-(declare dark? render-splash! render-graph! setup-interactivity! show-node-details! render-tables! update-json-input! render-attribute-graph! precompute-attribute-lineage! select-attribute! show-datasource-in-attribute-panel! render-group-toggles! select-group! show-group-details! select-node-from-hash!)
+(declare dark? render-splash! render-graph! setup-interactivity! show-node-details! render-tables! update-json-input! render-attribute-graph! precompute-attribute-lineage! select-attribute! show-datasource-in-attribute-panel! render-group-toggles! select-group! show-group-details! select-node-from-hash! populate-planner-picker! render-planner-graph! planner-state)
 
 ;; State
 (defonce state (atom {:config nil
@@ -17,6 +17,7 @@
                       :dark? false
                       :pipelines-only? false
                       :lineage-cache nil
+                      :blast-radius-cache nil
                       :collapsed-groups #{}
                       :dot-cache {}
                       :last-rendered-key nil}))
@@ -37,7 +38,7 @@
   (let [all-groups (set (graph/all-groups config))]
     (swap! state assoc
            :config config
-           :collapsed-groups all-groups
+           :collapsed-groups all-groups  ;; collapsed by default
            :dot-cache {}
            :last-rendered-key nil)))
 
@@ -55,6 +56,12 @@
     (swap! state assoc :lineage-cache cache)
     cache))
 
+;; Precompute blast radius for all nodes and groups
+(defn precompute-blast-radius! [config]
+  (let [blast-data (graph/precompute-all-blast-radius config)]
+    (swap! state assoc :blast-radius-cache blast-data)
+    blast-data))
+
 ;; DOM helpers
 (defn $id [id] (.getElementById js/document id))
 (defn on! [el event f] (when el (.addEventListener el event f)))
@@ -70,23 +77,71 @@
 (defn parse-hash []
   (let [hash (subs (or (.-hash js/window.location) "") 1)
         parts (str/split hash #"&")]
-    (into {}
-          (for [part parts
-                :when (str/includes? part "=")]
-            (let [[k v] (str/split part #"=" 2)]
-              [(keyword k) (js/decodeURIComponent v)])))))
+    (reduce (fn [acc part]
+              (cond
+                (str/includes? part "=")
+                (let [[k v] (str/split part #"=" 2)]
+                  (assoc acc (keyword k) (js/decodeURIComponent v)))
+
+                (not (str/blank? part))
+                (assoc acc :tab part)
+
+                :else acc))
+            {}
+            parts)))
 
 (defn get-node-from-hash []
   (:node (parse-hash)))
+
+(defn get-blast-from-hash []
+  (:blast (parse-hash)))
+
+(defn build-hash-string
+  "Build hash string from parsed hash map"
+  [{:keys [tab node blast view pipelines] :as _hash-map}]
+  (let [parts (cond-> []
+                tab (conj tab)
+                node (conj (str "node=" (js/encodeURIComponent node)))
+                blast (conj (str "blast=" (js/encodeURIComponent blast)))
+                view (conj (str "view=" (js/encodeURIComponent view)))
+                (seq pipelines) (conj (str "pipelines=" (str/join "," (map js/encodeURIComponent pipelines)))))]
+    (str/join "&" parts)))
+
+(defn get-planner-state-from-hash []
+  (let [{:keys [view pipelines]} (parse-hash)]
+    {:view (when view (keyword view))
+     :pipelines (when pipelines (str/split pipelines #","))}))
+
+(defn update-hash-with-planner-state [view pipelines]
+  (let [hash-str (build-hash-string {:tab "planner"
+                                      :view (name view)
+                                      :pipelines pipelines})]
+    (.replaceState js/history nil "" (str "#" hash-str))))
 
 (defn update-hash-with-node [node-name]
   (let [current (parse-hash)
         updated (if node-name
                   (assoc current :node node-name)
                   (dissoc current :node))
-        hash-str (str/join "&" (for [[k v] updated]
-                                 (str (name k) "=" (js/encodeURIComponent v))))]
-    (set! (.-hash js/window.location) hash-str)))
+        hash-str (build-hash-string updated)]
+    (.replaceState js/history nil "" (if (str/blank? hash-str) "" (str "#" hash-str)))))
+
+(defn update-hash-with-blast [blast-name]
+  (let [current (parse-hash)
+        updated (-> current
+                    (assoc :tab (or (:tab current) "graph"))
+                    (assoc :blast blast-name))
+        hash-str (build-hash-string updated)]
+    (.replaceState js/history nil "" (str "#" hash-str))))
+
+(defn clear-blast-from-hash []
+  (let [current (parse-hash)
+        updated (dissoc current :blast)
+        hash-str (build-hash-string updated)]
+    (.replaceState js/history nil "" (if (str/blank? hash-str) "" (str "#" hash-str)))))
+
+(defn clear-hash! []
+  (.replaceState js/history nil "" (.-pathname js/window.location)))
 
 ;; Theme
 (defn set-theme! [dark?]
@@ -110,6 +165,10 @@
     (set-theme! use-dark)))
 
 ;; Tabs
+(defn- tab-id->hash-name [tab-id]
+  (when tab-id
+    (str/replace tab-id #"-pane$" "")))
+
 (defn switch-tab! [tab-id]
   ;; Update tab buttons
   (doseq [btn (array-seq (.querySelectorAll js/document ".nav-tab"))]
@@ -121,17 +180,38 @@
     (if (= tab-id (.-id pane))
       (add-class! pane "active")
       (remove-class! pane "active")))
-  ;; Show/hide tabs based on home page
+  ;; Show/hide tabs and update URL hash
   (when-let [tabs ($id "main-tabs")]
     (if (= tab-id "home-pane")
-      (add-class! tabs "hidden-on-home")
-      (remove-class! tabs "hidden-on-home")))
+      (do
+        (add-class! tabs "hidden-on-home")
+        ;; Clear URL hash when going to home
+        (clear-hash!))
+      (do
+        (remove-class! tabs "hidden-on-home")
+        ;; Update hash with tab name (preserving node if on graph tab)
+        (let [current (parse-hash)
+              tab-name (tab-id->hash-name tab-id)
+              ;; Only preserve node param on graph tab
+              new-hash (if (and (= tab-id "graph-pane") (:node current))
+                         (build-hash-string {:tab tab-name :node (:node current)})
+                         tab-name)]
+          (.replaceState js/history nil "" (str "#" new-hash))))))
   ;; Render graph if switching to graph tab
   (when (and (= tab-id "graph-pane") (:config @state))
     (js/setTimeout render-graph! 50))
   ;; Render attribute graph if switching to attributes tab
   (when (and (= tab-id "attributes-pane") (:config @state))
-    (js/setTimeout render-attribute-graph! 50)))
+    (js/setTimeout render-attribute-graph! 50))
+  ;; Render planner graph if switching to planner tab
+  (when (and (= tab-id "planner-pane") (:config @state))
+    (js/setTimeout #(do (populate-planner-picker!)
+                        (render-planner-graph!)
+                        ;; Show picker dropdown so user can immediately select pipelines
+                        (when-let [dropdown ($id "planner-picker-dropdown")]
+                          (when-not (.contains (.-classList dropdown) "show")
+                            (add-class! dropdown "show")
+                            (swap! planner-state assoc :picker-open? true)))) 50)))
 
 (defn setup-tabs! []
   (doseq [btn (array-seq (.querySelectorAll js/document ".nav-tab"))]
@@ -165,9 +245,10 @@
                                                              :collapsed-groups (:collapsed-groups @state)})]
                            (swap! state assoc-in [:dot-cache cache-key] d)
                            d))
+                 width (.-clientWidth container)
                  gv (-> (d3/select "#graph")
                         (.graphviz)
-                        (.width (.-clientWidth container))
+                        (.width width)
                         (.height 500)
                         (.fit true)
                         (.transition (fn [] (-> (d3/transition "graph")
@@ -256,10 +337,11 @@
       (.classed "node-highlighted" false)
       (.classed "node-connected" false)
       (.classed "node-dimmed" false))
-  ;; Clear edge dimming
+  ;; Clear edge classes
   (-> (d3/select "#graph")
       (.selectAll ".edge")
-      (.classed "edge-dimmed" false))
+      (.classed "edge-dimmed" false)
+      (.classed "edge-highlighted" false))
   ;; Hide details panel and re-render graph to fit new container size
   (let [was-visible (.contains (.-classList ($id "details-col")) "visible")]
     (remove-class! ($id "graph-col") "with-details")
@@ -278,9 +360,15 @@
 
       ;; Build details HTML
       (let [has-lineage (or (seq upstream) (seq downstream))
+            escaped-name (str/replace group-name "'" "\\'")
             html (str
                   "<div class='detail-label'>Type</div>"
                   "<div class='detail-value'><span class='badge' style='background:#fff3e0;color:#e65100'>Group</span></div>"
+
+                  ;; Action buttons
+                  "<div class='node-actions'>"
+                  "<button class='graph-ctrl-btn danger' onclick=\"showBlastRadius('" escaped-name "')\">◉ Blast Radius</button>"
+                  "</div>"
 
                   "<div class='detail-label'>Pipelines (" (count members) ")</div>"
                   "<div class='detail-value'>"
@@ -392,7 +480,7 @@
                                 :else
                                 (.classed node "node-dimmed" true)))))))
 
-      ;; Dim unrelated edges
+      ;; Dim unrelated edges (but don't highlight - keep original colors)
       (let [in-group? (fn [n] (or (= n group-node-title)
                                   (and (not collapsed?) (members n))))]
         (-> (d3/select "#graph")
@@ -408,8 +496,7 @@
                                   (let [[_ source target] match
                                         source-in-chain (or (in-group? source) (all-connected source))
                                         target-in-chain (or (in-group? target) (all-connected target))]
-                                    (if (and source-in-chain target-in-chain)
-                                      (.classed edge "edge-highlighted" true)
+                                    (when-not (and source-in-chain target-in-chain)
                                       (.classed edge "edge-dimmed" true))))))))))
 
       ;; Show details panel
@@ -432,10 +519,16 @@
 
       ;; Build details HTML
       (let [has-lineage (or (seq upstream) (seq downstream))
+            escaped-name (str/replace node-name "'" "\\'")
             html (str
                   ;; Node info section
                   "<div class='detail-label'>Type</div>"
                   "<div class='detail-value'><span class='badge badge-type'>" node-type "</span></div>"
+
+                  ;; Action buttons
+                  "<div class='node-actions'>"
+                  "<button class='graph-ctrl-btn danger' onclick=\"showBlastRadius('" escaped-name "')\">◉ Blast Radius</button>"
+                  "</div>"
 
                   (when-let [desc (:description node-data)]
                     (str "<div class='detail-label'>Description</div>"
@@ -771,9 +864,10 @@
       (if valid?
         (do
           (set-config! config)
-          ;; Precompute lineage for fast selection
+          ;; Precompute lineage and blast radius for fast selection
           (precompute-lineage! config)
           (precompute-attribute-lineage! config)
+          (precompute-blast-radius! config)
           (update-json-input! config)
           (render-tables!)
           (switch-tab! "graph-pane"))
@@ -823,6 +917,7 @@
   (set-config! graph/example-config)
   (precompute-lineage! graph/example-config)
   (precompute-attribute-lineage! graph/example-config)
+  (precompute-blast-radius! graph/example-config)
   (update-json-input! graph/example-config)
   (render-tables!)
   (show-json-status! "Example loaded" false)
@@ -845,6 +940,7 @@
                 (set-config! config)
                 (precompute-lineage! config)
                 (precompute-attribute-lineage! config)
+                (precompute-blast-radius! config)
                 (render-tables!)
                 (show-json-status! "Config applied successfully" false)
                 (switch-tab! "graph-pane"))
@@ -1636,21 +1732,484 @@
                                                              (set! (.-value input) "")
                                                              (select-attribute! attr-id)))))))))))))))
 
+;; =============================================================================
+;; Blast Radius
+;; =============================================================================
+
+(defonce blast-radius-state (atom {:graphviz nil}))
+
+(defn show-blast-radius! [node-name]
+  (when-let [config (:config @state)]
+    (let [modal ($id "blast-radius-modal")
+          graph-container ($id "blast-radius-graph")
+          summary-container ($id "blast-radius-summary")
+          node-name-el ($id "blast-radius-node-name")
+          blast-cache (:blast-radius-cache @state)]
+      (when (and modal graph-container summary-container)
+        ;; Update URL with blast parameter
+        (update-hash-with-blast node-name)
+
+        ;; Set node name in title
+        (when node-name-el
+          (set! (.-textContent node-name-el) node-name))
+
+        ;; Reset graph container
+        (set! (.-innerHTML graph-container) "")
+        (swap! blast-radius-state assoc :graphviz nil)
+
+        ;; Get analysis from cache or compute on-the-fly
+        (let [analysis (graph/generate-blast-radius-analysis config node-name blast-cache)]
+          (if (or (nil? analysis) (zero? (:total-affected analysis)))
+            ;; No downstream dependencies
+            (do
+              (set-html! summary-container
+                         "<div style='text-align: center; padding: 2rem; color: var(--text-muted);'>
+                            <div style='font-size: 2rem; margin-bottom: 1rem;'>✓</div>
+                            <div>No downstream dependencies</div>
+                            <div style='font-size: 0.85em; margin-top: 0.5rem;'>This node has no downstream impact.</div>
+                          </div>")
+              (set-html! graph-container
+                         "<div style='display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);'>
+                            No downstream dependencies to visualize
+                          </div>"))
+            ;; Has downstream dependencies - build summary
+            (let [is-group? (= :group (:source-type analysis))
+                  depth-colors ["#c98b8b" "#d4a574" "#c4c474" "#7cb47c" "#6b9dc4" "#a88bc4"]
+
+                  ;; Group members section
+                  group-members-html
+                  (if (and is-group? (:group-members analysis))
+                    (str "<div style='margin-bottom: 1rem;'>"
+                         "<div style='font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;'>"
+                         "Group Members (" (:group-size analysis) ")</div>"
+                         "<div style='display: flex; flex-wrap: wrap; gap: 0.25rem;'>"
+                         (str/join "" (map #(str "<span style='font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid #00897b;'>▢ " % "</span>")
+                                           (:group-members analysis)))
+                         "</div></div>")
+                    "")
+
+                  ;; Impact summary section
+                  impact-html
+                  (str "<div style='margin-bottom: 1rem;'>"
+                       "<div style='font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;'>Impact Summary</div>"
+                       "<div style='display: flex; gap: 1rem;'>"
+                       "<div style='text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;'>"
+                       "<div style='font-size: 1.5rem; font-weight: bold; color: #c98b8b;'>" (:total-affected analysis) "</div>"
+                       "<div style='font-size: 0.7rem; color: var(--text-muted);'>Total Affected</div>"
+                       "</div>"
+                       "<div style='text-align: center; padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 4px;'>"
+                       "<div style='font-size: 1.5rem; font-weight: bold; color: #6b9dc4;'>" (:max-depth analysis) "</div>"
+                       "<div style='font-size: 0.7rem; color: var(--text-muted);'>Max Depth</div>"
+                       "</div></div></div>")
+
+                  ;; Nodes by depth section
+                  depth-html
+                  (str/join ""
+                            (for [[depth nodes] (:by-depth analysis)]
+                              (let [color (nth depth-colors (min depth (dec (count depth-colors))))]
+                                (str "<div style='margin-bottom: 0.5rem;'>"
+                                     "<div style='font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;'>"
+                                     "Depth " depth " <span style='color: " color ";'>●</span></div>"
+                                     "<div style='display: flex; flex-wrap: wrap; gap: 0.25rem;'>"
+                                     (str/join ""
+                                               (for [node nodes]
+                                                 (let [icon (if (= :pipeline (:type node)) "▢" "○")]
+                                                   (str "<span style='font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid " color ";'>"
+                                                        icon " " (:name node) "</span>"))))
+                                     "</div></div>"))))
+
+                  ;; JSON view
+                  json-html
+                  (str "<div id='blast-radius-json-view' style='display: none;'>"
+                       "<pre style='font-size: 0.7rem; max-height: 400px; overflow: auto; background: var(--bg-secondary); color: var(--text-primary); padding: 0.75rem; border-radius: 4px; margin: 0; border: 1px solid var(--border-color);'>"
+                       (js/JSON.stringify (clj->js analysis) nil 2)
+                       "</pre></div>")
+
+                  summary-html
+                  (str "<div class='lineage-view-toggle' style='margin-bottom: 0.75rem;'>"
+                       "<span class='lineage-toggle-label active' data-view='tree'>Summary</span>"
+                       "<div class='lineage-toggle-slider' id='blast-radius-toggle'></div>"
+                       "<span class='lineage-toggle-label' data-view='json'>JSON</span>"
+                       "</div>"
+                       "<div id='blast-radius-tree-view'>"
+                       group-members-html
+                       impact-html
+                       depth-html
+                       "</div>"
+                       json-html)]
+
+              (set-html! summary-container summary-html)
+
+              ;; Set up toggle listener
+              (when-let [toggle ($id "blast-radius-toggle")]
+                (on! toggle "click"
+                     (fn [_]
+                       (let [is-json? (.toggle (.-classList toggle) "json-active")
+                             tree-view ($id "blast-radius-tree-view")
+                             json-view ($id "blast-radius-json-view")
+                             tree-label (.querySelector summary-container ".lineage-toggle-label[data-view='tree']")
+                             json-label (.querySelector summary-container ".lineage-toggle-label[data-view='json']")]
+                         (if is-json?
+                           (do
+                             (set! (.-display (.-style tree-view)) "none")
+                             (set! (.-display (.-style json-view)) "block")
+                             (remove-class! tree-label "active")
+                             (add-class! json-label "active"))
+                           (do
+                             (set! (.-display (.-style tree-view)) "block")
+                             (set! (.-display (.-style json-view)) "none")
+                             (add-class! tree-label "active")
+                             (remove-class! json-label "active")))))))
+
+              ;; Render graph after modal is visible
+              (js/setTimeout
+               (fn []
+                 (let [dot (graph/generate-blast-radius-dot analysis (dark?))
+                       width (or (.-clientWidth graph-container) 600)
+                       height 400]
+                   (when dot
+                     (try
+                       ;; Clear any existing content completely
+                       (set! (.-innerHTML graph-container) "")
+                       ;; Create fresh graphviz with zoom disabled (we add our own)
+                       (let [gv (-> (.select d3 "#blast-radius-graph")
+                                    (.graphviz)
+                                    (.width width)
+                                    (.height height)
+                                    (.fit true)
+                                    (.zoom false)
+                                    (.on "end"
+                                         (fn []
+                                           ;; Add manual zoom behavior after render
+                                           (let [svg (.select d3 "#blast-radius-graph svg")
+                                                 g (.select svg "g")
+                                                 zoom (-> (.zoom d3)
+                                                          (.scaleExtent #js [0.1 4])
+                                                          (.on "zoom"
+                                                               (fn [event]
+                                                                 (.attr g "transform" (.-transform event)))))]
+                                             (.call svg zoom)
+                                             ;; Double-click to reset zoom
+                                             (.on svg "dblclick.zoom"
+                                                  (fn []
+                                                    (-> svg
+                                                        (.transition)
+                                                        (.duration 300)
+                                                        (.call (.transform zoom (.zoomIdentity d3))))))))))]
+                         (swap! blast-radius-state assoc :graphviz gv)
+                         (.renderDot gv dot))
+                       (catch :default e
+                         (js/console.error "Blast radius graph error:" e)
+                         (set-html! graph-container
+                                    "<div style='display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);'>Error rendering graph</div>"))))))
+               100)))
+
+          ;; Show modal
+          (add-class! modal "show")
+          (set! (.-display (.-style modal)) "flex"))))))
+
+(defn hide-blast-radius-modal! []
+  (when-let [modal ($id "blast-radius-modal")]
+    (remove-class! modal "show")
+    (set! (.-display (.-style modal)) "none")
+    ;; Clear blast from URL hash
+    (clear-blast-from-hash)))
+
+;; =============================================================================
+;; Planner
+;; =============================================================================
+
+(defonce planner-state (atom {:view :pipeline  ;; :pipeline, :airflow, :blast
+                              :selected []
+                              :graphviz nil
+                              :picker-open? false}))
+
+(def ^:private planner-hints
+  {:pipeline "Select pipelines to plan backfill execution order"
+   :airflow "Maps pipelines to Airflow DAGs based on links"
+   :blast "Select a node to see all downstream dependencies affected by changes"})
+
+(defn update-planner-picker-label! []
+  (when-let [label ($id "planner-picker-label")]
+    (let [selected (:selected @planner-state)
+          view (:view @planner-state)
+          text (cond
+                 (empty? selected) (if (= view :blast) "Select a node..." "Select pipelines...")
+                 (= view :blast) (first selected)
+                 :else (str (count selected) " selected"))]
+      (set! (.-textContent label) text))))
+
+(defn update-planner-count! []
+  (when-let [count-el ($id "planner-picker-count")]
+    (let [n (count (:selected @planner-state))]
+      (set! (.-textContent count-el) (str n " selected")))))
+
+(defn toggle-planner-picker! []
+  (when-let [dropdown ($id "planner-picker-dropdown")]
+    (let [is-open? (.contains (.-classList dropdown) "show")]
+      (if is-open?
+        (remove-class! dropdown "show")
+        (add-class! dropdown "show"))
+      (swap! planner-state assoc :picker-open? (not is-open?)))))
+
+(defn close-planner-picker! []
+  (when-let [dropdown ($id "planner-picker-dropdown")]
+    (remove-class! dropdown "show")
+    (swap! planner-state assoc :picker-open? false)))
+
+(defn render-planner-graph! []
+  (when-let [config (:config @state)]
+    (let [container ($id "planner-graph")
+          output ($id "planner-output")
+          {:keys [view selected]} @planner-state
+          blast-cache (:blast-radius-cache @state)]
+      (when container
+        ;; Update URL hash with planner state
+        (when (seq selected)
+          (update-hash-with-planner-state view selected))
+        (if (empty? selected)
+          ;; No selection - show placeholder and reset graphviz instance
+          (do
+            (swap! planner-state assoc :graphviz nil)
+            (set! (.-innerHTML container) "<div class='planner-placeholder'>Select pipelines to see the execution plan</div>")
+            (when output (set! (.-textContent output) "")))
+          ;; Generate analysis and render
+          (let [analysis (case view
+                           :blast (graph/generate-blast-radius-analysis config (first selected) blast-cache)
+                           :airflow (let [backfill (graph/generate-backfill-analysis config selected)]
+                                      (graph/generate-airflow-analysis config backfill))
+                           (graph/generate-backfill-analysis config selected))
+                dot (case view
+                      :blast (graph/generate-blast-radius-dot analysis (dark?))
+                      :airflow (graph/generate-airflow-dot analysis (dark?))
+                      (graph/generate-backfill-dot analysis (dark?)))]
+            ;; Update output JSON
+            (when output
+              (set! (.-textContent output) (js/JSON.stringify (clj->js analysis) nil 2)))
+            ;; Render graph - reuse graphviz instance for smooth morphing
+            (if dot
+              (try
+                (let [existing-gv (:graphviz @planner-state)
+                      width (or (.-clientWidth container) 500)]
+                  (if existing-gv
+                    ;; Reuse existing instance for smooth morph transition
+                    (.renderDot existing-gv dot)
+                    ;; Create new instance (first render)
+                    (do
+                      (set! (.-innerHTML container) "")
+                      (let [gv (-> (.select d3 "#planner-graph")
+                                   (.graphviz)
+                                   (.width width)
+                                   (.height 450)
+                                   (.fit true)
+                                   (.zoom false)
+                                   (.transition (fn [] (-> (d3/transition "planner")
+                                                           (.duration 300)
+                                                           (.ease (.-easeCubicInOut d3)))))
+                                   (.on "end"
+                                        (fn []
+                                          (let [svg (.select d3 "#planner-graph svg")
+                                                g (.select svg "g")
+                                                zoom (-> (.zoom d3)
+                                                         (.scaleExtent #js [0.1 4])
+                                                         (.on "zoom" (fn [event]
+                                                                       (.attr g "transform" (.-transform event)))))]
+                                            (.call svg zoom)))))]
+                        (swap! planner-state assoc :graphviz gv)
+                        (.renderDot gv dot)))))
+                (catch :default e
+                  (js/console.error "Planner graph error:" e)
+                  (swap! planner-state assoc :graphviz nil)
+                  (set! (.-innerHTML container) "<div class='planner-placeholder'>Error rendering graph</div>")))
+              (do
+                ;; Reset graphviz instance since we're replacing the container content
+                (swap! planner-state assoc :graphviz nil)
+                (set! (.-innerHTML container) "<div class='planner-placeholder'>No dependencies to visualize</div>")))))))))
+
+(defn handle-planner-item-change! [e]
+  (let [input (.-target e)
+        name (.-value input)
+        checked? (.-checked input)
+        view (:view @planner-state)]
+    (if (= view :blast)
+      ;; Blast mode - single selection (radio)
+      (swap! planner-state assoc :selected (if checked? [name] []))
+      ;; Pipeline/Airflow mode - multiple selection (checkbox)
+      (swap! planner-state update :selected
+             (fn [sel]
+               (if checked?
+                 (conj (vec sel) name)
+                 (vec (remove #(= % name) sel))))))
+    (update-planner-picker-label!)
+    (update-planner-count!)
+    (render-planner-graph!)))
+
+(defn populate-planner-picker! []
+  (when-let [config (:config @state)]
+    (when-let [list-el ($id "planner-picker-list")]
+      (let [{:keys [view selected]} @planner-state
+            pipelines (or (:pipelines config) [])
+            datasources (or (:datasources config) [])
+            selected-set (set selected)
+            is-blast? (= view :blast)
+            input-type (if is-blast? "radio" "checkbox")
+
+            ;; Group pipelines by cluster or group
+            grouped (group-by #(or (:cluster %) (:group %) "Other") pipelines)
+
+            ;; Build HTML
+            html (str
+                  ;; Pipelines grouped
+                  (str/join ""
+                            (for [[group-name group-pipelines] (sort-by first grouped)]
+                              (str "<div class='planner-picker-group'>" group-name "</div>"
+                                   (str/join ""
+                                             (for [p (sort-by :name group-pipelines)]
+                                               (str "<label class='planner-picker-item' data-name='" (str/lower-case (:name p)) "'>"
+                                                    "<input type='" input-type "' name='planner-item' value='" (:name p) "'"
+                                                    (when (contains? selected-set (:name p)) " checked") ">"
+                                                    "<span>" (:name p) "</span>"
+                                                    "</label>"))))))
+                  ;; Datasources (only in blast mode)
+                  (when is-blast?
+                    (str "<div class='planner-picker-group'>Datasources</div>"
+                         (str/join ""
+                                   (for [ds (sort-by :name datasources)]
+                                     (str "<label class='planner-picker-item' data-name='" (str/lower-case (:name ds)) "'>"
+                                          "<input type='radio' name='planner-item' value='" (:name ds) "'"
+                                          (when (contains? selected-set (:name ds)) " checked") ">"
+                                          "<span>" (:name ds) "</span>"
+                                          "<span class='ds-tag'>ds</span>"
+                                          "</label>"))))))]
+        (set! (.-innerHTML list-el) html)
+        ;; Add event listeners
+        (doseq [input (array-seq (.querySelectorAll list-el "input"))]
+          (on! input "change" handle-planner-item-change!))))))
+
+(defn filter-planner-items! [query]
+  (when-let [list-el ($id "planner-picker-list")]
+    (let [q (str/lower-case (str/trim query))]
+      (doseq [item (array-seq (.querySelectorAll list-el ".planner-picker-item"))]
+        (let [name (.getAttribute item "data-name")]
+          (if (or (str/blank? q) (str/includes? name q))
+            (remove-class! item "hidden")
+            (add-class! item "hidden")))))))
+
+(defn clear-planner-selection! []
+  (swap! planner-state assoc :selected [])
+  (when-let [list-el ($id "planner-picker-list")]
+    (doseq [input (array-seq (.querySelectorAll list-el "input"))]
+      (set! (.-checked input) false)))
+  (update-planner-picker-label!)
+  (update-planner-count!)
+  (render-planner-graph!))
+
+(defn set-planner-view! [view-name]
+  (let [view (keyword view-name)]
+    ;; Reset graphviz instance and selection for clean transition
+    (swap! planner-state assoc :view view :selected [] :graphviz nil)
+    ;; Update button states
+    (doseq [btn (array-seq (.querySelectorAll js/document ".planner-view-btn"))]
+      (if (= view-name (.getAttribute btn "data-view"))
+        (add-class! btn "active")
+        (remove-class! btn "active")))
+    ;; Update hint
+    (when-let [hint ($id "planner-hint")]
+      (set! (.-textContent hint) (get planner-hints view)))
+    ;; Repopulate picker and reset graph
+    (populate-planner-picker!)
+    (update-planner-picker-label!)
+    (update-planner-count!)
+    (render-planner-graph!)
+    ;; Show the picker dropdown (like JS version does)
+    (when-let [dropdown ($id "planner-picker-dropdown")]
+      (when-not (.contains (.-classList dropdown) "show")
+        (add-class! dropdown "show")
+        (swap! planner-state assoc :picker-open? true)
+        (when-let [filter-input ($id "planner-picker-filter")]
+          (js/setTimeout #(.focus filter-input) 0))))))
+
+(defn copy-planner-output! []
+  (when-let [output ($id "planner-output")]
+    (let [text (.-textContent output)]
+      (when (not (str/blank? text))
+        (when-let [btn (.querySelector js/document ".planner-copy-btn")]
+          (let [copy-icon (.-innerHTML btn)
+                check-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>"]
+            (-> (js/navigator.clipboard.writeText text)
+                (.then (fn []
+                         (add-class! btn "copied")
+                         (set! (.-innerHTML btn) check-icon)
+                         (js/setTimeout #(do
+                                           (remove-class! btn "copied")
+                                           (set! (.-innerHTML btn) copy-icon))
+                                        1500)))
+                (.catch #(js/console.error "Failed to copy:" %)))))))))
+
+(defn restore-planner-from-hash! []
+  (let [{:keys [view pipelines]} (get-planner-state-from-hash)]
+    (when (or view pipelines)
+      (when view
+        (swap! planner-state assoc :view view)
+        ;; Update button states
+        (doseq [btn (array-seq (.querySelectorAll js/document ".planner-view-btn"))]
+          (if (= (name view) (.getAttribute btn "data-view"))
+            (add-class! btn "active")
+            (remove-class! btn "active")))
+        ;; Update hint
+        (when-let [hint ($id "planner-hint")]
+          (set! (.-textContent hint) (get planner-hints view))))
+      (when pipelines
+        (swap! planner-state assoc :selected (vec pipelines)))
+      (populate-planner-picker!)
+      (update-planner-picker-label!)
+      (update-planner-count!)
+      (render-planner-graph!))))
+
+(defn init-planner! []
+  (populate-planner-picker!)
+  (update-planner-picker-label!)
+  ;; Close picker when clicking outside
+  (.addEventListener js/document "click"
+                     (fn [e]
+                       (when (:picker-open? @planner-state)
+                         (let [picker (.closest (.-target e) ".planner-picker")]
+                           (when-not picker
+                             (close-planner-picker!)))))))
+
 ;; Handle hashchange for browser back/forward navigation
 (defn setup-hashchange-listener! []
   (.addEventListener js/window "hashchange"
                      (fn [_]
-                       (let [node-from-hash (get-node-from-hash)
-                             current-selected (:selected-node @state)]
+                       (let [{:keys [tab node blast view pipelines]} (parse-hash)
+                             current-selected (:selected-node @state)
+                             modal-visible? (when-let [m ($id "blast-radius-modal")]
+                                              (.contains (.-classList m) "show"))]
                          (cond
+                           ;; Blast in hash - show blast radius modal
+                           (and blast (not modal-visible?))
+                           (do
+                             (switch-tab! "graph-pane")
+                             (js/setTimeout #(show-blast-radius! blast) 100))
+
+                           ;; No blast in hash but modal is visible - close it
+                           (and (nil? blast) modal-visible?)
+                           (hide-blast-radius-modal!)
+
+                           ;; Planner tab with state
+                           (and (= tab "planner") (or view pipelines))
+                           (do
+                             (switch-tab! "planner-pane")
+                             (js/setTimeout restore-planner-from-hash! 100))
+
                            ;; Node in hash but different from current selection
-                           (and node-from-hash (not= node-from-hash current-selected))
+                           (and node (not= node current-selected))
                            (do
                              (switch-tab! "graph-pane")
                              (js/setTimeout select-node-from-hash! 100))
 
                            ;; No node in hash but we have a selection - clear it
-                           (and (nil? node-from-hash) current-selected)
+                           (and (nil? node) current-selected)
                            (clear-selection!))))))
 
 ;; Init
@@ -1668,11 +2227,34 @@
   (set-config! graph/example-config)
   (precompute-lineage! graph/example-config)
   (precompute-attribute-lineage! graph/example-config)
+  (precompute-blast-radius! graph/example-config)
   (update-json-input! graph/example-config)
   (render-tables!)
-  ;; If there's a node in the hash, switch to graph pane
-  (when (get-node-from-hash)
-    (switch-tab! "graph-pane")))
+  (init-planner!)
+  ;; Handle hash state on page load
+  (let [{:keys [tab node blast view pipelines]} (parse-hash)]
+    (cond
+      ;; If there's a blast in the hash, show blast radius modal
+      blast
+      (do
+        (switch-tab! "graph-pane")
+        (js/setTimeout #(show-blast-radius! blast) 200))
+
+      ;; If there's a node in the hash, switch to graph and select it
+      node
+      (do
+        (switch-tab! "graph-pane")
+        (js/setTimeout select-node-from-hash! 200))
+
+      ;; If it's the planner tab with view/pipelines, restore state
+      (and (= tab "planner") (or view pipelines))
+      (do
+        (switch-tab! "planner-pane")
+        (js/setTimeout restore-planner-from-hash! 200))
+
+      ;; If there's a specific tab in the hash, switch to it
+      (and tab (not= tab "home"))
+      (switch-tab! (str tab "-pane")))))
 
 (defn reload []
   (when (:config @state)
@@ -1690,5 +2272,12 @@
 (set! js/window.applyConfig apply-config!)
 (set! js/window.formatJson format-json!)
 (set! js/window.resetAttributeGraph reset-attribute-graph!)
+(set! js/window.showBlastRadius show-blast-radius!)
+(set! js/window.hideBlastRadiusModal hide-blast-radius-modal!)
+(set! js/window.togglePlannerPicker toggle-planner-picker!)
+(set! js/window.filterPlannerItems filter-planner-items!)
+(set! js/window.clearPlannerSelection clear-planner-selection!)
+(set! js/window.setPlannerView set-planner-view!)
+(set! js/window.copyPlannerOutput copy-planner-output!)
 
 

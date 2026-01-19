@@ -1,6 +1,7 @@
 (ns pipeviz.graph
   "Pure graph logic for pipeline lineage - no DOM, no JS interop"
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [pipeviz.graph-core :as core]))
 
 (declare format-schedule)
 
@@ -439,6 +440,14 @@
          hierarchy (into {} (for [c clusters :when (:parent c)] [(:name c) (:parent c)]))
          children (reduce (fn [m [c p]] (update m p (fnil conj []) c)) {} hierarchy)
 
+         ;; Collect implicit datasources (referenced but not defined)
+         explicit-ds-names (set (map :name datasources))
+         implicit-datasources (->> pipelines
+                                   (mapcat #(concat (:input_sources %) (:output_sources %)))
+                                   distinct
+                                   (remove explicit-ds-names)
+                                   (map #(hash-map :name %)))
+
          ;; Group nodes by cluster (including collapsed groups)
          nodes-by-cluster (as-> {} $
                             (reduce #(update %1 (or (:cluster %2) "_none")
@@ -453,6 +462,12 @@
                               (reduce #(update %1 (or (:cluster %2) "_none")
                                                (fnil conj []) {:type :datasource :node %2})
                                       $ datasources)
+                              $)
+                            ;; Add implicit datasources (no cluster, so goes to _none)
+                            (if show-datasources?
+                              (reduce #(update %1 "_none"
+                                               (fnil conj []) {:type :datasource :node %2})
+                                      $ implicit-datasources)
                               $))
 
          ;; Render cluster recursively
@@ -758,76 +773,558 @@
          clusters "\n" edges "\n}")))
 
 ;; =============================================================================
+;; Blast Radius Analysis
+;; =============================================================================
+
+(defn build-blast-radius-graph
+  "Build the downstream adjacency graph and node types map from config.
+   This is precomputed once per config and reused for all blast radius queries.
+   Returns {:downstream {node -> #{neighbors}}, :node-types {node -> :pipeline|:datasource},
+            :pipelines [...], :groups {group-name -> [member-names]}}"
+  [config]
+  (when config
+    (let [pipelines (or (:pipelines config) [])
+          datasources (or (:datasources config) [])
+          downstream (atom {})
+          node-types (atom {})]
+
+      ;; Build graph from pipelines
+      (doseq [p pipelines]
+        (swap! node-types assoc (:name p) :pipeline)
+        (when-not (get @downstream (:name p))
+          (swap! downstream assoc (:name p) #{}))
+
+        ;; pipeline -> output sources
+        (doseq [s (:output_sources p)]
+          (swap! downstream update (:name p) (fnil conj #{}) s)
+          (when-not (get @node-types s)
+            (swap! node-types assoc s :datasource)))
+
+        ;; input sources -> pipeline
+        (doseq [s (:input_sources p)]
+          (when-not (get @downstream s)
+            (swap! downstream assoc s #{}))
+          (swap! downstream update s (fnil conj #{}) (:name p))
+          (when-not (get @node-types s)
+            (swap! node-types assoc s :datasource)))
+
+        ;; upstream pipelines -> this pipeline
+        (doseq [u (:upstream_pipelines p)]
+          (when-not (get @downstream u)
+            (swap! downstream assoc u #{}))
+          (swap! downstream update u (fnil conj #{}) (:name p))))
+
+      ;; Add datasources not referenced by pipelines
+      (doseq [ds datasources]
+        (when-not (get @node-types (:name ds))
+          (swap! node-types assoc (:name ds) :datasource)))
+
+      ;; Build groups map
+      (let [groups (->> pipelines
+                        (filter :group)
+                        (group-by :group)
+                        (reduce-kv (fn [m k v] (assoc m k (mapv :name v))) {}))]
+        {:downstream @downstream
+         :node-types @node-types
+         :pipelines pipelines
+         :groups groups}))))
+
+(defn blast-radius-for-node
+  "Compute blast radius for a specific node using precomputed graph.
+   Much faster than generate-blast-radius-analysis when called multiple times."
+  [{:keys [downstream node-types pipelines groups]} node-name]
+  (when node-name
+    (let [;; Check if this is a pipeline group
+          group-members (get groups node-name)
+          is-group? (seq group-members)
+
+          ;; BFS starting nodes
+          start-nodes (if is-group? group-members [node-name])
+          group-member-names (set start-nodes)
+
+          ;; BFS to find all downstream nodes
+          visited (atom (into {} (map #(vector % 0) start-nodes)))
+          edges (atom [])
+          queue (atom (vec (map #(vector % 0) start-nodes)))]
+
+      (while (seq @queue)
+        (let [[current depth] (first @queue)]
+          (swap! queue #(vec (rest %)))
+          (let [neighbors (get downstream current #{})]
+            (doseq [neighbor neighbors]
+              ;; For groups, don't add edges between group members
+              (when-not (and is-group?
+                             (contains? group-member-names current)
+                             (contains? group-member-names neighbor))
+                (swap! edges conj {:source (if is-group? node-name current)
+                                   :target neighbor})
+                (when-not (contains? @visited neighbor)
+                  (swap! visited assoc neighbor (inc depth))
+                  (swap! queue conj [neighbor (inc depth)])))))))
+
+      ;; Build downstream nodes list (excluding source/group members)
+      (let [downstream-nodes
+            (->> @visited
+                 (remove (fn [[node _]]
+                           (if is-group?
+                             (contains? group-member-names node)
+                             (= node node-name))))
+                 (map (fn [[node depth]]
+                        (let [node-type (get node-types node :unknown)
+                              pipeline (first (filter #(= (:name %) node) pipelines))
+                              base {:name node :type node-type :depth depth}]
+                          (cond-> base
+                            (:schedule pipeline) (assoc :schedule (:schedule pipeline))
+                            (:cluster pipeline) (assoc :cluster (:cluster pipeline))))))
+                 (sort-by (juxt :depth :name))
+                 vec)
+
+            by-depth (->> downstream-nodes
+                          (group-by :depth)
+                          (into (sorted-map)))
+
+            max-depth (if (seq downstream-nodes)
+                        (apply max (map :depth downstream-nodes))
+                        0)
+
+            result {:source node-name
+                    :source-type (if is-group? :group (get node-types node-name :unknown))
+                    :total-affected (count downstream-nodes)
+                    :max-depth max-depth
+                    :downstream downstream-nodes
+                    :by-depth by-depth
+                    :edges (vec (distinct @edges))}]
+
+        (if is-group?
+          (assoc result
+                 :group-members group-members
+                 :group-size (count group-members))
+          result)))))
+
+(defn precompute-all-blast-radius
+  "Precompute blast radius for all nodes and groups in the config.
+   Returns {:graph <precomputed-graph>, :results {node-name -> analysis}}"
+  [config]
+  (when config
+    (let [graph (build-blast-radius-graph config)
+          all-nodes (keys (:node-types graph))
+          all-groups (keys (:groups graph))
+          all-targets (concat all-nodes all-groups)]
+      {:graph graph
+       :results (into {}
+                      (for [node-name all-targets]
+                        [node-name (blast-radius-for-node graph node-name)]))})))
+
+(defn generate-blast-radius-analysis
+  "Generate blast radius analysis for a node. Can use precomputed data for speed.
+   If blast-data is provided (from precompute-all-blast-radius), uses cached result.
+   Otherwise computes on-the-fly."
+  ([config node-name]
+   (generate-blast-radius-analysis config node-name nil))
+  ([config node-name blast-data]
+   (if-let [cached (get-in blast-data [:results node-name])]
+     cached
+     ;; Compute on-the-fly
+     (when-let [graph (or (:graph blast-data) (build-blast-radius-graph config))]
+       (blast-radius-for-node graph node-name)))))
+
+(defn generate-blast-radius-dot
+  "Generate DOT syntax for blast radius visualization"
+  [analysis dark?]
+  (when (and analysis (pos? (:total-affected analysis)))
+    (let [bg-color (if dark? "#1a1a1a" "#ffffff")
+          text-color (if dark? "#b0b0b0" "#666666")
+          edge-color (if dark? "#666666" "#999999")
+
+          depth-colors (if dark?
+                         [{:fill "#4a2a2a" :border "#c98b8b" :text "#e0e0e0"}  ; Source
+                          {:fill "#4a3a2a" :border "#d4a574" :text "#e0e0e0"}  ; Depth 1
+                          {:fill "#4a4a2a" :border "#c4c474" :text "#e0e0e0"}  ; Depth 2
+                          {:fill "#2a4a3a" :border "#7cb47c" :text "#e0e0e0"}  ; Depth 3
+                          {:fill "#2a3a4a" :border "#6b9dc4" :text "#e0e0e0"}  ; Depth 4
+                          {:fill "#3a2a4a" :border "#a88bc4" :text "#e0e0e0"}] ; Depth 5+
+                         [{:fill "#fce4ec" :border "#c98b8b" :text "#495057"}
+                          {:fill "#fff3e0" :border "#d4a574" :text "#495057"}
+                          {:fill "#fffde7" :border "#c4c474" :text "#495057"}
+                          {:fill "#e8f5e9" :border "#7cb47c" :text "#495057"}
+                          {:fill "#e3f2fd" :border "#6b9dc4" :text "#495057"}
+                          {:fill "#f3e5f5" :border "#a88bc4" :text "#495057"}])
+
+          source-color (first depth-colors)
+          is-group? (= :group (:source-type analysis))
+          source-shape (if (= :datasource (:source-type analysis)) "ellipse" "box")
+          source-label (if is-group?
+                         (str (:source analysis) "\\n(" (:group-size analysis) " pipelines)")
+                         (:source analysis))
+          source-border (if is-group? "#00897b" (:border source-color))
+
+          ;; Build source node
+          source-node (str "    \"" (:source analysis) "\" [label=\"" source-label
+                           "\" shape=\"" source-shape
+                           "\" fillcolor=\"" (:fill source-color)
+                           "\" color=\"" source-border
+                           "\" fontcolor=\"" (:text source-color) "\" penwidth=\"2\"]\n\n")
+
+          ;; Build depth clusters
+          depth-clusters
+          (str/join "\n"
+                    (for [[depth nodes] (:by-depth analysis)]
+                      (let [color-idx (min depth (dec (count depth-colors)))
+                            colors (nth depth-colors color-idx)
+                            node-strs (str/join "\n"
+                                                (for [node nodes]
+                                                  (let [shape (if (= :datasource (:type node)) "ellipse" "box")]
+                                                    (str "        \"" (:name node) "\" [label=\"" (:name node)
+                                                         "\" shape=\"" shape
+                                                         "\" fillcolor=\"" (:fill colors)
+                                                         "\" color=\"" (:border colors)
+                                                         "\" fontcolor=\"" (:text colors) "\"]"))))]
+                        (str "    subgraph cluster_depth" depth " {\n"
+                             "        label=\"Depth " depth "\"\n"
+                             "        fontname=\"Helvetica\"\n"
+                             "        style=\"dashed\"\n"
+                             "        color=\"" (:border colors) "\"\n"
+                             "        fontcolor=\"" text-color "\"\n"
+                             "        fontsize=\"9\"\n\n"
+                             node-strs "\n"
+                             "    }"))))
+
+          ;; Build edges (deduplicated)
+          edge-strs (->> (:edges analysis)
+                         (map (fn [{:keys [source target]}]
+                                (str "    \"" source "\" -> \"" target "\"")))
+                         distinct
+                         (str/join "\n"))]
+
+      (str "digraph BlastRadius {\n"
+           "    rankdir=LR\n"
+           "    bgcolor=\"" bg-color "\"\n"
+           "    fontname=\"Helvetica\"\n"
+           "    node [fontname=\"Helvetica\" fontsize=\"9\" style=\"filled\"]\n"
+           "    edge [color=\"" edge-color "\" arrowsize=\"0.6\"]\n\n"
+           source-node
+           depth-clusters "\n\n"
+           edge-strs "\n"
+           "}\n"))))
+
+;; =============================================================================
+;; Backfill/Planner Analysis (using pure core functions)
+;; =============================================================================
+
+(defn generate-backfill-analysis
+  "Generate backfill analysis for selected pipelines using Kahn's topological sort.
+   Returns execution waves (stages) where pipelines in same wave can run in parallel.
+
+   Uses pure functions from pipeviz.graph-core - no atoms, no side effects."
+  [config selected-pipelines]
+  (when (and config (seq selected-pipelines))
+    (let [pipelines (or (:pipelines config) [])
+          pipeline-map (into {} (map (juxt :name identity) pipelines))
+          pipeline-names (set (map :name pipelines))
+
+          ;; Validate: only allow pipelines
+          invalid-nodes (remove pipeline-names selected-pipelines)
+          _ (when (seq invalid-nodes)
+              (throw (ex-info "Backfill only works for pipelines" {:invalid invalid-nodes})))
+
+          ;; Use core functions for graph analysis
+          {:keys [waves edges node-count]}
+          (core/compute-execution-waves pipelines selected-pipelines)
+
+          ;; Build result with pipeline metadata
+          wave-data (map-indexed
+                     (fn [idx wave-nodes]
+                       {:wave idx
+                        :parallel-count (count wave-nodes)
+                        :pipelines (mapv (fn [n]
+                                          (let [p (get pipeline-map n)]
+                                            (cond-> {:name n}
+                                              (:schedule p) (assoc :schedule (format-schedule (:schedule p)))
+                                              (:cluster p) (assoc :cluster (:cluster p))
+                                              (:owner p) (assoc :owner (:owner p)))))
+                                        wave-nodes)})
+                     waves)]
+
+      {:nodes (vec selected-pipelines)
+       :total-downstream-pipelines (max 0 (- node-count (count selected-pipelines)))
+       :total-waves (count waves)
+       :max-parallelism (if (seq waves) (apply max (map count waves)) 0)
+       :waves (vec wave-data)
+       :edges (mapv (fn [[from to]] {:source from :target to}) edges)})))
+
+(def ^:private wave-colors
+  [{:fill "#e8f5e9" :border "#81c784" :text "#495057"}   ; Green
+   {:fill "#e3f2fd" :border "#64b5f6" :text "#495057"}   ; Blue
+   {:fill "#f3e5f5" :border "#ba68c8" :text "#495057"}   ; Purple
+   {:fill "#fff3e0" :border "#ffb74d" :text "#495057"}   ; Orange
+   {:fill "#e0f7fa" :border "#4dd0e1" :text "#495057"}   ; Cyan
+   {:fill "#fce4ec" :border "#f48fb1" :text "#495057"}]) ; Pink
+
+(def ^:private wave-colors-dark
+  [{:fill "#1b3d1b" :border "#81c784" :text "#e0e0e0"}
+   {:fill "#1a2d3d" :border "#64b5f6" :text "#e0e0e0"}
+   {:fill "#2d1a2d" :border "#ba68c8" :text "#e0e0e0"}
+   {:fill "#3d2d1a" :border "#ffb74d" :text "#e0e0e0"}
+   {:fill "#1a3d3d" :border "#4dd0e1" :text "#e0e0e0"}
+   {:fill "#3d1a2d" :border "#f48fb1" :text "#e0e0e0"}])
+
+(def ^:private wave0-color
+  {:fill "#fef3e2" :border "#d4915c" :text "#495057"})
+
+(def ^:private wave0-color-dark
+  {:fill "#3d2d1a" :border "#d4915c" :text "#e0e0e0"})
+
+(defn generate-backfill-dot
+  "Generate DOT syntax for backfill execution plan visualization"
+  [analysis dark?]
+  (when (and analysis (pos? (:total-waves analysis)))
+    (let [bg-color (if dark? "#1a1a1a" "#ffffff")
+          text-color (if dark? "#b0b0b0" "#666666")
+          edge-color (if dark? "#666666" "#999999")
+          colors (if dark? wave-colors-dark wave-colors)
+          w0-color (if dark? wave0-color-dark wave0-color)
+
+          ;; Build wave clusters
+          wave-clusters
+          (str/join "\n"
+                    (for [{:keys [wave pipelines]} (:waves analysis)]
+                      (let [color (if (zero? wave)
+                                    w0-color
+                                    (nth colors (mod (dec wave) (count colors))))
+                            node-strs (str/join "\n"
+                                                (for [p pipelines]
+                                                  (str "        \"" (:name p) "\" [label=\"" (:name p)
+                                                       "\" fillcolor=\"" (:fill color)
+                                                       "\" color=\"" (:border color)
+                                                       "\" fontcolor=\"" (:text color) "\"]")))]
+                        (str "    subgraph cluster_wave" wave " {\n"
+                             "        label=\"Wave " wave "\"\n"
+                             "        style=\"dashed\"\n"
+                             "        color=\"" (:border color) "\"\n"
+                             "        fontcolor=\"" text-color "\"\n"
+                             "        fontsize=\"9\"\n\n"
+                             node-strs "\n"
+                             "    }"))))
+
+          ;; Build edges
+          edge-strs (->> (:edges analysis)
+                         (map (fn [{:keys [source target]}]
+                                (str "    \"" source "\" -> \"" target "\"")))
+                         distinct
+                         (str/join "\n"))]
+
+      (str "digraph Backfill {\n"
+           "    rankdir=LR\n"
+           "    bgcolor=\"" bg-color "\"\n"
+           "    fontname=\"Helvetica\"\n"
+           "    node [fontname=\"Helvetica\" fontsize=\"9\" style=\"filled\" shape=\"box\"]\n"
+           "    edge [color=\"" edge-color "\" arrowsize=\"0.6\"]\n\n"
+           wave-clusters "\n\n"
+           edge-strs "\n"
+           "}\n"))))
+
+(defn generate-airflow-analysis
+  "Transform backfill analysis to Airflow DAG view"
+  [config backfill-analysis]
+  (when backfill-analysis
+    (let [pipelines (or (:pipelines config) [])
+          pipeline-map (into {} (map (juxt :name identity) pipelines))
+
+          ;; Extract DAG name from airflow URL
+          extract-dag (fn [p]
+                        (when-let [url (get-in p [:links :airflow])]
+                          (when-let [match (re-find #"/dags?/([^/?\s]+)" url)]
+                            (second match))))
+
+          ;; Build pipeline -> dag mapping
+          pipeline-to-dag (into {}
+                                (for [[name p] pipeline-map
+                                      :let [dag (extract-dag p)]
+                                      :when dag]
+                                  [name dag]))
+
+          ;; Transform waves to DAG waves
+          dag-waves
+          (for [{:keys [wave pipelines]} (:waves backfill-analysis)]
+            (let [dag-groups (group-by #(get pipeline-to-dag (:name %) (:name %)) pipelines)]
+              {:wave wave
+               :parallel-count (count dag-groups)
+               :dags (vec (for [[dag-name pips] dag-groups]
+                            (let [p (first pips)
+                                  url (get-in (get pipeline-map (:name p)) [:links :airflow])]
+                              {:dag dag-name
+                               :airflow-url url
+                               :pipelines (mapv :name pips)
+                               :missing (nil? url)})))}))
+
+          ;; Transform edges to DAG edges
+          dag-edges (->> (:edges backfill-analysis)
+                         (map (fn [{:keys [source target]}]
+                                {:source-dag (get pipeline-to-dag source source)
+                                 :target-dag (get pipeline-to-dag target target)}))
+                         (filter #(not= (:source-dag %) (:target-dag %)))
+                         distinct
+                         vec)]
+
+      {:view :airflow
+       :total-dags (count (distinct (map #(get pipeline-to-dag % %) (:nodes backfill-analysis))))
+       :total-waves (count dag-waves)
+       :waves (vec dag-waves)
+       :edges dag-edges})))
+
+(defn generate-airflow-dot
+  "Generate DOT syntax for Airflow DAG visualization"
+  [analysis dark?]
+  (when (and analysis (pos? (:total-waves analysis)))
+    (let [bg-color (if dark? "#1a1a1a" "#ffffff")
+          text-color (if dark? "#b0b0b0" "#666666")
+          edge-color (if dark? "#666666" "#999999")
+          colors (if dark? wave-colors-dark wave-colors)
+          w0-color (if dark? wave0-color-dark wave0-color)
+
+          ;; Build wave clusters
+          wave-clusters
+          (str/join "\n"
+                    (for [{:keys [wave dags]} (:waves analysis)]
+                      (let [color (if (zero? wave)
+                                    w0-color
+                                    (nth colors (mod (dec wave) (count colors))))
+                            node-strs (str/join "\n"
+                                                (for [d dags]
+                                                  (let [label (if (> (count (:pipelines d)) 1)
+                                                                (str (:dag d) "\\n(" (count (:pipelines d)) " pipelines)")
+                                                                (:dag d))
+                                                        url (:airflow-url d)]
+                                                    (str "        \"" (:dag d) "\" [label=\"" label
+                                                         "\" fillcolor=\"" (:fill color)
+                                                         "\" color=\"" (if (:missing d) "#cccccc" (:border color))
+                                                         "\" fontcolor=\"" (:text color) "\""
+                                                         (when (:missing d) " style=\"filled,dashed\"")
+                                                         (when (and url (not (:missing d)))
+                                                           (str " href=\"" url "\" target=\"_blank\" tooltip=\"Open in Airflow\""))
+                                                         "]"))))]
+                        (str "    subgraph cluster_wave" wave " {\n"
+                             "        label=\"Wave " wave "\"\n"
+                             "        style=\"dashed\"\n"
+                             "        color=\"" (:border color) "\"\n"
+                             "        fontcolor=\"" text-color "\"\n"
+                             "        fontsize=\"9\"\n\n"
+                             node-strs "\n"
+                             "    }"))))
+
+          ;; Build edges
+          edge-strs (->> (:edges analysis)
+                         (map (fn [{:keys [source-dag target-dag]}]
+                                (str "    \"" source-dag "\" -> \"" target-dag "\"")))
+                         distinct
+                         (str/join "\n"))]
+
+      (str "digraph Airflow {\n"
+           "    rankdir=LR\n"
+           "    bgcolor=\"" bg-color "\"\n"
+           "    fontname=\"Helvetica\"\n"
+           "    node [fontname=\"Helvetica\" fontsize=\"9\" style=\"filled\" shape=\"box\"]\n"
+           "    edge [color=\"" edge-color "\" arrowsize=\"0.6\"]\n\n"
+           wave-clusters "\n\n"
+           edge-strs "\n"
+           "}\n"))))
+
+;; =============================================================================
 ;; Example Config
 ;; =============================================================================
 
 (def example-config
   {:clusters
-   [{:name "user-processing" :description "User data processing cluster"}
-    {:name "order-management" :description "Order processing cluster"}
-    {:name "real-time" :description "Real-time streaming" :parent "order-management"}
+   [{:name "user-processing" :description "User data processing and enrichment cluster"}
+    {:name "order-management" :description "Order processing and validation cluster"}
+    {:name "real-time" :description "Real-time streaming data cluster" :parent "order-management"}
     {:name "analytics" :description "Analytics and reporting cluster"}]
 
    :pipelines
    [{:name "user-enrichment"
-     :description "Enriches user data with behavioral signals"
+     :description "Enriches user data with behavioral signals and ML features"
      :input_sources ["raw_users" "user_events"]
      :output_sources ["enriched_users"]
      :schedule "Every 2 hours"
+     :duration 45
+     :cost 18.5
      :cluster "user-processing"
-     :tags ["user-data" "ml"]
-     :links {:airflow "https://airflow.company.com/dags/user_enrichment"}}
+     :tags ["user-data" "ml" "enrichment"]
+     :links {:airflow "https://airflow.company.com/dags/user_enrichment"
+             :monitoring "https://grafana.company.com/d/user-enrichment"
+             :docs "https://docs.company.com/pipelines/user-enrichment"}}
     {:name "order-processing"
-     :description "Validates and processes incoming orders"
+     :description "Validates and processes incoming orders in real-time"
      :input_sources ["raw_orders" "inventory"]
      :output_sources ["processed_orders" "order_audit"]
      :schedule "Every 15 minutes"
+     :duration 12
+     :cost 4.2
      :cluster "real-time"
-     :tags ["orders" "real-time"]}
+     :tags ["orders" "real-time" "validation"]
+     :links {:airflow "https://airflow.company.com/dags/order_processing"
+             :monitoring "https://grafana.company.com/d/orders"
+             :alerts "https://pagerduty.company.com/services/orders"}}
     {:name "analytics-aggregation"
-     :description "Daily aggregation of user metrics"
+     :description "Daily aggregation of user metrics and business KPIs"
      :input_sources ["enriched_users" "processed_orders" "user_events"]
      :output_sources ["daily_metrics" "user_cohorts"]
      :schedule "Daily at 1:00 AM"
+     :duration 90
+     :cost 42.0
      :cluster "analytics"
      :upstream_pipelines ["user-enrichment" "order-processing"]
-     :tags ["analytics" "daily"]}
+     :tags ["analytics" "aggregation" "daily"]
+     :links {:airflow "https://airflow.company.com/dags/analytics_agg"
+             :dashboard "https://tableau.company.com/analytics-dashboard"}}
     {:name "export-to-salesforce"
      :description "Sync user cohorts to Salesforce"
      :input_sources ["user_cohorts"]
      :output_sources ["salesforce_users"]
      :group "data-exports"
      :cluster "analytics"
-     :upstream_pipelines ["analytics-aggregation"]}
+     :duration 8
+     :cost 2.1
+     :upstream_pipelines ["analytics-aggregation"]
+     :links {:airflow "https://airflow.company.com/dags/crm_exports"}}
     {:name "export-to-hubspot"
      :description "Sync user cohorts to HubSpot"
      :input_sources ["user_cohorts"]
      :output_sources ["hubspot_contacts"]
      :group "data-exports"
      :cluster "analytics"
-     :upstream_pipelines ["analytics-aggregation"]}
+     :duration 5
+     :cost 1.8
+     :upstream_pipelines ["analytics-aggregation"]
+     :links {:airflow "https://airflow.company.com/dags/crm_exports"}}
     {:name "export-to-amplitude"
      :description "Sync daily metrics to Amplitude"
      :input_sources ["daily_metrics"]
      :output_sources ["amplitude_events"]
      :group "data-exports"
      :cluster "analytics"
-     :upstream_pipelines ["analytics-aggregation"]}
+     :duration 3
+     :cost 0.9
+     :upstream_pipelines ["analytics-aggregation"]
+     :links {:airflow "https://airflow.company.com/dags/analytics_exports"}}
     {:name "weekly-rollup"
-     :description "Weekly executive summary"
+     :description "Aggregate daily metrics into weekly executive summary"
      :input_sources ["daily_metrics" "enriched_users"]
      :output_sources ["executive_summary"]
      :schedule "0 6 * * MON"
+     :duration 120
+     :cost 65.0
      :cluster "analytics"
-     :upstream_pipelines ["analytics-aggregation" "user-enrichment"]}]
+     :upstream_pipelines ["analytics-aggregation" "user-enrichment"]
+     :links {:airflow "https://airflow.company.com/dags/weekly_rollup"}}]
 
    :datasources
    [{:name "raw_users"
      :type "snowflake"
-     :description "Raw user registration data"
+     :description "Raw user registration and profile data from production database"
      :cluster "user-processing"
      :owner "data-platform@company.com"
-     :tags ["pii" "users"]
+     :tags ["pii" "users" "core-data"]
      :attributes [{:name "id"}
                   {:name "first_name"}
                   {:name "last_name"}
@@ -836,49 +1333,103 @@
                   {:name "address"
                    :attributes [{:name "city"}
                                 {:name "zip"}
-                                {:name "geo" :attributes [{:name "lat"} {:name "lng"}]}]}]}
+                                {:name "geo" :attributes [{:name "lat"} {:name "lng"}]}]}]
+     :metadata {:schema "RAW_DATA"
+                :table "USERS"
+                :size "2.1TB"
+                :record_count "45M"
+                :refresh_frequency "real-time"}
+     :links {:snowflake "https://company.snowflakecomputing.com/console#/data/databases/PROD/schemas/RAW_DATA/table/USERS"
+             :monitoring "https://grafana.company.com/d/raw-users"
+             :docs "https://docs.company.com/schemas/raw_users"}}
     {:name "user_events"
      :type "s3"
-     :description "Clickstream events"
+     :description "Clickstream and interaction events from all digital touchpoints"
      :cluster "analytics"
-     :tags ["events" "clickstream"]
+     :owner "analytics-team@company.com"
+     :tags ["events" "clickstream" "large-dataset"]
      :attributes [{:name "event_id"}
                   {:name "user_id" :from "raw_users::id"}
                   {:name "event_type"}
-                  {:name "timestamp"}]}
-    {:name "raw_orders" :type "api" :description "Real-time orders" :cluster "real-time"}
-    {:name "inventory" :type "snowflake" :description "Inventory levels" :cluster "order-management"}
+                  {:name "page_url"}
+                  {:name "timestamp"}]
+     :metadata {:bucket "company-events-prod"
+                :size "15TB"
+                :record_count "2.5B"
+                :file_format "parquet"}
+     :links {:s3 "https://s3.console.aws.amazon.com/s3/buckets/company-events-prod"
+             :athena "https://console.aws.amazon.com/athena/home#query"}}
+    {:name "raw_orders"
+     :type "api"
+     :description "Real-time order data from e-commerce platform"
+     :cluster "real-time"
+     :owner "platform-team@company.com"
+     :tags ["orders" "real-time" "revenue"]
+     :metadata {:endpoint "https://api.company.com/v2/orders"
+                :rate_limit "1000 req/min"
+                :record_count "120M"}
+     :links {:api_docs "https://docs.company.com/api/orders"
+             :monitoring "https://grafana.company.com/d/orders-api"}}
+    {:name "inventory"
+     :type "snowflake"
+     :description "Product inventory levels across all warehouses"
+     :cluster "order-management"
+     :owner "supply-chain@company.com"
+     :tags ["inventory" "warehouse" "operational"]
+     :metadata {:schema "INVENTORY"
+                :size "150GB"
+                :refresh_frequency "every 15 minutes"}
+     :links {:snowflake "https://company.snowflakecomputing.com/console#/data/databases/PROD/schemas/INVENTORY"
+             :tableau "https://tableau.company.com/views/inventory-dashboard"}}
     {:name "enriched_users"
      :type "delta"
-     :description "Enriched user profiles"
+     :description "Enriched user profiles with behavioral features"
      :cluster "user-processing"
+     :owner "data-platform@company.com"
+     :tags ["users" "enriched" "ml-ready"]
      :attributes [{:name "user_id" :from "raw_users::id"}
                   {:name "full_name" :from ["raw_users::first_name" "raw_users::last_name"]}
                   {:name "email" :from "raw_users::email"}
                   {:name "event_count" :from "user_events::event_id"}
+                  {:name "last_active" :from "user_events::timestamp"}
+                  {:name "signup_date" :from "raw_users::signup_date"}
                   {:name "location" :from "raw_users::address"
                    :attributes [{:name "city" :from "raw_users::address::city"}
-                                {:name "zip" :from "raw_users::address::zip"}]}]}
-    {:name "processed_orders" :type "snowflake" :description "Validated orders"}
-    {:name "order_audit" :type "s3" :description "Order audit trail"}
+                                {:name "zip" :from "raw_users::address::zip"}
+                                {:name "coords" :from "raw_users::address::geo"}]}]}
     {:name "daily_metrics"
      :type "snowflake"
-     :description "Daily business metrics"
+     :description "Aggregated daily business metrics"
      :cluster "analytics"
+     :owner "analytics-team@company.com"
+     :tags ["metrics" "daily" "kpi"]
      :attributes [{:name "date"}
                   {:name "active_users" :from "enriched_users::user_id"}
                   {:name "total_events" :from "user_events::event_id"}]}
-    {:name "user_cohorts" :type "snowflake" :description "User segments" :cluster "analytics"}
-    {:name "salesforce_users" :type "api" :description "Salesforce sync" :cluster "analytics"}
-    {:name "hubspot_contacts" :type "api" :description "HubSpot sync" :cluster "analytics"}
-    {:name "amplitude_events" :type "api" :description "Amplitude events" :cluster "analytics"}
+    {:name "user_cohorts"
+     :type "snowflake"
+     :description "User segmentation and cohort definitions"
+     :cluster "analytics"}
+    {:name "salesforce_users"
+     :type "api"
+     :description "User data synced to Salesforce CRM"
+     :cluster "analytics"}
+    {:name "hubspot_contacts"
+     :type "api"
+     :description "Contact data synced to HubSpot"
+     :cluster "analytics"}
+    {:name "amplitude_events"
+     :type "api"
+     :description "Product analytics events sent to Amplitude"
+     :cluster "analytics"}
     {:name "executive_summary"
      :type "snowflake"
-     :description "Weekly executive metrics"
+     :description "Weekly executive dashboard metrics"
      :cluster "analytics"
      :attributes [{:name "week"}
                   {:name "weekly_active_users" :from "daily_metrics::active_users"}
-                  {:name "weekly_events" :from "daily_metrics::total_events"}]}]})
+                  {:name "weekly_events" :from "daily_metrics::total_events"}
+                  {:name "user_growth" :from ["daily_metrics::active_users" "enriched_users::signup_date"]}]}]})
 
 ;; =============================================================================
 ;; Cron Parsing
