@@ -121,6 +121,12 @@
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 1rem;
             gap: 2px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .nav-tabs::-webkit-scrollbar {
+            display: none;
         }
         .nav-tab {
             padding: 8px 16px;
@@ -132,6 +138,8 @@
             font-family: inherit;
             border-bottom: 2px solid transparent;
             margin-bottom: -1px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .nav-tab:hover {
             color: var(--text-primary);
@@ -1622,10 +1630,8 @@
         <!-- Home Tab -->
         <div class="tab-pane active" id="home-pane">
             <div class="home-content">
-                <!-- Intro -->
-                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem;">
-                    An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
-                </p>
+                <!-- Tagline -->
+                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 1rem;">An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.</p>
 
                 <!-- Demo -->
                 <div class="hero-demo">
@@ -1794,12 +1800,12 @@
                         Why Clojure
                     </div>
                     <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
-                        Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript, for two reasons:
+                        Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript, for two main reasons:
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">Code-as-data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure vs 10 functions on 10 structures. This style is well suited to spec validation, transformation, and extensibility. Your lineage lives in plain JSON that can be versioned, diffed, and reviewed like code.</div>
+                            <div><strong style="color: var(--text-primary)">Code-as-data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure vs 10 functions on 10 structures. This style is well suited to spec validation, transformation, and extensibility.</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>

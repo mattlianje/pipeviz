@@ -1,36 +1,31 @@
-.PHONY: dev build clean install repl bundle server server-dev test fmt
+.PHONY: dev build clean install repl bundle server server-dev test fmt publish
 
 SHELL := /bin/bash
 NVM = source $(HOME)/.nvm/nvm.sh; nvm use --silent &&
 
-# Development with hot reload (frontend only)
 dev:
 	$(NVM) npx shadow-cljs watch app
 
-# Run API server
 server:
 	clj -M:server
 
-# Run API server with config file
 server-dev:
 	clj -M:server 3000 resources/example.json
 
-# Run tests
 test:
 	clj -M:test
 
-# Format Clojure code
 fmt:
 	clj -M:fmt
 
-# Build release version
 build: install
 	$(NVM) npx shadow-cljs release release
 
 bundle: build
 	bash scripts/bundle.sh
-	@cp dist/pipeviz.html ../pipeviz-cljs.html
-	@echo "Copied to ../pipeviz-cljs.html"
+	@echo "Built dist/pipeviz.html"
+	@cp dist/pipeviz.html pipeviz.html
+	@echo "Copied to pipeviz.html"
 
 install: node_modules
 
@@ -46,3 +41,6 @@ clean:
 
 serve:
 	$(NVM) npx shadow-cljs server
+
+publish: bundle
+	rsync -avz --delete dist/ root@nargothrond.xyz:/var/www/pipeviz.org/

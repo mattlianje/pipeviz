@@ -1,27 +1,25 @@
 #!/bin/bash
-# Bundles compiled JS into a single HTML file
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-# Read files
-HTML_TEMPLATE=$(cat resources/public/index.html)
-JS_CONTENT=$(cat dist/js/main.js)
-
-# Create bundled HTML by replacing script tag with inline JS
 mkdir -p dist
 
-# Use awk to replace the script tag
-awk -v js="$JS_CONTENT" '
-/<script src="js\/main.js"><\/script>/ {
-    print "<script>"
-    print js
-    print "</script>"
-    next
-}
-{ print }
-' resources/public/index.html > dist/pipeviz.html
+# Get line count of HTML template
+TOTAL_LINES=$(wc -l < resources/public/index.html)
+
+# Find the line with the script tag
+SCRIPT_LINE=$(grep -n 'script src="js/main.js"' resources/public/index.html | cut -d: -f1)
+
+# Build the bundled html
+{
+    head -n $((SCRIPT_LINE - 1)) resources/public/index.html
+    echo '    <script>'
+    cat dist/js/main.js
+    echo '    </script>'
+    tail -n $((TOTAL_LINES - SCRIPT_LINE)) resources/public/index.html
+} > dist/pipeviz.html
 
 SIZE=$(du -h dist/pipeviz.html | cut -f1)
 echo "Bundled to dist/pipeviz.html ($SIZE)"
