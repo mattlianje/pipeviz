@@ -66,17 +66,6 @@ To auto-load a config, use `?url=`:
 https://pipeviz.org?url=https://yoursite.com/pipeviz.json
 ```
 
-To self-host, build the ClojureScript app and serve statically:
-
-```bash
-cd clojure
-npm install
-npx shadow-cljs release app
-# serve clojure/resources/public/ from anywhere
-```
-
-For development with hot reload: `npx shadow-cljs watch app` → http://localhost:8080
-
 ## Attribute Lineage
 Track column-level provenance with `::` notation. Supports infinitely nested complex data-types.
 
