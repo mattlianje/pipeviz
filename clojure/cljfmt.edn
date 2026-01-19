@@ -1,0 +1,11 @@
+{;; Whitespace rules (the useful stuff)
+ :remove-surrounding-whitespace? true
+ :remove-trailing-whitespace? true
+ :insert-missing-whitespace? true      ;; catches foo(bar -> foo (bar
+ :remove-consecutive-blank-lines? true
+
+ ;; Don't mess with indentation - trust the developer
+ :indentation? false
+
+ ;; Sort ns requires alphabetically
+ :sort-ns-references? true}

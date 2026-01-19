@@ -340,24 +340,15 @@
             min-width: 0;
         }
         .graph-col.with-details {
-            flex: 1;  /* Stay full width, don't shrink */
+            flex: 0 0 66.67%;
         }
         .details-col {
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: 33.33%;
+            flex: 0 0 33.33%;
             display: none;
-            z-index: 20;
             background: var(--bg-primary);
-            border-left: 1px solid var(--border-color);
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
         }
         .details-col.visible {
             display: block;
-        }
-        [data-theme="dark"] .details-col {
-            box-shadow: -2px 0 8px rgba(0,0,0,0.4);
         }
 
         .graph-container {
@@ -470,6 +461,10 @@
         .badge-pipeline { background: #e3f2fd; color: #1565c0; }
         .badge-source { background: #f3e5f5; color: #7b1fa2; }
         .badge-type { background: #e8f5e9; color: #2e7d32; }
+        .badge-input { background: #f3e5f5; color: #7b1fa2; }
+        .badge-output { background: #e3f2fd; color: #1565c0; }
+        .badge-cluster { background: #e8f5e9; color: #2e7d32; }
+        .group-toggle-section { margin: 1rem 0; }
         .lineage-item, .lineage-link {
             padding: 2px 0;
             font-size: 12px;
@@ -1059,8 +1054,7 @@
         }
         .planner-graph {
             height: 450px;
-            background: var(--bg-secondary);
-            border-radius: 4px;
+            background: var(--bg-primary);
             overflow: hidden;
         }
         .planner-placeholder {
