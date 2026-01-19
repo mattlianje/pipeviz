@@ -1,7 +1,6 @@
 (ns pipeviz.graph
   "Pure graph logic for pipeline lineage - no DOM, no JS interop"
-  (:require [clojure.string :as str]
-            [pipeviz.graph-core :as core]))
+  (:require [clojure.string :as str]))
 
 (declare format-schedule)
 
@@ -77,6 +76,75 @@
   "All nodes reachable from start via neighbors-fn"
   [start neighbors-fn]
   (set (map :id (bfs start neighbors-fn))))
+
+(defn kahns-waves
+  "Kahn's algorithm returning nodes grouped into execution waves.
+   Nodes in same wave can execute in parallel."
+  [nodes edges]
+  (let [in-degree (reduce (fn [m [_ to]]
+                            (if (nodes to) (update m to (fnil inc 0)) m))
+                          (zipmap nodes (repeat 0))
+                          edges)
+        adj (reduce (fn [m [from to]]
+                      (if (and (nodes from) (nodes to))
+                        (update m from (fnil conj []) to)
+                        m))
+                    {} edges)]
+    (loop [waves [] degrees in-degree]
+      (let [ready (sort (keys (filter (fn [[_ d]] (zero? d)) degrees)))]
+        (if (empty? ready)
+          (if (empty? degrees) waves nil)
+          (recur (conj waves (vec ready))
+                 (reduce (fn [m node]
+                           (reduce (fn [m2 neighbor]
+                                     (if (contains? m2 neighbor)
+                                       (update m2 neighbor dec) m2))
+                                   (dissoc m node)
+                                   (get adj node [])))
+                         degrees ready)))))))
+
+(defn build-downstream-edges
+  "Build downstream edges from pipeline definitions."
+  [pipelines]
+  (let [output->producer (into {} (for [p pipelines
+                                        out (:output_sources p)]
+                                    [out (:name p)]))]
+    (distinct
+     (concat
+      (for [p pipelines, up (:upstream_pipelines p)] [up (:name p)])
+      (for [p pipelines
+            input (:input_sources p)
+            :let [producer (get output->producer input)]
+            :when (and producer (not= producer (:name p)))]
+        [producer (:name p)])))))
+
+(defn build-edge-adjacency
+  "Build upstream and downstream adjacency maps from edges."
+  [edges]
+  (reduce (fn [acc [from to]]
+            (-> acc
+                (update-in [:downstream from] (fnil conj #{}) to)
+                (update-in [:upstream to] (fnil conj #{}) from)))
+          {:upstream {} :downstream {}}
+          edges))
+
+(defn compute-execution-waves
+  "Compute execution waves for selected pipelines using Kahn's algorithm."
+  [pipelines selected-names]
+  (when (seq selected-names)
+    (let [edges (build-downstream-edges pipelines)
+          {:keys [downstream]} (build-edge-adjacency edges)
+          downstream-of (into {}
+                              (for [node selected-names]
+                                [node (reachable node #(get downstream % #{}))]))
+          affected (reduce into (set selected-names) (vals downstream-of))
+          relevant-edges (filter (fn [[from to]]
+                                   (and (affected from) (affected to)))
+                                 edges)
+          waves (kahns-waves affected relevant-edges)]
+      {:waves (or waves [])
+       :edges (vec relevant-edges)
+       :node-count (count affected)})))
 
 ;; =============================================================================
 ;; Pipeline Graph Adjacency
@@ -1015,7 +1083,7 @@
   "Generate backfill analysis for selected pipelines using Kahn's topological sort.
    Returns execution waves (stages) where pipelines in same wave can run in parallel.
 
-   Uses pure functions from pipeviz.graph-core - no atoms, no side effects."
+   Uses pure functions - no atoms, no side effects."
   [config selected-pipelines]
   (when (and config (seq selected-pipelines))
     (let [pipelines (or (:pipelines config) [])
@@ -1027,9 +1095,9 @@
           _ (when (seq invalid-nodes)
               (throw (ex-info "Backfill only works for pipelines" {:invalid invalid-nodes})))
 
-          ;; Use core functions for graph analysis
+          ;; Compute execution waves using Kahn's algorithm
           {:keys [waves edges node-count]}
-          (core/compute-execution-waves pipelines selected-pipelines)
+          (compute-execution-waves pipelines selected-pipelines)
 
           ;; Build result with pipeline metadata
           wave-data (map-indexed
