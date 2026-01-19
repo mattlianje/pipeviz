@@ -1,11 +1,11 @@
 (ns pipeviz.graph
-  "Pure graph logic for pipeline lineage - no DOM, no JS interop"
+  "Pure graph logic - no DOM/JS interop"
   (:require [clojure.string :as str]))
 
 (declare format-schedule)
 
 ;; =============================================================================
-;; Specs (lean, data-oriented)
+;; Specs
 ;; =============================================================================
 
 (def pipeline-keys #{:name :description :input_sources :output_sources
@@ -50,7 +50,7 @@
   (-> s (str/replace "\\" "\\\\") (str/replace "\"" "\\\"")))
 
 ;; =============================================================================
-;; Graph Traversal (generic, reusable)
+;; Graph Traversal
 ;; =============================================================================
 
 (defn bfs
