@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeviz</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #828282;
+            --border-color: #dee2e6;
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252525;
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --text-muted: #888;
+            --border-color: #444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            overflow-y: scroll;
+        }
+        body {
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 13px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            box-sizing: border-box;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 0.75rem 1rem; }
+        }
+        @media (max-width: 400px) {
+            .container { padding: 0.5rem 0.75rem; }
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 2.5rem 0 1rem;
+            position: relative;
+        }
+        .header-controls {
+            position: absolute;
+            top: 0.5rem;
+            right: 0;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .header-controls a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+        }
+        .hero-title {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .hero-title img {
+            height: 1.3em;
+            vertical-align: middle;
+            margin-right: 0.3rem;
+        }
+        .lead {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        @media (max-width: 480px) {
+            .hero-title { font-size: 1.75rem; }
+            .lead { font-size: 11px; }
+        }
+        .lead span { color: #d63384; }
+        code { color: #d63384; font-family: monospace; font-size: 12px; }
+
+        /* Home content */
+        .home-content {
+            max-width: 750px;
+            margin: 0 auto;
+            padding: 1rem 0 2rem;
+            box-sizing: border-box;
+        }
+        @media (max-width: 480px) {
+            .home-content {
+                padding: 0.5rem 0 1.5rem;
+            }
+        }
+
+        /* Prevent horizontal overflow */
+        html, body {
+            overflow-x: hidden;
+        }
+
+        /* Tabs */
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+            gap: 2px;
+        }
+        .nav-tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .nav-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+        .nav-tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--text-primary);
+        }
+        .nav-tabs.hidden-on-home { visibility: hidden; }
+        .hidden { display: none !important; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        /* Hero demo */
+        .hero-demo {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+        .hero-demo pre {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            font-size: 12px;
+            border-radius: 4px;
+            margin: 0;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        .hero-demo svg.arrow {
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        #splash-graph {
+            min-width: 240px;
+            min-height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @media (max-width: 600px) {
+            .hero-demo {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .hero-demo svg.arrow {
+                transform: rotate(90deg);
+            }
+            .hero-demo pre {
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+
+        /* Hero animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hero-animate { opacity: 0; animation: fadeInUp 0.5s ease-out forwards; }
+        .hero-animate-1 { animation-delay: 0.1s; }
+        .hero-animate-2 { animation-delay: 0.3s; }
+        .hero-animate-3 { animation-delay: 0.5s; }
+        .hero-animate-4 { animation-delay: 0.7s; }
+
+        /* Feature grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        @media (max-width: 768px) {
+            .feature-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .feature-grid { grid-template-columns: 1fr; }
+        }
+        .feature-tile {
+            padding: 0.875rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        .feature-icon {
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Superpowers grid */
+        .superpowers-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        @media (max-width: 600px) {
+            .superpowers-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Section headers */
+        .section-header {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* JSON editor */
+        .json-editor {
+            width: 100%;
+            min-height: 400px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            resize: vertical;
+        }
+        .json-editor:focus {
+            outline: none;
+            border-color: var(--text-muted);
+        }
+        .config-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+        .json-status {
+            margin-top: 0.5rem;
+            font-size: 12px;
+        }
+        .json-status.error { color: #dc3545; }
+        .json-status.success { color: #28a745; }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        .btn-dark {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: 1px solid var(--text-primary);
+        }
+        .btn-dark:hover { opacity: 0.85; }
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .btn-outline:hover { background: var(--bg-secondary); }
+
+        /* Drop zone */
+        #drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+        }
+        #drop-zone:hover {
+            border-color: var(--text-secondary);
+            background: var(--bg-secondary);
+        }
+        #drop-zone.dragover {
+            border-color: #0d6efd;
+            background: rgba(13, 110, 253, 0.05);
+        }
+        #file-input { display: none; }
+
+        /* Graph container */
+        .graph-row {
+            display: flex;
+            gap: 1rem;
+            position: relative;
+        }
+        .graph-col {
+            flex: 1;
+            min-width: 0;
+        }
+        .graph-col.with-details {
+            flex: 1;  /* Stay full width, don't shrink */
+        }
+        .details-col {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 33.33%;
+            display: none;
+            z-index: 20;
+            background: var(--bg-primary);
+            border-left: 1px solid var(--border-color);
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        }
+        .details-col.visible {
+            display: block;
+        }
+        [data-theme="dark"] .details-col {
+            box-shadow: -2px 0 8px rgba(0,0,0,0.4);
+        }
+
+        .graph-container {
+            background: var(--bg-primary);
+            min-height: 500px;
+            position: relative;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .graph-controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            display: flex;
+            gap: 6px;
+        }
+        .graph-ctrl-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            cursor: pointer;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-family: inherit;
+        }
+        .graph-ctrl-btn:hover {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+        .graph-ctrl-btn.active {
+            background: var(--bg-secondary);
+            border-color: var(--text-muted);
+        }
+        #graph {
+            min-height: 500px;
+            overflow: auto;
+        }
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--bg-primary);
+            padding: 4px 8px;
+            opacity: 0.9;
+        }
+        .legend-toggle {
+            cursor: pointer;
+        }
+        .legend-toggle:hover {
+            color: var(--text-primary);
+        }
+        .legend-content {
+            display: none;
+            margin-top: 4px;
+            color: var(--text-primary);
+        }
+        .legend-toggle::after {
+            content: ' ▸';
+        }
+        .legend.expanded .legend-toggle::after {
+            content: ' ▾';
+        }
+        .legend.expanded .legend-toggle {
+            color: var(--text-primary);
+        }
+        .legend.expanded .legend-content {
+            display: block;
+        }
+
+        /* Node details panel */
+        .node-details-panel {
+            background: var(--bg-primary);
+            padding: 1rem;
+            min-height: 500px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .node-details-panel h5 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .detail-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+        .detail-value {
+            margin-bottom: 1rem;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+        .badge-pipeline { background: #e3f2fd; color: #1565c0; }
+        .badge-source { background: #f3e5f5; color: #7b1fa2; }
+        .badge-type { background: #e8f5e9; color: #2e7d32; }
+        .lineage-item, .lineage-link {
+            padding: 2px 0;
+            font-size: 12px;
+            cursor: pointer;
+            color: #0366d6;
+        }
+        [data-theme='dark'] .lineage-item,
+        [data-theme='dark'] .lineage-link {
+            color: #58a6ff;
+        }
+        .lineage-item .lineage-name:hover,
+        .lineage-link:hover {
+            text-decoration: underline;
+        }
+        .lineage-indent {
+            color: var(--text-muted);
+        }
+
+        /* Links section */
+        .links-section {
+            margin-bottom: 1rem;
+        }
+
+        /* Tree/JSON toggle */
+        .lineage-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .lineage-view-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+        .lineage-toggle-label {
+            opacity: 0.6;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .lineage-toggle-label.active {
+            opacity: 1;
+            color: var(--text-primary);
+        }
+        .lineage-toggle-slider {
+            position: relative;
+            width: 32px;
+            height: 16px;
+            background: var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .lineage-toggle-slider::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .lineage-toggle-slider.json-active {
+            background: var(--text-muted);
+        }
+        .lineage-toggle-slider.json-active::after {
+            transform: translateX(16px);
+        }
+        .lineage-json-view {
+            position: relative;
+        }
+        .lineage-json-pre {
+            font-family: monospace;
+            font-size: 10px;
+            line-height: 1.4;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem;
+            padding-top: 2rem;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 300px;
+        }
+        .json-copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 4px 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+            z-index: 1;
+        }
+        .json-copy-btn:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+        .json-copy-btn.copied {
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        /* Node highlighting */
+        .node-highlighted {
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 4px rgba(230, 81, 0, 0.4));
+        }
+        .node-highlighted polygon,
+        .node-highlighted ellipse,
+        .node-highlighted path {
+            fill: #fff3e0 !important;
+        }
+        .node-highlighted text {
+            font-weight: normal !important;
+            stroke: none !important;
+        }
+        .node-highlighted text:not([fill]) {
+            fill: #000;
+        }
+        .node-connected {
+            stroke: #7b1fa2 !important;
+            stroke-width: 1.5px !important;
+        }
+        .node-connected text {
+            font-weight: normal !important;
+            stroke: none !important;
+        }
+        .node-connected text:not([fill]) {
+            fill: #000;
+        }
+        .node-dimmed {
+            opacity: 0.35 !important;
+            transition: opacity 0.2s ease;
+        }
+        .edge-highlighted path {
+            stroke: #7b1fa2 !important;
+            stroke-width: 2px !important;
+        }
+        .edge-highlighted polygon {
+            stroke: #7b1fa2 !important;
+            fill: #7b1fa2 !important;
+        }
+        .edge-dimmed {
+            opacity: 0.18 !important;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Dark mode adjustments */
+        [data-theme="dark"] .node-highlighted text:not([fill]),
+        [data-theme="dark"] .node-connected text:not([fill]) {
+            fill: #000 !important;
+        }
+        /* Dark mode graph text fix */
+        [data-theme="dark"] #graph text,
+        [data-theme="dark"] #splash-graph text,
+        [data-theme="dark"] #attribute-graph text {
+            fill: #e0e0e0 !important;
+        }
+        [data-theme="dark"] #graph .node text,
+        [data-theme="dark"] #splash-graph .node text,
+        [data-theme="dark"] #attribute-graph .node text {
+            fill: #1a1a1a !important;
+        }
+        [data-theme="dark"] #graph .graph > polygon,
+        [data-theme="dark"] #splash-graph .graph > polygon,
+        [data-theme="dark"] #attribute-graph .graph > polygon {
+            fill: transparent !important;
+        }
+        [data-theme="dark"] #graph .cluster > polygon,
+        [data-theme="dark"] #graph .cluster > path,
+        [data-theme="dark"] #attribute-graph .cluster > polygon,
+        [data-theme="dark"] #attribute-graph .cluster > path {
+            fill: #2a2a2a !important;
+            stroke: #555 !important;
+        }
+        [data-theme="dark"] #graph .cluster text,
+        [data-theme="dark"] #attribute-graph .cluster text {
+            fill: #e0e0e0 !important;
+        }
+
+        /* Search box */
+        .search-wrapper {
+            position: relative;
+            margin-bottom: 0.75rem;
+            width: 240px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--text-muted);
+        }
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        .search-results-dropdown.show {
+            display: block;
+        }
+        .search-result-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-item:hover,
+        .search-result-item.selected {
+            background-color: var(--bg-secondary);
+        }
+        .search-result-item .result-type {
+            font-size: 9px;
+            padding: 2px 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .search-result-item .result-type.pipeline {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #1565c0;
+        }
+        .search-result-item .result-type.datasource {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #7b1fa2;
+        }
+        .search-result-item .result-name {
+            font-weight: 400;
+        }
+        .search-result-item .result-match {
+            color: #d84315;
+            font-weight: 600;
+        }
+        .search-result-item.no-match {
+            color: var(--text-muted);
+            font-style: italic;
+            cursor: default;
+        }
+        .search-result-item.no-match:hover {
+            background-color: transparent;
+        }
+
+        /* Node action buttons */
+        .node-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .graph-ctrl-btn.danger {
+            border-color: #c98b8b;
+            color: #c98b8b;
+        }
+        .graph-ctrl-btn.danger:hover {
+            background: #fbe9e7;
+            border-color: #c98b8b;
+            color: #8b5a5a;
+        }
+        [data-theme="dark"] .graph-ctrl-btn.danger:hover {
+            background: rgba(201, 139, 139, 0.15);
+            color: #e0a0a0;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .modal-dialog {
+            position: relative;
+            z-index: 1001;
+            width: 90%;
+            max-width: 1100px;
+            max-height: 90vh;
+        }
+        .modal-dialog.modal-xl {
+            max-width: 1100px;
+        }
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            line-height: 1;
+            padding: 0;
+        }
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+        .modal-body {
+            padding: 0;
+        }
+        .modal-row {
+            display: flex;
+        }
+        .modal-col-graph {
+            flex: 0 0 66%;
+            height: 500px;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+        .modal-col-summary {
+            flex: 0 0 34%;
+            height: 500px;
+            overflow-y: auto;
+            border-left: 1px solid var(--border-color);
+            padding: 1rem;
+        }
+        #blast-radius-graph {
+            width: 100%;
+            height: 100%;
+        }
+        @media (max-width: 768px) {
+            .modal-row {
+                flex-direction: column;
+            }
+            .modal-col-graph,
+            .modal-col-summary {
+                flex: none;
+                width: 100%;
+                height: 300px;
+            }
+            .modal-col-summary {
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+            }
+        }
+
+        /* Planner styles */
+        .planner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .planner-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .planner-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .planner-picker {
+            position: relative;
+        }
+        .planner-picker-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-primary);
+            min-width: 160px;
+            justify-content: space-between;
+        }
+        .planner-picker-btn:hover {
+            background: var(--bg-primary);
+        }
+        .planner-picker-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 280px;
+            margin-top: 4px;
+        }
+        .planner-picker-dropdown.show {
+            display: block;
+        }
+        .planner-picker-search {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .planner-picker-search input {
+            width: 100%;
+            padding: 0.4rem 0.6rem;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        .planner-picker-list {
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+        .planner-picker-group {
+            padding: 0.4rem 0.75rem;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .planner-picker-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.75rem;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .planner-picker-item:hover {
+            background: var(--bg-secondary);
+        }
+        .planner-picker-item.hidden {
+            display: none;
+        }
+        .planner-picker-item input {
+            margin: 0;
+        }
+        .planner-picker-item .ds-tag {
+            font-size: 9px;
+            padding: 1px 4px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 2px;
+            margin-left: auto;
+        }
+        [data-theme="dark"] .planner-picker-item .ds-tag {
+            background: #1e3a5f;
+            color: #90caf9;
+        }
+        .planner-picker-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .planner-picker-clear {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            text-decoration: underline;
+        }
+        .planner-picker-clear:hover {
+            color: var(--text-primary);
+        }
+        .planner-view-btns {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .planner-view-btn {
+            padding: 0.4rem 0.75rem;
+            font-size: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        .planner-view-btn:hover {
+            background: var(--bg-primary);
+        }
+        .planner-view-btn.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+        .planner-view-btn.danger {
+            color: #c98b8b;
+            border-color: #c98b8b;
+        }
+        .planner-view-btn.danger:hover {
+            background: #fbe9e7;
+            color: #8b5a5a;
+        }
+        .planner-view-btn.danger.active {
+            background: #fbe9e7;
+            border-color: #c98b8b;
+            color: #8b5a5a;
+        }
+        [data-theme="dark"] .planner-view-btn.danger:hover {
+            background: rgba(201, 139, 139, 0.15);
+            color: #e0a0a0;
+        }
+        [data-theme="dark"] .planner-view-btn.danger.active {
+            background: rgba(201, 139, 139, 0.15);
+            color: #e0a0a0;
+        }
+        .planner-hint {
+            font-size: 11px;
+            font-style: italic;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+        .planner-content {
+            display: flex;
+            gap: 1rem;
+        }
+        .planner-graph-col {
+            flex: 0 0 65%;
+        }
+        .planner-output-col {
+            flex: 0 0 calc(35% - 1rem);
+            position: relative;
+        }
+        .planner-graph {
+            height: 450px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .planner-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .planner-output {
+            height: 450px;
+            margin: 0;
+            padding: 0.75rem;
+            font-size: 11px;
+            font-family: monospace;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .planner-copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 0.3rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            z-index: 10;
+        }
+        .planner-copy-btn:hover {
+            color: var(--text-primary);
+        }
+        .planner-copy-btn.copied {
+            border-color: #28a745;
+            color: #28a745;
+        }
+        @media (max-width: 768px) {
+            .planner-content {
+                flex-direction: column;
+            }
+            .planner-graph-col,
+            .planner-output-col {
+                flex: none;
+                width: 100%;
+            }
+            .planner-graph,
+            .planner-output {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-controls">
+                <a href="https://github.com/mattlianje/pipeviz" target="_blank" style="display: inline-flex; align-items: center; gap: 4px;"><svg height="14" width="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+                <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle">🌙</button>
+            </div>
+            <h1 class="hero-title">
+                <img src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png" alt="Pipeviz">
+                Pipeviz
+            </h1>
+            <p class="lead">Easy, elegant lineage from a single <span>.json</span></p>
+        </header>
+
+        <nav class="nav-tabs hidden-on-home" id="main-tabs">
+            <button class="nav-tab active" data-tab="home-pane">Home</button>
+            <button class="nav-tab" data-tab="config-pane">Config</button>
+            <button class="nav-tab" data-tab="graph-pane">Graph</button>
+            <button class="nav-tab" data-tab="attributes-pane">Attributes</button>
+            <button class="nav-tab" data-tab="planner-pane">Planner</button>
+            <button class="nav-tab" data-tab="spec-pane">Spec</button>
+        </nav>
+
+        <!-- Home Tab -->
+        <div class="tab-pane active" id="home-pane">
+            <div class="home-content">
+                <!-- Intro -->
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem;">
+                    An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
+                </p>
+
+                <!-- Demo -->
+                <div class="hero-demo">
+                    <pre class="hero-animate hero-animate-1">{
+  "pipelines": [{
+    "name": "etl-job",
+    "input_sources": ["raw_events"],
+    "output_sources": ["cleaned_events"]
+  }]
+}</pre>
+                    <svg class="arrow hero-animate hero-animate-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M5 12h14M13 5l7 7-7 7"/>
+                    </svg>
+                    <div id="splash-graph" class="hero-animate hero-animate-3"></div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="btn-group hero-animate hero-animate-4">
+                    <button class="btn btn-dark" onclick="loadExample()">Try demo</button>
+                    <button class="btn btn-outline" onclick="switchTab('spec-pane')">Read spec</button>
+                </div>
+
+                <!-- Feature tiles -->
+                <div class="feature-grid" style="margin-bottom: 2rem">
+                    <div class="feature-tile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                            <rect x="4" y="4" width="6" height="6" rx="1"/>
+                            <rect x="14" y="4" width="6" height="6" rx="1"/>
+                            <rect x="4" y="14" width="6" height="6" rx="1"/>
+                            <rect x="14" y="14" width="6" height="6" rx="1"/>
+                        </svg>
+                        <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem">Stack Agnostic</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">SQL, Spark, Kafka, APIs, shell scripts. Just JSON.</div>
+                    </div>
+                    <div class="feature-tile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem">Zero Dependencies</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">One HTML file. No backend, no build step. Host anywhere.</div>
+                    </div>
+                    <div class="feature-tile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                            <circle cx="6" cy="6" r="3"/>
+                            <circle cx="18" cy="6" r="3"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <circle cx="18" cy="18" r="3"/>
+                            <path d="M6 9v6m12-6v6M9 6h6m-6 12h6"/>
+                        </svg>
+                        <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem">Federated</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Each team owns their JSON. Merge with jq for the org-wide view.</div>
+                    </div>
+                    <div class="feature-tile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="feature-icon">
+                            <path d="M3 6h18M3 12h18M3 18h18"/>
+                            <circle cx="7" cy="6" r="1.5" fill="currentColor"/>
+                            <circle cx="14" cy="12" r="1.5" fill="currentColor"/>
+                            <circle cx="10" cy="18" r="1.5" fill="currentColor"/>
+                        </svg>
+                        <div style="font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 0.2rem">Column-Level Lineage</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Track field-level provenance. See where each attribute comes from.</div>
+                    </div>
+                </div>
+
+                <!-- How it works -->
+                <div style="margin-bottom: 2rem">
+                    <div class="section-header">How it works</div>
+                    <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap">
+                        <div style="flex: 1; min-width: 140px; text-align: center">
+                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">1</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Define</div>
+                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                        </div>
+                        <div style="flex: 1; min-width: 140px; text-align: center">
+                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">2</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Load</div>
+                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Drop your file here, or host both files together on any static server</div>
+                        </div>
+                        <div style="flex: 1; min-width: 140px; text-align: center">
+                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">3</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Explore</div>
+                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Click through the graph, trace dependencies, export DOT for other tools</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Superpowers -->
+                <div style="margin-bottom: 2rem">
+                    <div class="section-header">Superpowers</div>
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 1rem 0">
+                        Each pipeline declares what it reads and writes. Pipeviz stitches these into a complete graph. From there, you get some superpowers for free:
+                    </p>
+                    <div class="superpowers-grid">
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M4 6h4M4 12h6M4 18h8"/>
+                                <path d="M14 6h6M12 12h8M10 18h10"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Parallelize backfills</strong> by topologically sorting nodes into stages. Independent pipelines run together.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <circle cx="12" cy="12" r="9"/>
+                                <path d="M12 8v4l2 2"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Detect circular dependencies</strong> before they break your backfill. Cycles shown in red.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M12 2l8 10-8 10-8-10z"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Handle diamond dependencies</strong> correctly. Each node runs only after all its parents complete.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <circle cx="12" cy="12" r="10"/>
+                                <circle cx="12" cy="12" r="4"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Trace blast radius</strong> downstream from any node. Know exactly what breaks.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M4 17l6-6-6-6"/>
+                                <path d="M12 19h8"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Export to Mermaid</strong> and embed diagrams in CI/CD, PRs, or docs.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                <path d="M9 9h6M9 12h6M9 15h4"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Build MCPs</strong> on top of your graph. LLMs can query your lineage.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M3 12h4l3-9 4 18 3-9h4"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Find critical path</strong> via PERT analysis. Know your pipeline's true bottleneck.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Track spend</strong> per node and path. See where your compute budget goes.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Why -->
+                <div style="margin-bottom: 2rem">
+                    <div class="section-header">Why</div>
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0">
+                        Other solutions ask for a lot.
+                        <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary)">OpenLineage</a>/<a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary)">Marquez</a> need agents, a metadata store, scheduler integration.
+                        <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary)">Atlas</a> wants a governance platform.
+                        <a href="https://www.getdbt.com/" target="_blank" style="color: var(--text-secondary)">dbt</a> couples you to their framework. Pipeviz asks for one JSON file.
+                    </p>
+                </div>
+
+                <!-- Why Clojure -->
+                <div style="margin-bottom: 2rem">
+                    <div class="section-header" style="display: flex; align-items: center; gap: 0.5rem">
+                        <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 20px">
+                        Why Clojure
+                    </div>
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
+                        Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript. Two reasons:
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
+                        <div style="display: flex; gap: 0.5rem">
+                            <span style="color: var(--text-muted)">•</span>
+                            <div><strong style="color: var(--text-primary)">Code is data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure beats 10 functions on 10 structures. Your lineage lives in plain JSON that can be versioned, diffed, and reviewed like code. Each team owns their <code>pipeviz.json</code>. Merge them with <code>jq</code> for the org-wide view.</div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem">
+                            <span style="color: var(--text-muted)">•</span>
+                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Tab -->
+        <div class="tab-pane" id="config-pane">
+            <div style="max-width: 900px; padding: 1rem 0">
+                <textarea class="json-editor" id="json-input" placeholder="Paste your pipeviz JSON here..."></textarea>
+                <div class="config-controls">
+                    <button class="btn btn-dark" onclick="applyConfig()">Apply</button>
+                    <button class="btn btn-outline" onclick="loadExample()">Load Example</button>
+                    <button class="btn btn-outline" onclick="formatJson()">Format</button>
+                </div>
+                <div class="json-status" id="json-status"></div>
+            </div>
+        </div>
+
+        <!-- Graph Tab -->
+        <div class="tab-pane" id="graph-pane">
+            <div class="search-wrapper">
+                <input type="text" class="search-input" id="graph-search" placeholder="Search nodes..." autocomplete="off">
+                <div id="graph-search-results" class="search-results-dropdown"></div>
+            </div>
+            <div class="graph-row">
+                <div class="graph-col" id="graph-col">
+                    <div class="graph-container">
+                        <div class="graph-controls">
+                            <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
+                            <button class="graph-ctrl-btn" id="pipelines-only-btn" onclick="togglePipelinesOnly()">Pipelines Only</button>
+                            <span id="group-toggles"></span>
+                        </div>
+                        <div id="graph"></div>
+                        <div class="legend">
+                            <div class="legend-toggle" onclick="this.parentElement.classList.toggle('expanded')">Legend</div>
+                            <div class="legend-content">
+                                <div>■ = Pipeline</div>
+                                <div>● = Data Source</div>
+                                <div style="color:#ff6b35">▣ = Group</div>
+                                <div>□ = Cluster</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="details-col" id="details-col">
+                    <div class="node-details-panel" id="node-details">
+                        <h5 id="details-title">Node Details</h5>
+                        <div id="details-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attributes Tab -->
+        <div class="tab-pane" id="attributes-pane">
+            <div class="search-wrapper">
+                <input type="text" class="search-input" id="attribute-search" placeholder="Search attributes..." autocomplete="off">
+                <div id="attribute-search-results" class="search-results-dropdown"></div>
+            </div>
+            <div class="graph-row">
+                <div class="graph-col" id="attribute-graph-col">
+                    <div class="graph-container">
+                        <div class="graph-controls">
+                            <button class="graph-ctrl-btn" onclick="resetAttributeGraph()">Reset</button>
+                        </div>
+                        <div id="attribute-graph"></div>
+                        <div class="legend">
+                            <div class="legend-toggle" onclick="this.parentElement.classList.toggle('expanded')">Legend</div>
+                            <div class="legend-content">
+                                <div>▢ = Data Source</div>
+                                <div>· = Attribute</div>
+                                <div>→ = Derived from</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="details-col" id="attribute-details-col">
+                    <div class="node-details-panel" id="attribute-details-panel">
+                        <div id="attribute-details-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Planner Tab -->
+        <div class="tab-pane" id="planner-pane">
+            <div class="planner-header">
+                <div class="planner-title">Planner</div>
+                <div class="planner-controls">
+                    <div class="planner-picker">
+                        <button class="planner-picker-btn" onclick="togglePlannerPicker()">
+                            <span id="planner-picker-label">Select pipelines...</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="planner-picker-dropdown" id="planner-picker-dropdown">
+                            <div class="planner-picker-search">
+                                <input type="text" id="planner-picker-filter" placeholder="Filter..." oninput="filterPlannerItems(this.value)">
+                            </div>
+                            <div class="planner-picker-list" id="planner-picker-list"></div>
+                            <div class="planner-picker-footer">
+                                <span id="planner-picker-count">0 selected</span>
+                                <button class="planner-picker-clear" onclick="clearPlannerSelection()">Clear all</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="planner-view-btns">
+                        <button class="planner-view-btn active" data-view="pipeline" onclick="setPlannerView('pipeline')">Run Order</button>
+                        <button class="planner-view-btn" data-view="airflow" onclick="setPlannerView('airflow')">Airflow</button>
+                        <button class="planner-view-btn danger" data-view="blast" onclick="setPlannerView('blast')">Blast Radius</button>
+                    </div>
+                </div>
+            </div>
+            <div class="planner-hint" id="planner-hint">Select pipelines to plan backfill execution order</div>
+            <div class="planner-content">
+                <div class="planner-graph-col">
+                    <div class="planner-graph" id="planner-graph">
+                        <div class="planner-placeholder">Select pipelines to see the execution plan</div>
+                    </div>
+                </div>
+                <div class="planner-output-col">
+                    <button class="planner-copy-btn" onclick="copyPlannerOutput()" title="Copy to clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                    <pre class="planner-output" id="planner-output"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spec Tab -->
+        <div class="tab-pane" id="spec-pane">
+            <style>
+                .spec-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 0.75rem 0 1rem 0; }
+                .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
+                .spec-table th { background: var(--bg-secondary); }
+                .spec-section { margin-bottom: 2rem; }
+                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
+                .spec-pre { background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; }
+            </style>
+            <div style="max-width: 800px; padding: 1rem 0">
+                <div style="margin-bottom: 1.5rem">
+                    <h5 style="font-weight: 600; font-size: 1.25rem; margin-bottom: 0.25rem">Pipeviz JSON Spec</h5>
+                    <p style="color: var(--text-secondary); font-size: 13px">
+                        Only <code>pipelines</code> is required. Clusters and datasources are auto-created when referenced.
+                    </p>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Root</h5>
+                    <table class="spec-table">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><code>pipelines</code></td><td>array</td><td>Yes</td><td>Jobs that transform or move data</td></tr>
+                        <tr><td><code>datasources</code></td><td>array</td><td>No</td><td>Tables, files, streams, APIs</td></tr>
+                        <tr><td><code>clusters</code></td><td>array</td><td>No</td><td>Groups for visual organization</td></tr>
+                    </table>
+                    <pre class="spec-pre">{
+  "clusters": [...],
+  "pipelines": [...],
+  "datasources": [...]
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Pipeline</h5>
+                    <table class="spec-table">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                        <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                        <tr><td><code>input_sources</code></td><td>array</td><td>No</td><td>Datasources read from</td></tr>
+                        <tr><td><code>output_sources</code></td><td>array</td><td>No</td><td>Datasources written to</td></tr>
+                        <tr><td><code>upstream_pipelines</code></td><td>array</td><td>No</td><td>Pipeline or group names (orange edges)</td></tr>
+                        <tr><td><code>cluster</code></td><td>string</td><td>No</td><td>Cluster name</td></tr>
+                        <tr><td><code>group</code></td><td>string</td><td>No</td><td>Collapse into group node</td></tr>
+                        <tr><td><code>schedule</code></td><td>string</td><td>No</td><td>Free text</td></tr>
+                        <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                        <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                        <tr><td><code>duration</code></td><td>number</td><td>No</td><td>Runtime in minutes (for critical path)</td></tr>
+                        <tr><td><code>cost</code></td><td>number</td><td>No</td><td>Cost per run (for spend analysis)</td></tr>
+                    </table>
+                    <pre class="spec-pre">{
+  "name": "user-enrichment",
+  "description": "Enriches user data with events",
+  "input_sources": ["raw_users", "events"],
+  "output_sources": ["enriched_users"],
+  "upstream_pipelines": ["data-ingestion"],
+  "cluster": "user-processing",
+  "group": "etl-jobs",
+  "schedule": "Every 2 hours",
+  "duration": 45,
+  "cost": 12.50,
+  "tags": ["user-data", "ml"],
+  "links": {
+    "airflow": "https://...",
+    "docs": "https://..."
+  }
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Datasource</h5>
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                        Auto-created when referenced. Define explicitly to add metadata.
+                    </p>
+                    <table class="spec-table">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                        <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                        <tr><td><code>type</code></td><td>string</td><td>No</td><td>snowflake, postgres, kafka, s3...</td></tr>
+                        <tr><td><code>owner</code></td><td>string</td><td>No</td><td></td></tr>
+                        <tr><td><code>cluster</code></td><td>string</td><td>No</td><td></td></tr>
+                        <tr><td><code>tags</code></td><td>array</td><td>No</td><td></td></tr>
+                        <tr><td><code>metadata</code></td><td>object</td><td>No</td><td>Arbitrary key-value</td></tr>
+                        <tr><td><code>links</code></td><td>object</td><td>No</td><td>name to URL</td></tr>
+                        <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Column-level lineage</td></tr>
+                    </table>
+                    <pre class="spec-pre">{
+  "name": "raw_users",
+  "description": "Raw user data from prod",
+  "type": "snowflake",
+  "owner": "data-team@company.com",
+  "cluster": "user-processing",
+  "tags": ["pii", "users"],
+  "metadata": {
+    "size": "2.1TB",
+    "record_count": "45M"
+  },
+  "links": {
+    "snowflake": "https://...",
+    "docs": "https://..."
+  }
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Cluster</h5>
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                        Auto-created when referenced. Define explicitly for nesting.
+                    </p>
+                    <table class="spec-table">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
+                        <tr><td><code>description</code></td><td>string</td><td>No</td><td></td></tr>
+                        <tr><td><code>parent</code></td><td>string</td><td>No</td><td>Parent cluster for nesting</td></tr>
+                    </table>
+                    <pre class="spec-pre">{
+  "name": "realtime",
+  "description": "Real-time processing cluster",
+  "parent": "order-processing"
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Attribute Lineage</h5>
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                        Add <code>attributes</code> to a datasource. Supports nesting for structs/objects. Reference upstream with <code>source::attr</code> or <code>source::parent::child</code>.
+                    </p>
+                    <table class="spec-table">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Column/field name</td></tr>
+                        <tr><td><code>from</code></td><td>string or array</td><td>No</td><td>Upstream refs</td></tr>
+                        <tr><td><code>attributes</code></td><td>array</td><td>No</td><td>Nested child attributes</td></tr>
+                    </table>
+                    <pre class="spec-pre">{
+  "name": "enriched_users",
+  "attributes": [
+    { "name": "user_id", "from": "raw_users::id" },
+    {
+      "name": "location",
+      "from": "raw_users::address",
+      "attributes": [
+        { "name": "city", "from": "raw_users::address::city" },
+        { "name": "zip", "from": "raw_users::address::zip" }
+      ]
+    }
+  ]
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Full Example</h5>
+                    <pre class="spec-pre">{
+  "clusters": [
+    { "name": "etl", "description": "ETL pipelines" }
+  ],
+  "pipelines": [
+    {
+      "name": "user-enrichment",
+      "description": "Enriches user data with events",
+      "input_sources": ["raw_users", "events"],
+      "output_sources": ["enriched_users"],
+      "cluster": "etl",
+      "schedule": "Every 2 hours",
+      "tags": ["user-data"],
+      "links": { "airflow": "https://..." }
+    }
+  ],
+  "datasources": [
+    {
+      "name": "raw_users",
+      "type": "snowflake",
+      "owner": "data-team@company.com",
+      "attributes": [
+        { "name": "id" },
+        { "name": "first" },
+        { "name": "last" }
+      ]
+    },
+    {
+      "name": "enriched_users",
+      "type": "snowflake",
+      "attributes": [
+        { "name": "user_id", "from": "raw_users::id" },
+        { "name": "full_name", "from": ["raw_users::first", "raw_users::last"] }
+      ]
+    }
+  ]
+}</pre>
+                </div>
+
+                <div class="spec-section">
+                    <h5>Edge Types</h5>
+                    <table class="spec-table">
+                        <tr><th>Color</th><th>Source</th><th>Description</th></tr>
+                        <tr><td style="color:#555">Gray →</td><td><code>input_sources</code> / <code>output_sources</code></td><td>Data flow through datasources</td></tr>
+                        <tr><td style="color:#ff6b35">Orange →</td><td><code>upstream_pipelines</code></td><td>Direct pipeline dependency</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blast Radius Modal -->
+    <div class="modal" id="blast-radius-modal">
+        <div class="modal-backdrop" onclick="hideBlastRadiusModal()"></div>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <span style="color: #c98b8b">◉</span> Blast Radius:
+                        <span id="blast-radius-node-name"></span>
+                    </h5>
+                    <button type="button" class="modal-close" onclick="hideBlastRadiusModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-row">
+                        <div class="modal-col-graph">
+                            <div id="blast-radius-graph"></div>
+                        </div>
+                        <div class="modal-col-summary">
+                            <div id="blast-radius-summary"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
+
+

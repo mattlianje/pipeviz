@@ -1,0 +1,38 @@
+{
+  "pipelines": [
+    {
+      "name": "ingest",
+      "schedule": "0 */2 * * *",
+      "output_sources": ["raw_events"]
+    },
+    {
+      "name": "validate",
+      "input_sources": ["raw_events"],
+      "output_sources": ["valid_events", "quarantine"]
+    },
+    {
+      "name": "enrich",
+      "input_sources": ["valid_events"],
+      "output_sources": ["enriched_events"]
+    },
+    {
+      "name": "aggregate",
+      "schedule": "0 0 * * *",
+      "input_sources": ["enriched_events"],
+      "output_sources": ["daily_stats"]
+    },
+    {
+      "name": "export",
+      "input_sources": ["daily_stats"],
+      "output_sources": ["data_warehouse"]
+    }
+  ],
+  "datasources": [
+    {"name": "raw_events", "type": "kafka"},
+    {"name": "valid_events", "type": "kafka"},
+    {"name": "quarantine", "type": "s3"},
+    {"name": "enriched_events", "type": "kafka"},
+    {"name": "daily_stats", "type": "postgres"},
+    {"name": "data_warehouse", "type": "snowflake"}
+  ]
+}
