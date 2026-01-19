@@ -204,7 +204,10 @@ jq -s '{
 
 ## API Server
 
-There's an optional Clojure server if you want programmatic access to the graph:
+There's an optional Clojure server if you want programmatic access to the graph...
+
+This is especially useful for cases where you want to let other people routinely "get answers" from your graph ("what would break if?", "what is
+downstream of that?") without poking digging into a UI.
 
 ```bash
 cd clojure
@@ -223,41 +226,9 @@ Wire it into CI. Point an LLM agent at it. Build custom tooling. The graph is ju
 
 ## Why Clojure?
 
-- Clojure espouses the same code-as-data core idea as Pipeviz.
+- Pipviz, like Clojure has the code-as-data philosophy.
 - No required persistence layer. Since Clojure is [homoiconic](https://en.wikipedia.org/wiki/Homoiconicity) you can REPL into, poke at, update, define listeners and hooks on your graph 
 without having to restart your server or drop-down into the relational algebra of CRUD apps and ORM's. Your graph becomes very easy to extend, almost like a living organism.
-
-```clojure
-;; load your config
-(def config (json/read-str (slurp "pipeviz.json") :key-fn keyword))
-
-;; what breaks if "raw_users" goes down?
-(core/downstream-of config "raw_users")
-;; => #{"user-enrichment" "analytics-aggregation" "weekly-rollup"}
-
-;; get the full lineage as data
-(core/full-graph-lineage config "analytics-aggregation")
-;; => {:upstream [{:name "user-enrichment", :depth 1} ...], :downstream [...]}
-
-;; generate DOT, pipe to graphviz
-(spit "graph.dot" (core/generate-dot config))
-```
-
-The graph is a living thing. Define hooks, react to changes:
-
-```clojure
-(def graph (atom config))
-
-;; recompute blast radius whenever the graph changes
-(add-watch graph :blast-radius
-  (fn [_ _ _ new-config]
-    (println "Affected nodes:" (core/downstream-of new-config "raw_users"))))
-
-;; add a pipeline, watch it ripple
-(swap! graph update :pipelines conj
-  {:name "new-etl" :input_sources ["raw_users"] :output_sources ["new_table"]})
-;; => Affected nodes: #{"user-enrichment" "new-etl" "analytics-aggregation" ...}
-```
 
 ## Inspiration
 - The LISP [code-as-data](https://en.wikipedia.org/wiki/Code_as_data) ethos
