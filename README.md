@@ -226,7 +226,7 @@ Wire it into CI. Point an LLM agent at it. Build custom tooling. The graph is ju
 
 ## Why Clojure?
 
-- Pipviz, like Clojure has the code-as-data philosophy.
+- Pipeviz, like Clojure has the code-as-data philosophy.
 - No required persistence layer. Since Clojure is [homoiconic](https://en.wikipedia.org/wiki/Homoiconicity) you can REPL into, poke at, update, define listeners and hooks on your graph 
 without having to restart your server or drop-down into the relational algebra of CRUD apps and ORM's. Your graph becomes very easy to extend, almost like a living organism.
 
