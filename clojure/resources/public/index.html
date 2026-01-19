@@ -242,10 +242,13 @@
         }
         .btn {
             padding: 8px 16px;
-            border-radius: 4px;
+            border-radius: 0;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             font-family: inherit;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             transition: all 0.2s;
         }
         .btn-dark {
@@ -344,11 +347,33 @@
             bottom: 10px;
             left: 10px;
             font-size: 11px;
-            color: var(--text-primary);
+            color: var(--text-muted);
             background: var(--bg-primary);
-            padding: 8px 12px;
-            max-width: 160px;
+            padding: 4px 8px;
             opacity: 0.9;
+        }
+        .legend-toggle {
+            cursor: pointer;
+        }
+        .legend-toggle:hover {
+            color: var(--text-primary);
+        }
+        .legend-content {
+            display: none;
+            margin-top: 4px;
+            color: var(--text-primary);
+        }
+        .legend-toggle::after {
+            content: ' ▸';
+        }
+        .legend.expanded .legend-toggle::after {
+            content: ' ▾';
+        }
+        .legend.expanded .legend-toggle {
+            color: var(--text-primary);
+        }
+        .legend.expanded .legend-content {
+            display: block;
         }
 
         /* Node details panel */
@@ -406,6 +431,11 @@
         }
         .lineage-indent {
             color: var(--text-muted);
+        }
+
+        /* Links section */
+        .links-section {
+            margin-bottom: 1rem;
         }
 
         /* Tree/JSON toggle */
@@ -508,8 +538,10 @@
         }
         .node-highlighted text {
             font-weight: normal !important;
-            fill: #000;
             stroke: none !important;
+        }
+        .node-highlighted text:not([fill]) {
+            fill: #000;
         }
         .node-connected {
             stroke: #7b1fa2 !important;
@@ -517,8 +549,10 @@
         }
         .node-connected text {
             font-weight: normal !important;
-            fill: #000;
             stroke: none !important;
+        }
+        .node-connected text:not([fill]) {
+            fill: #000;
         }
         .node-dimmed {
             opacity: 0.35 !important;
@@ -538,8 +572,8 @@
         }
 
         /* Dark mode adjustments */
-        [data-theme="dark"] .node-highlighted text,
-        [data-theme="dark"] .node-connected text {
+        [data-theme="dark"] .node-highlighted text:not([fill]),
+        [data-theme="dark"] .node-connected text:not([fill]) {
             fill: #000 !important;
         }
 
@@ -547,6 +581,7 @@
         .search-wrapper {
             position: relative;
             margin-bottom: 0.75rem;
+            width: 240px;
         }
         .search-input {
             width: 100%;
@@ -652,9 +687,9 @@
 
         <!-- Home Tab -->
         <div class="tab-pane active" id="home-pane">
-            <div style="max-width: 750px; margin: 0 auto; padding: 2rem 1rem">
+            <div style="max-width: 750px; margin: 0 auto; padding: 1rem 1rem 2rem">
                 <!-- Intro -->
-                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem">
+                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem;">
                     An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.
                 </p>
 
@@ -823,20 +858,17 @@
                         <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 20px">
                         Why Clojure
                     </div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.5rem 0">
-                        This version of Pipeviz is written in Clojure/ClojureScript. The core graph logic lives in <code>.cljc</code> files that compile to both JVM bytecode and JavaScript. Same code, two runtimes.
-                    </p>
                     <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
-                        Clojure is homoiconic: code is data, data is code. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map, trivially serializable and introspectable. Run Pipeviz two ways:
+                        This version of Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript. Two reasons:
                     </p>
-                    <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-top: 0.5rem">
-                        <div style="flex: 1; min-width: 200px; display: flex; gap: 0.5rem">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
+                        <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">Client only</strong><br>Static HTML, no backend. Embed in docs or share via URL.</div>
+                            <div><strong style="color: var(--text-primary)">Code is data.</strong> Pipeviz espouses the code-as-data philosophy. Your <code>pipeviz.json</code> files are monoids under concatenation. Merge them with <code>jq -s 'reduce .[] as $x ({}; . * $x)'</code> and the result is still a valid config. Clojure thinks the same way.</div>
                         </div>
-                        <div style="flex: 1; min-width: 200px; display: flex; gap: 0.5rem">
+                        <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">With server</strong><br>Ring/Jetty backend. Let teams query your graph via API. REPL into a running server to redefine functions, inspect state, or patch behaviour without restarts.</div>
+                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph.</div>
                         </div>
                     </div>
                 </div>
@@ -868,15 +900,17 @@
                         <div class="graph-controls">
                             <button class="graph-ctrl-btn" onclick="resetGraph()">Reset</button>
                             <button class="graph-ctrl-btn" id="pipelines-only-btn" onclick="togglePipelinesOnly()">Pipelines Only</button>
+                            <span id="group-toggles"></span>
                         </div>
                         <div id="graph"></div>
                         <div class="legend">
-                            <div><strong>Legend:</strong></div>
-                            <div>■ = Pipeline</div>
-                            <div>● = Data Source</div>
-                            <div>□ = Cluster</div>
-                            <div>→ = Data flow</div>
-                            <div style="color:#ff6b35">→ = Dependency</div>
+                            <div class="legend-toggle" onclick="this.parentElement.classList.toggle('expanded')">Legend</div>
+                            <div class="legend-content">
+                                <div>■ = Pipeline</div>
+                                <div>● = Data Source</div>
+                                <div style="color:#ff6b35">▣ = Group</div>
+                                <div>□ = Cluster</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -896,7 +930,7 @@
                 .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
                 .spec-table th { background: var(--bg-secondary); }
                 .spec-section { margin-bottom: 2rem; }
-                .spec-section h6 { font-weight: 600; margin-bottom: 0.5rem; }
+                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
                 .spec-pre { background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; }
             </style>
             <div style="max-width: 800px; padding: 1rem 0">
@@ -908,7 +942,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Root</h6>
+                    <h5>Root</h5>
                     <table class="spec-table">
                         <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
                         <tr><td><code>pipelines</code></td><td>array</td><td>Yes</td><td>Jobs that transform or move data</td></tr>
@@ -923,7 +957,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Pipeline</h6>
+                    <h5>Pipeline</h5>
                     <table class="spec-table">
                         <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
                         <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique identifier</td></tr>
@@ -959,7 +993,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Datasource</h6>
+                    <h5>Datasource</h5>
                     <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
                         Auto-created when referenced. Define explicitly to add metadata.
                     </p>
@@ -994,7 +1028,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Cluster</h6>
+                    <h5>Cluster</h5>
                     <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
                         Auto-created when referenced. Define explicitly for nesting.
                     </p>
@@ -1012,7 +1046,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Attribute Lineage</h6>
+                    <h5>Attribute Lineage</h5>
                     <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
                         Add <code>attributes</code> to a datasource. Supports nesting for structs/objects. Reference upstream with <code>source::attr</code> or <code>source::parent::child</code>.
                     </p>
@@ -1039,7 +1073,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Full Example</h6>
+                    <h5>Full Example</h5>
                     <pre class="spec-pre">{
   "clusters": [
     { "name": "etl", "description": "ETL pipelines" }
@@ -1080,7 +1114,7 @@
                 </div>
 
                 <div class="spec-section">
-                    <h6>Edge Types</h6>
+                    <h5>Edge Types</h5>
                     <table class="spec-table">
                         <tr><th>Color</th><th>Source</th><th>Description</th></tr>
                         <tr><td style="color:#555">Gray →</td><td><code>input_sources</code> / <code>output_sources</code></td><td>Data flow through datasources</td></tr>

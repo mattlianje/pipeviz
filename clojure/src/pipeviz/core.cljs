@@ -8,7 +8,7 @@
 ;; Ensure d3-graphviz side-effects load
 (def ^:private _ d3-graphviz)
 
-(declare render-splash! render-graph! setup-interactivity! show-node-details! render-tables! update-json-input! render-attribute-graph! precompute-attribute-lineage! select-attribute! show-datasource-in-attribute-panel! render-group-toggles! select-group! show-group-details!)
+(declare dark? render-splash! render-graph! setup-interactivity! show-node-details! render-tables! update-json-input! render-attribute-graph! precompute-attribute-lineage! select-attribute! show-datasource-in-attribute-panel! render-group-toggles! select-group! show-group-details! select-node-from-hash!)
 
 ;; State
 (defonce state (atom {:config nil
@@ -17,7 +17,9 @@
                       :dark? false
                       :pipelines-only? false
                       :lineage-cache nil
-                      :collapsed-groups #{}}))
+                      :collapsed-groups #{}
+                      :dot-cache {}
+                      :last-rendered-key nil}))
 
 ;; Filter state
 (defonce filter-state (atom {:pipeline-tags #{}
@@ -26,12 +28,18 @@
                              :datasource-tags #{}
                              :datasource-clusters #{}}))
 
+;; View state cache key for snappy toggling
+(defn- view-cache-key []
+  (str (dark?) "|" (:pipelines-only? @state) "|" (pr-str (:collapsed-groups @state))))
+
 ;; Set config and initialize groups as collapsed by default
 (defn set-config! [config]
   (let [all-groups (set (graph/all-groups config))]
     (swap! state assoc
            :config config
-           :collapsed-groups all-groups)))
+           :collapsed-groups all-groups
+           :dot-cache {}
+           :last-rendered-key nil)))
 
 ;; Precompute lineage for all nodes
 (defn precompute-lineage! [config]
@@ -58,13 +66,35 @@
 (defn dark? []
   (= "dark" (.getAttribute js/document.documentElement "data-theme")))
 
+;; URL hash helpers for direct node linking
+(defn parse-hash []
+  (let [hash (subs (or (.-hash js/window.location) "") 1)
+        parts (str/split hash #"&")]
+    (into {}
+          (for [part parts
+                :when (str/includes? part "=")]
+            (let [[k v] (str/split part #"=" 2)]
+              [(keyword k) (js/decodeURIComponent v)])))))
+
+(defn get-node-from-hash []
+  (:node (parse-hash)))
+
+(defn update-hash-with-node [node-name]
+  (let [current (parse-hash)
+        updated (if node-name
+                  (assoc current :node node-name)
+                  (dissoc current :node))
+        hash-str (str/join "&" (for [[k v] updated]
+                                 (str (name k) "=" (js/encodeURIComponent v))))]
+    (set! (.-hash js/window.location) hash-str)))
+
 ;; Theme
 (defn set-theme! [dark?]
   (.setAttribute js/document.documentElement "data-theme" (if dark? "dark" "light"))
   (js/localStorage.setItem "theme" (if dark? "dark" "light"))
   (when-let [btn ($id "theme-toggle")]
     (set! (.-textContent btn) (if dark? "☀️" "🌙")))
-  (swap! state assoc :dark? dark?)
+  (swap! state assoc :dark? dark? :last-rendered-key nil) ;; invalidate cache on theme change
   (when ($id "splash-graph")
     (render-splash!))
   (when (:config @state)
@@ -118,29 +148,42 @@
           (.fit true)
           (.renderDot dot)))))
 
-;; Main graph rendering
-(defn render-graph! []
-  (when-let [config (:config @state)]
-    (when-let [container ($id "graph")]
-      (let [dot (graph/generate-dot config {:dark? (dark?)
-                                            :show-datasources? (not (:pipelines-only? @state))
-                                            :collapsed-groups (:collapsed-groups @state)})
-            gv (-> (d3/select "#graph")
-                   (.graphviz)
-                   (.width (.-clientWidth container))
-                   (.height 500)
-                   (.fit true)
-                   (.transition (fn [] (-> (d3/transition "graph")
-                                           (.duration 300)
-                                           (.ease (.-easeCubicInOut d3))))))]
-        (swap! state assoc :graphviz gv)
-        (.renderDot gv dot)
-        (.on gv "end" setup-interactivity!)
-        (render-group-toggles!)))))
+;; Main graph rendering (with DOT caching for snappy toggles)
+(defn render-graph!
+  ([] (render-graph! false))
+  ([force?]
+   (when-let [config (:config @state)]
+     (when-let [container ($id "graph")]
+       (let [cache-key (view-cache-key)
+             last-key (:last-rendered-key @state)]
+         ;; Skip re-render if already rendered with same view state (unless forced)
+         (when (or force? (not= cache-key last-key))
+           (let [cached-dot (get (:dot-cache @state) cache-key)
+                 dot (or cached-dot
+                         (let [d (graph/generate-dot config {:dark? (dark?)
+                                                             :show-datasources? (not (:pipelines-only? @state))
+                                                             :collapsed-groups (:collapsed-groups @state)})]
+                           (swap! state assoc-in [:dot-cache cache-key] d)
+                           d))
+                 gv (-> (d3/select "#graph")
+                        (.graphviz)
+                        (.width (.-clientWidth container))
+                        (.height 500)
+                        (.fit true)
+                        (.transition (fn [] (-> (d3/transition "graph")
+                                                (.duration 300)
+                                                (.ease (.-easeCubicInOut d3))))))]
+             (swap! state assoc :graphviz gv :last-rendered-key cache-key)
+             (.renderDot gv dot)
+             (.on gv "end" (fn []
+                             (setup-interactivity!)
+                             (select-node-from-hash!)))
+             (render-group-toggles!))))))))
 
 ;; Node selection with full provenance highlighting
 (defn select-node! [node-name]
   (swap! state assoc :selected-node node-name)
+  (update-hash-with-node node-name)
   (when-let [config (:config @state)]
     (let [;; Use cached lineage if available, otherwise compute
           {:keys [upstream downstream]} (or (get (:lineage-cache @state) node-name)
@@ -198,8 +241,15 @@
       ;; Show details panel
       (show-node-details! node-name upstream downstream))))
 
+(defn select-node-from-hash! []
+  (when-let [node-name (get-node-from-hash)]
+    (if (str/starts-with? node-name "group:")
+      (select-group! (subs node-name 6))
+      (select-node! node-name))))
+
 (defn clear-selection! []
   (swap! state assoc :selected-node nil)
+  (update-hash-with-node nil)
   ;; Clear node classes
   (-> (d3/select "#graph")
       (.selectAll ".node")
@@ -311,8 +361,12 @@
 
 (defn select-group! [group-name]
   (swap! state assoc :selected-node (str "group:" group-name))
+  (update-hash-with-node (str "group:" group-name))
   (when-let [config (:config @state)]
     (let [{:keys [upstream downstream]} (graph/group-provenance config group-name)
+          {:keys [groups]} (graph/build-group-data config)
+          members (set (:members (get groups group-name)))
+          collapsed? (contains? (:collapsed-groups @state) group-name)
           all-connected (set (concat (map :name upstream) (map :name downstream)))
           group-node-title (str "group:" group-name)]
 
@@ -327,7 +381,9 @@
                               (.classed node "node-connected" false)
                               (.classed node "node-dimmed" false)
                               (cond
-                                (= title group-node-title)
+                                ;; Highlight group node (collapsed) or members (expanded)
+                                (or (= title group-node-title)
+                                    (and (not collapsed?) (members title)))
                                 (.classed node "node-highlighted" true)
 
                                 (all-connected title)
@@ -337,20 +393,24 @@
                                 (.classed node "node-dimmed" true)))))))
 
       ;; Dim unrelated edges
-      (-> (d3/select "#graph")
-          (.selectAll ".edge")
-          (.each (fn [d]
-                   (this-as this
-                            (let [edge (d3/select this)
-                                  title (-> edge (.select "title") (.text) str/trim)
-                                  match (re-find #"^(.+?)(?:->|--)\s*(.+?)$" title)]
-                              (.classed edge "edge-dimmed" false)
-                              (when match
-                                (let [[_ source target] match
-                                      source-in-chain (or (= source group-node-title) (all-connected source))
-                                      target-in-chain (or (= target group-node-title) (all-connected target))]
-                                  (when-not (and source-in-chain target-in-chain)
-                                    (.classed edge "edge-dimmed" true)))))))))
+      (let [in-group? (fn [n] (or (= n group-node-title)
+                                  (and (not collapsed?) (members n))))]
+        (-> (d3/select "#graph")
+            (.selectAll ".edge")
+            (.each (fn [d]
+                     (this-as this
+                              (let [edge (d3/select this)
+                                    title (-> edge (.select "title") (.text) str/trim)
+                                    match (re-find #"^(.+?)(?:->|--)\s*(.+?)$" title)]
+                                (.classed edge "edge-dimmed" false)
+                                (.classed edge "edge-highlighted" false)
+                                (when match
+                                  (let [[_ source target] match
+                                        source-in-chain (or (in-group? source) (all-connected source))
+                                        target-in-chain (or (in-group? target) (all-connected target))]
+                                    (if (and source-in-chain target-in-chain)
+                                      (.classed edge "edge-highlighted" true)
+                                      (.classed edge "edge-dimmed" true))))))))))
 
       ;; Show details panel
       (show-group-details! group-name upstream downstream))))
@@ -555,29 +615,45 @@
   (clear-selection!))
 
 (defn toggle-pipelines-only! []
-  (swap! state update :pipelines-only? not)
+  (swap! state assoc :pipelines-only? (not (:pipelines-only? @state)) :last-rendered-key nil)
   (toggle-class! ($id "pipelines-only-btn") "active")
   (render-graph!))
 
 (defn toggle-group! [group-name]
   (let [selected (:selected-node @state)]
-    (swap! state update :collapsed-groups
-           (fn [groups]
-             (if (groups group-name)
-               (disj groups group-name)
-               (conj groups group-name))))
+    (swap! state (fn [s]
+                   (-> s
+                       (update :collapsed-groups
+                               (fn [groups]
+                                 (if (groups group-name)
+                                   (disj groups group-name)
+                                   (conj groups group-name))))
+                       (assoc :last-rendered-key nil))))
     (render-graph!)
-    ;; Re-select the group to update the panel with new button state
-    (when (= selected (str "group:" group-name))
-      (select-group! group-name))))
+    ;; Re-apply selection after transition completes (300ms + buffer)
+    (when selected
+      (js/setTimeout
+       #(if (str/starts-with? selected "group:")
+          (select-group! (subs selected 6))
+          (select-node! selected))
+       350))))
 
 (defn toggle-all-groups! []
   (when-let [config (:config @state)]
     (let [all-groups (set (graph/all-groups config))
           collapsed (:collapsed-groups @state)
-          all-collapsed? (= all-groups collapsed)]
-      (swap! state assoc :collapsed-groups (if all-collapsed? #{} all-groups))
-      (render-graph!))))
+          all-collapsed? (= all-groups collapsed)
+          selected (:selected-node @state)]
+      (swap! state assoc
+             :collapsed-groups (if all-collapsed? #{} all-groups)
+             :last-rendered-key nil)
+      (render-graph!)
+      (when selected
+        (js/setTimeout
+         #(if (str/starts-with? selected "group:")
+            (select-group! (subs selected 6))
+            (select-node! selected))
+         350)))))
 
 (defn render-group-toggles! []
   (when-let [config (:config @state)]
@@ -1560,6 +1636,23 @@
                                                              (set! (.-value input) "")
                                                              (select-attribute! attr-id)))))))))))))))
 
+;; Handle hashchange for browser back/forward navigation
+(defn setup-hashchange-listener! []
+  (.addEventListener js/window "hashchange"
+                     (fn [_]
+                       (let [node-from-hash (get-node-from-hash)
+                             current-selected (:selected-node @state)]
+                         (cond
+                           ;; Node in hash but different from current selection
+                           (and node-from-hash (not= node-from-hash current-selected))
+                           (do
+                             (switch-tab! "graph-pane")
+                             (js/setTimeout select-node-from-hash! 100))
+
+                           ;; No node in hash but we have a selection - clear it
+                           (and (nil? node-from-hash) current-selected)
+                           (clear-selection!))))))
+
 ;; Init
 (defn init []
   (js/console.log "Pipeviz ClojureScript initialized")
@@ -1569,17 +1662,21 @@
   (setup-search!)
   (setup-table-search!)
   (setup-attribute-search!)
+  (setup-hashchange-listener!)
   (render-splash!)
   ;; Load example by default
   (set-config! graph/example-config)
   (precompute-lineage! graph/example-config)
   (precompute-attribute-lineage! graph/example-config)
   (update-json-input! graph/example-config)
-  (render-tables!))
+  (render-tables!)
+  ;; If there's a node in the hash, switch to graph pane
+  (when (get-node-from-hash)
+    (switch-tab! "graph-pane")))
 
 (defn reload []
   (when (:config @state)
-    (render-graph!))
+    (render-graph! true)) ;; force re-render
   (render-splash!))
 
 ;; Expose to window for HTML onclick handlers

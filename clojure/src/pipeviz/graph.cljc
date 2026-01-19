@@ -87,37 +87,37 @@
   (let [output->producer (into {} (for [p pipelines, out (:output_sources p)]
                                     [out (:name p)]))]
     (reduce
-      (fn [acc {:keys [name input_sources upstream_pipelines]}]
-        (let [implicit (keep output->producer input_sources)
-              all-up (distinct (concat upstream_pipelines implicit))]
-          (reduce (fn [a up]
-                    (-> a
-                        (update-in [:downstream up] (fnil conj #{}) name)
-                        (update-in [:upstream name] (fnil conj #{}) up)))
-                  acc all-up)))
-      {:upstream {} :downstream {}}
-      pipelines)))
+     (fn [acc {:keys [name input_sources upstream_pipelines]}]
+       (let [implicit (keep output->producer input_sources)
+             all-up (distinct (concat upstream_pipelines implicit))]
+         (reduce (fn [a up]
+                   (-> a
+                       (update-in [:downstream up] (fnil conj #{}) name)
+                       (update-in [:upstream name] (fnil conj #{}) up)))
+                 acc all-up)))
+     {:upstream {} :downstream {}}
+     pipelines)))
 
 (defn build-full-adjacency
   "Build adjacency including datasources as nodes"
   [{:keys [pipelines]}]
   (reduce
-    (fn [acc {:keys [name input_sources output_sources upstream_pipelines]}]
-      (as-> acc $
-        (reduce #(-> %1
-                     (update-in [:downstream %2] (fnil conj []) name)
-                     (update-in [:upstream name] (fnil conj []) %2))
-                $ (or input_sources []))
-        (reduce #(-> %1
-                     (update-in [:downstream name] (fnil conj []) %2)
-                     (update-in [:upstream %2] (fnil conj []) name))
-                $ (or output_sources []))
-        (reduce #(-> %1
-                     (update-in [:downstream %2] (fnil conj []) name)
-                     (update-in [:upstream name] (fnil conj []) %2))
-                $ (or upstream_pipelines []))))
-    {:downstream {} :upstream {}}
-    pipelines))
+   (fn [acc {:keys [name input_sources output_sources upstream_pipelines]}]
+     (as-> acc $
+       (reduce #(-> %1
+                    (update-in [:downstream %2] (fnil conj []) name)
+                    (update-in [:upstream name] (fnil conj []) %2))
+               $ (or input_sources []))
+       (reduce #(-> %1
+                    (update-in [:downstream name] (fnil conj []) %2)
+                    (update-in [:upstream %2] (fnil conj []) name))
+               $ (or output_sources []))
+       (reduce #(-> %1
+                    (update-in [:downstream %2] (fnil conj []) name)
+                    (update-in [:upstream name] (fnil conj []) %2))
+               $ (or upstream_pipelines []))))
+   {:downstream {} :upstream {}}
+   pipelines))
 
 ;; =============================================================================
 ;; Lineage Queries
@@ -175,8 +175,8 @@
                 {:from node :to neighbor})]
     {:node (-> {:name node-name :type node-type}
                (merge (select-keys node-data
-                        [:description :cluster :tags :schedule
-                         :input_sources :output_sources])))
+                                   [:description :cluster :tags :schedule
+                                    :input_sources :output_sources])))
      :upstream (mapv #(select-keys % [:id :depth]) up-chain)
      :downstream (mapv #(select-keys % [:id :depth]) down-chain)
      :edges (vec edges)}))
@@ -338,12 +338,12 @@
                             (remove explicit-names)
                             distinct)]
       (->> (concat
-             (for [p pipelines :let [s (match-score p)] :when s]
-               {:name (:name p) :type :pipeline :score s})
-             (for [ds datasources :let [s (match-score ds)] :when s]
-               {:name (:name ds) :type :datasource :score s})
-             (for [n auto-sources :let [m (fuzzy-match n q)] :when (:match m)]
-               {:name n :type :datasource :score (* (:score m) 1.5)}))
+            (for [p pipelines :let [s (match-score p)] :when s]
+              {:name (:name p) :type :pipeline :score s})
+            (for [ds datasources :let [s (match-score ds)] :when s]
+              {:name (:name ds) :type :datasource :score s})
+            (for [n auto-sources :let [m (fuzzy-match n q)] :when (:match m)]
+              {:name n :type :datasource :score (* (:score m) 1.5)}))
            (sort-by :score >)
            (take 8)
            vec))))
@@ -373,10 +373,10 @@
   (let [n (escape-dot name)
         color (edge-color dark?)]
     (concat
-      (for [src input_sources]
-        (str "\"" (escape-dot src) "\" -> \"" n "\" [color=\"" color "\" arrowsize=0.8];"))
-      (for [src output_sources]
-        (str "\"" n "\" -> \"" (escape-dot src) "\" [color=\"" color "\" arrowsize=0.8];")))))
+     (for [src input_sources]
+       (str "\"" (escape-dot src) "\" -> \"" n "\" [color=\"" color "\" arrowsize=0.8];"))
+     (for [src output_sources]
+       (str "\"" n "\" -> \"" (escape-dot src) "\" [color=\"" color "\" arrowsize=0.8];")))))
 
 (defn- dependency-edges [pipelines]
   (let [valid (set (map :name pipelines))]
@@ -387,9 +387,9 @@
            "\" [color=\"#ff6b35\" style=solid arrowsize=0.8];"))))
 
 (defn- dot-group-node
-  "Render a collapsed group as a single node"
+  "Render a collapsed group as a single node (3D orange box)"
   [group-name member-count]
-  (str "\"group:" (escape-dot group-name) "\" [shape=box style=\"filled,rounded\" "
+  (str "\"group:" (escape-dot group-name) "\" [shape=box3d style=filled "
        "fillcolor=\"#fff3e0\" color=\"#ff6b35\" "
        "label=<" (escape-dot group-name)
        "<BR/><FONT POINT-SIZE=\"9\" COLOR=\"#666\">" member-count " pipelines</FONT>>];"))
@@ -618,33 +618,33 @@
         ;; Add full chains
         attr-map (reduce-kv (fn [m id attr]
                               (assoc m id
-                                (assoc attr
-                                  :full-upstream (bfs id #(get-in attr-map [% :upstream] []))
-                                  :full-downstream (bfs id #(get-in attr-map [% :downstream] [])))))
+                                     (assoc attr
+                                            :full-upstream (bfs id #(get-in attr-map [% :upstream] []))
+                                            :full-downstream (bfs id #(get-in attr-map [% :downstream] [])))))
                             {} attr-map)
 
         ;; Build datasource-level lineage
         ds-ids (set (map #(sanitize-id (:name %)) datasources))
 
         ds-upstream (reduce-kv
-                      (fn [m id {:keys [upstream]}]
-                        (let [ds (first (str/split id #"__"))
-                              ups (->> upstream
-                                       (map #(first (str/split % #"__")))
-                                       (filter #(and (not= % ds) (ds-ids %)))
-                                       set)]
-                          (update m ds (fnil into #{}) ups)))
-                      {} attr-map)
+                     (fn [m id {:keys [upstream]}]
+                       (let [ds (first (str/split id #"__"))
+                             ups (->> upstream
+                                      (map #(first (str/split % #"__")))
+                                      (filter #(and (not= % ds) (ds-ids %)))
+                                      set)]
+                         (update m ds (fnil into #{}) ups)))
+                     {} attr-map)
 
         ds-downstream (reduce-kv
-                        (fn [m id {:keys [downstream]}]
-                          (let [ds (first (str/split id #"__"))
-                                downs (->> downstream
-                                           (map #(first (str/split % #"__")))
-                                           (filter #(and (not= % ds) (ds-ids %)))
-                                           set)]
-                            (update m ds (fnil into #{}) downs)))
-                        {} attr-map)
+                       (fn [m id {:keys [downstream]}]
+                         (let [ds (first (str/split id #"__"))
+                               downs (->> downstream
+                                          (map #(first (str/split % #"__")))
+                                          (filter #(and (not= % ds) (ds-ids %)))
+                                          set)]
+                           (update m ds (fnil into #{}) downs)))
+                       {} attr-map)
 
         ds-map (into {} (for [ds datasources
                               :let [id (sanitize-id (:name ds))]]
@@ -682,40 +682,40 @@
   [config]
   (let [datasources (:datasources config)
         all-refs (reduce #(if (:attributes %2)
-                           (into %1 (collect-source-refs (:attributes %2)))
-                           %1)
+                            (into %1 (collect-source-refs (:attributes %2)))
+                            %1)
                          #{} datasources)
 
         has-lineage? (fn [ds-name attr-path]
                        (contains? all-refs
-                         (str ds-name "::" (str/replace attr-path "__" "::"))))
+                                  (str ds-name "::" (str/replace attr-path "__" "::"))))
 
         struct-attrs (atom #{})
 
         render-attrs (fn render-attrs [attrs ds-name ds-id prefix depth]
                        (str/join ""
-                         (for [attr attrs
-                               :let [path (if (seq prefix)
-                                            (str prefix "__" (:name attr))
-                                            (:name attr))
-                                     id (str ds-id "__" (sanitize-id path))
-                                     has-lin (or (:from attr) (has-lineage? ds-name path))
-                                     kids (:attributes attr)]]
-                           (if kids
-                             (do (swap! struct-attrs conj id)
-                                 (str "    subgraph cluster_" id " {\n"
-                                      "      label=\"" (:name attr) "\" labelloc=t style=filled\n"
-                                      "      fillcolor=\"" (if has-lin "#dde5ed" "#e8eef4") "\"\n"
-                                      "      fontcolor=\"" (if has-lin "#7b1fa2" "#334155") "\"\n"
-                                      "      color=\"" (if has-lin "#7b1fa2" "#94a3b8") "\"\n"
-                                      "      fontname=Arial fontsize=9 margin=8\n"
-                                      "      \"" id "\" [label=\"\" shape=point width=0 height=0 style=invis];\n"
-                                      (render-attrs kids ds-name ds-id path (inc depth))
-                                      "    }\n"))
-                             (str "      \"" id "\" [label=\"" (:name attr) "\" shape=box "
-                                  "style=\"filled,rounded\" fillcolor=\""
-                                  (if has-lin "#e2e8f0" "#ffffff") "\" "
-                                  "color=\"#94a3b8\" fontcolor=\"#334155\" fontsize=9 height=0.3];\n")))))
+                                 (for [attr attrs
+                                       :let [path (if (seq prefix)
+                                                    (str prefix "__" (:name attr))
+                                                    (:name attr))
+                                             id (str ds-id "__" (sanitize-id path))
+                                             has-lin (or (:from attr) (has-lineage? ds-name path))
+                                             kids (:attributes attr)]]
+                                   (if kids
+                                     (do (swap! struct-attrs conj id)
+                                         (str "    subgraph cluster_" id " {\n"
+                                              "      label=\"" (:name attr) "\" labelloc=t style=filled\n"
+                                              "      fillcolor=\"" (if has-lin "#dde5ed" "#e8eef4") "\"\n"
+                                              "      fontcolor=\"" (if has-lin "#7b1fa2" "#334155") "\"\n"
+                                              "      color=\"" (if has-lin "#7b1fa2" "#94a3b8") "\"\n"
+                                              "      fontname=Arial fontsize=9 margin=8\n"
+                                              "      \"" id "\" [label=\"\" shape=point width=0 height=0 style=invis];\n"
+                                              (render-attrs kids ds-name ds-id path (inc depth))
+                                              "    }\n"))
+                                     (str "      \"" id "\" [label=\"" (:name attr) "\" shape=box "
+                                          "style=\"filled,rounded\" fillcolor=\""
+                                          (if has-lin "#e2e8f0" "#ffffff") "\" "
+                                          "color=\"#94a3b8\" fontcolor=\"#334155\" fontsize=9 height=0.3];\n")))))
 
         collect-edges (fn collect-edges [attrs ds-id prefix]
                         (mapcat (fn [attr]
@@ -727,29 +727,29 @@
                                                     (:from attr) [(:from attr)]
                                                     :else [])]
                                     (concat
-                                      (for [src froms
-                                            :let [{:keys [id]} (parse-source-ref src)
-                                                  attrs (cond-> ["color=\"#7b1fa2\""]
-                                                          (@struct-attrs id) (conj (str "ltail=\"cluster_" id "\""))
-                                                          (@struct-attrs tid) (conj (str "lhead=\"cluster_" tid "\"")))]]
-                                        (str "  \"" id "\" -> \"" tid "\" [" (str/join " " attrs) "];"))
-                                      (when (:attributes attr)
-                                        (collect-edges (:attributes attr) ds-id path)))))
+                                     (for [src froms
+                                           :let [{:keys [id]} (parse-source-ref src)
+                                                 attrs (cond-> ["color=\"#7b1fa2\""]
+                                                         (@struct-attrs id) (conj (str "ltail=\"cluster_" id "\""))
+                                                         (@struct-attrs tid) (conj (str "lhead=\"cluster_" tid "\"")))]]
+                                       (str "  \"" id "\" -> \"" tid "\" [" (str/join " " attrs) "];"))
+                                     (when (:attributes attr)
+                                       (collect-edges (:attributes attr) ds-id path)))))
                                 attrs))
 
         clusters (str/join ""
-                   (for [ds datasources :when (:attributes ds)
-                         :let [id (sanitize-id (:name ds))]]
-                     (str "  subgraph cluster_" id " {\n"
-                          "    label=\"" (:name ds) "\" style=filled fillcolor=\"#f1f5f9\"\n"
-                          "    fontcolor=\"#334155\" color=\"#94a3b8\" fontname=Arial fontsize=11\n"
-                          (render-attrs (:attributes ds) (:name ds) id "" 0)
-                          "  }\n")))
+                           (for [ds datasources :when (:attributes ds)
+                                 :let [id (sanitize-id (:name ds))]]
+                             (str "  subgraph cluster_" id " {\n"
+                                  "    label=\"" (:name ds) "\" style=filled fillcolor=\"#f1f5f9\"\n"
+                                  "    fontcolor=\"#334155\" color=\"#94a3b8\" fontname=Arial fontsize=11\n"
+                                  (render-attrs (:attributes ds) (:name ds) id "" 0)
+                                  "  }\n")))
 
         edges (str/join "\n"
-                (mapcat #(when (:attributes %)
-                           (collect-edges (:attributes %) (sanitize-id (:name %)) ""))
-                        datasources))]
+                        (mapcat #(when (:attributes %)
+                                   (collect-edges (:attributes %) (sanitize-id (:name %)) ""))
+                                datasources))]
 
     (str "digraph AttributeLineage {\n"
          "  rankdir=LR bgcolor=transparent compound=true nodesep=0.15\n"
@@ -796,12 +796,21 @@
      :description "Sync user cohorts to Salesforce"
      :input_sources ["user_cohorts"]
      :output_sources ["salesforce_users"]
+     :group "data-exports"
      :cluster "analytics"
      :upstream_pipelines ["analytics-aggregation"]}
     {:name "export-to-hubspot"
      :description "Sync user cohorts to HubSpot"
      :input_sources ["user_cohorts"]
      :output_sources ["hubspot_contacts"]
+     :group "data-exports"
+     :cluster "analytics"
+     :upstream_pipelines ["analytics-aggregation"]}
+    {:name "export-to-amplitude"
+     :description "Sync daily metrics to Amplitude"
+     :input_sources ["daily_metrics"]
+     :output_sources ["amplitude_events"]
+     :group "data-exports"
      :cluster "analytics"
      :upstream_pipelines ["analytics-aggregation"]}
     {:name "weekly-rollup"
@@ -862,6 +871,7 @@
     {:name "user_cohorts" :type "snowflake" :description "User segments" :cluster "analytics"}
     {:name "salesforce_users" :type "api" :description "Salesforce sync" :cluster "analytics"}
     {:name "hubspot_contacts" :type "api" :description "HubSpot sync" :cluster "analytics"}
+    {:name "amplitude_events" :type "api" :description "Amplitude events" :cluster "analytics"}
     {:name "executive_summary"
      :type "snowflake"
      :description "Weekly executive metrics"

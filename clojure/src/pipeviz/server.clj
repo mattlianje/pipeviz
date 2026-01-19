@@ -1,5 +1,5 @@
 (ns pipeviz.server
-  "Optional API server for serving graph data"
+  "Ring server for pipeviz API"
   (:require [pipeviz.graph :as graph]
             [clojure.data.json :as json]
             [org.httpkit.server :as http]
@@ -9,179 +9,98 @@
             [clojure.java.io :as io])
   (:gen-class))
 
-;; Config storage - can be set via API or loaded from file
 (defonce config (atom nil))
 
-(defn json-response [data]
+;; Response helpers
+(defn- json-response [data]
   (-> (resp/response (json/write-str data))
       (resp/content-type "application/json")))
 
-(defn dot-response [dot-string]
-  (-> (resp/response dot-string)
+(defn- dot-response [s]
+  (-> (resp/response s)
       (resp/content-type "text/vnd.graphviz")))
 
+(defn- error [status msg]
+  (-> (json-response {:error msg}) (resp/status status)))
+
+(defn- require-config [f]
+  (if @config (f @config) (error 404 "No config loaded")))
+
+(defn- parse-int [s]
+  (try (Integer/parseInt s) (catch Exception _ nil)))
+
+;; Config loading
 (defn load-config-file [path]
   (when (.exists (io/file path))
-    (-> (slurp path)
-        (json/read-str :key-fn keyword))))
+    (-> (slurp path) (json/read-str :key-fn keyword))))
 
-;; API handlers
-(defn handle-get-config [_req]
-  (if-let [cfg @config]
-    (json-response cfg)
-    (-> (resp/response "No config loaded")
-        (resp/status 404))))
+;; Handlers
+(defn- handle-health [_]
+  (json-response {:status "ok" :config-loaded (some? @config)}))
 
-(defn handle-set-config [req]
+(defn- handle-get-config [_]
+  (require-config json-response))
+
+(defn- handle-set-config [req]
   (try
-    (let [body (slurp (:body req))
-          cfg (json/read-str body :key-fn keyword)
+    (let [cfg (-> req :body slurp (json/read-str :key-fn keyword))
           {:keys [valid? errors]} (graph/validate-config cfg)]
       (if valid?
-        (do
-          (reset! config cfg)
-          (json-response {:status "ok" :pipelines (count (:pipelines cfg))}))
-        (-> (json-response {:status "error" :errors errors})
-            (resp/status 400))))
+        (do (reset! config cfg)
+            (json-response {:status "ok" :pipelines (count (:pipelines cfg))}))
+        (error 400 (first errors))))
     (catch Exception e
-      (-> (json-response {:status "error" :message (.getMessage e)})
-          (resp/status 400)))))
+      (error 400 (.getMessage e)))))
 
-(defn handle-get-dot [_req]
-  (if-let [cfg @config]
-    (dot-response (graph/generate-dot cfg))
-    (-> (resp/response "No config loaded")
-        (resp/status 404))))
+(defn- handle-get-dot [_]
+  (require-config #(dot-response (graph/generate-dot %))))
 
-(defn handle-get-lineage [req]
-  (if-let [cfg @config]
-    (let [node (get-in req [:params :node])]
-      (if node
-        (json-response
-         {:node node
-          :upstream (vec (graph/upstream-of cfg node))
-          :downstream (vec (graph/downstream-of cfg node))})
-        (-> (json-response {:error "Missing 'node' parameter"})
-            (resp/status 400))))
-    (-> (resp/response "No config loaded")
-        (resp/status 404))))
+(defn- handle-get-lineage [req]
+  (require-config
+   (fn [cfg]
+     (if-let [node (get-in req [:params :node])]
+       (let [depth (parse-int (get-in req [:params :depth]))]
+         (json-response
+          {:node node
+           :upstream (cond->> (graph/upstream-of cfg node) depth (take depth) true vec)
+           :downstream (cond->> (graph/downstream-of cfg node) depth (take depth) true vec)}))
+       (error 400 "Missing 'node' parameter")))))
 
-(defn handle-health [_req]
-  (json-response {:status "ok"
-                  :config-loaded (some? @config)}))
+(defn- handle-get-provenance [req]
+  (require-config
+   (fn [cfg]
+     (if-let [node (get-in req [:params :node])]
+       (let [depth (parse-int (get-in req [:params :depth]))
+             lineage-map (:attribute-map (graph/build-attribute-lineage-map cfg))
+             opts (when depth {:max-depth depth})]
+         (if-let [prov (graph/attribute-provenance lineage-map node opts)]
+           (json-response prov)
+           (error 404 (str "Attribute not found: " node))))
+       (error 400 "Missing 'node' parameter")))))
 
-(defn handle-get-provenance [req]
-  (if-let [cfg @config]
-    (let [node (get-in req [:params :node])
-          max-depth (when-let [d (get-in req [:params :depth])]
-                      (try (Integer/parseInt d) (catch Exception _ nil)))]
-      (if node
-        (let [lineage-map (:attribute-map (graph/build-attribute-lineage-map cfg))
-              provenance (graph/attribute-provenance lineage-map node
-                                                     (when max-depth {:max-depth max-depth}))]
-          (if provenance
-            (json-response provenance)
-            (-> (json-response {:error "Attribute not found" :attribute node})
-                (resp/status 404))))
-        (-> (json-response {:error "Missing 'node' parameter"
-                            :usage "/api/provenance?node=datasource__attribute&depth=2"})
-            (resp/status 400))))
-    (-> (resp/response "No config loaded")
-        (resp/status 404))))
+(defn- handle-api-docs [_]
+  (json-response
+   {:endpoints
+    [{:path "/health" :method "GET" :desc "Health check"}
+     {:path "/api/config" :method "GET" :desc "Get current config"}
+     {:path "/api/config" :method "POST" :desc "Set config (JSON body)"}
+     {:path "/api/dot" :method "GET" :desc "Get DOT graph"}
+     {:path "/api/lineage" :method "GET" :desc "Get lineage"
+      :params "node (required), depth (optional)"}
+     {:path "/api/provenance" :method "GET" :desc "Get attribute provenance"
+      :params "node=datasource__attr, depth (optional)"}]}))
 
-(def api-docs
-  {:name "Pipeviz API"
-   :version "1.0"
-   :description "REST API for pipeline lineage visualization"
-   :endpoints
-   [{:path "/health"
-     :method "GET"
-     :description "Health check"
-     :response {:status "ok" :config-loaded "boolean"}}
-    {:path "/api/config"
-     :method "GET"
-     :description "Get current loaded configuration"}
-    {:path "/api/config"
-     :method "POST"
-     :description "Load a new configuration"
-     :body "JSON pipeviz config"
-     :response {:status "ok" :pipelines "count"}}
-    {:path "/api/dot"
-     :method "GET"
-     :description "Get DOT graph representation"
-     :content-type "text/vnd.graphviz"}
-    {:path "/api/lineage"
-     :method "GET"
-     :description "Get pipeline/datasource lineage"
-     :parameters {:node "Name of pipeline or datasource"
-                  :depth "Optional. Max depth (1=direct, 2=two hops, etc.)"}
-     :example "/api/lineage?node=my_pipeline&depth=2"}
-    {:path "/api/provenance"
-     :method "GET"
-     :description "Get attribute-level provenance"
-     :parameters {:node "Attribute ID (format: datasource__attribute)"
-                  :depth "Optional. Max depth (1=direct, 2=two hops, etc.)"}
-     :example "/api/provenance?node=users__email&depth=1"}
-    {:path "/api"
-     :method "GET"
-     :description "This documentation"}]})
-
-(defn handle-api-docs [_req]
-  (json-response api-docs))
-
-(defn handle-get-lineage [req]
-  (if-let [cfg @config]
-    (let [node (get-in req [:params :node])
-          max-depth (when-let [d (get-in req [:params :depth])]
-                      (try (Integer/parseInt d) (catch Exception _ nil)))]
-      (if node
-        (let [upstream (graph/upstream-of cfg node)
-              downstream (graph/downstream-of cfg node)
-              ;; Filter by depth if specified
-              filter-by-depth (fn [items]
-                                (if max-depth
-                                  (take max-depth items)
-                                  items))]
-          (json-response
-           {:node node
-            :depth-applied max-depth
-            :upstream (vec (filter-by-depth upstream))
-            :downstream (vec (filter-by-depth downstream))}))
-        (-> (json-response {:error "Missing 'node' parameter"
-                            :usage "/api/lineage?node=pipeline_name&depth=2"})
-            (resp/status 400))))
-    (-> (resp/response "No config loaded")
-        (resp/status 404))))
-
-;; Routing
-(defn router [req]
-  (let [method (:request-method req)
-        path (:uri req)]
-    (cond
-      (= path "/health")
-      (handle-health req)
-
-      (and (= method :get) (= path "/api"))
-      (handle-api-docs req)
-
-      (and (= method :get) (= path "/api/config"))
-      (handle-get-config req)
-
-      (and (= method :post) (= path "/api/config"))
-      (handle-set-config req)
-
-      (and (= method :get) (= path "/api/dot"))
-      (handle-get-dot req)
-
-      (and (= method :get) (= path "/api/lineage"))
-      (handle-get-lineage req)
-
-      (and (= method :get) (= path "/api/provenance"))
-      (handle-get-provenance req)
-
-      :else
-      (-> (resp/response "Not found")
-          (resp/status 404)))))
+;; Router
+(defn router [{:keys [request-method uri] :as req}]
+  (case [request-method uri]
+    [:get "/health"]         (handle-health req)
+    [:get "/api"]            (handle-api-docs req)
+    [:get "/api/config"]     (handle-get-config req)
+    [:post "/api/config"]    (handle-set-config req)
+    [:get "/api/dot"]        (handle-get-dot req)
+    [:get "/api/lineage"]    (handle-get-lineage req)
+    [:get "/api/provenance"] (handle-get-provenance req)
+    (error 404 "Not found")))
 
 (def app
   (-> router
@@ -189,22 +108,14 @@
       wrap-params))
 
 (defn -main [& args]
-  (let [port (Integer/parseInt (or (first args) "3000"))
+  (let [port (or (some-> (first args) parse-int) 3000)
         config-file (second args)]
     (when config-file
       (if-let [cfg (load-config-file config-file)]
-        (do
-          (reset! config cfg)
-          (println "Loaded config from" config-file))
+        (do (reset! config cfg)
+            (println "Loaded config from" config-file))
         (println "Warning: could not load" config-file)))
-    (println (str "Starting server on http://localhost:" port))
-    (println "Endpoints:")
-    (println "  GET  /api              - API documentation (self-documenting)")
-    (println "  GET  /health           - Health check")
-    (println "  GET  /api/config       - Get current config")
-    (println "  POST /api/config       - Set config (JSON body)")
-    (println "  GET  /api/dot          - Get DOT graph string")
-    (println "  GET  /api/lineage      - Get lineage (?node=NAME&depth=N)")
-    (println "  GET  /api/provenance   - Get attribute provenance (?node=ds__attr&depth=N)")
+    (println (str "Pipeviz server running on http://localhost:" port))
+    (println "GET /api for endpoint docs")
     (http/run-server app {:port port})
     @(promise)))
