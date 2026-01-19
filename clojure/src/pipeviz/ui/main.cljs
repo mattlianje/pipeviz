@@ -11,9 +11,11 @@
                                               detail-row badge badges lineage-link lineage-section
                                               icon-copy icon-check setup-copy-btn!
                                               clear-graph-highlight! setup-view-toggle!]]
+              [pipeviz.ui.export :as export]
               [pipeviz.ui.hash :as hash]
               [pipeviz.ui.planner :as planner]
               [pipeviz.ui.state :as state]
+              [pipeviz.ui.stats :as stats]
               [pipeviz.ui.tables :as tables]))
 
 ;; Ensure d3-graphviz side-effects load
@@ -125,12 +127,13 @@
   ;; Render planner graph if switching to planner tab
       (when (and (= tab-id "planner-pane") (:config @state/app))
             (js/setTimeout #(do (planner/populate-picker!)
-                                (planner/render-graph!)
-                        ;; Show picker dropdown so user can immediately select pipelines
-                                (when-let [dropdown ($id "planner-picker-dropdown")]
-                                          (when-not (.contains (.-classList dropdown) "show")
-                                                    (add-class! dropdown "show")
-                                                    (swap! state/planner assoc :picker-open? true)))) 50)))
+                                (planner/render-graph!)) 50))
+  ;; Render export if switching to export tab
+      (when (and (= tab-id "export-pane") (:config @state/app))
+            (js/setTimeout export/update-export! 50))
+  ;; Render stats if switching to stats tab
+      (when (and (= tab-id "stats-pane") (:config @state/app))
+            (js/setTimeout stats/render-stats! 50)))
 
 (defn setup-tabs! []
       (doseq [btn (array-seq (.querySelectorAll js/document ".nav-tab"))]
@@ -251,12 +254,11 @@
       (swap! state/app assoc :selected-node nil)
       (hash/update-node! nil)
       (clear-graph-highlight! "#graph")
-  ;; Hide details panel and re-render graph to fit new container size
       (let [was-visible (.contains (.-classList ($id "details-col")) "visible")]
-           (remove-class! ($id "graph-col") "with-details")
            (remove-class! ($id "details-col") "visible")
+           ;; Re-render to fit new size after panel transition (200ms) completes
            (when was-visible
-                 (js/setTimeout render-graph! 50))))
+                 (js/setTimeout #(render-graph! true) 220))))
 
 ;; Group selection and details
 (defn show-group-details! [group-name upstream downstream]
@@ -294,7 +296,6 @@
                      (doseq [item (array-seq (.querySelectorAll ($id "details-content") ".lineage-link"))]
                             (set! (.. item -style -cursor) "pointer")
                             (on! item "click" (fn [_] (select-node! (.getAttribute item "data-node-name")))))
-                     (add-class! ($id "graph-col") "with-details")
                      (add-class! ($id "details-col") "visible"))))
 
 (defn select-group! [group-name]
@@ -410,7 +411,6 @@
                                (setup-copy-btn! copy-btn provenance-json))
                      (doseq [item (array-seq (.querySelectorAll ($id "details-content") ".lineage-link"))]
                             (on! item "click" (fn [_] (select-node! (.getAttribute item "data-node-name")))))
-                     (add-class! ($id "graph-col") "with-details")
                      (add-class! ($id "details-col") "visible"))))
 
 (defn setup-interactivity! []
@@ -425,12 +425,12 @@
                                   (if (str/starts-with? node-name "group:")
                                       (select-group! (subs node-name 6))
                                       (select-node! node-name)))))))
-  ;; Click background to clear
+  ;; Click background to clear (if not clicking on a node)
       (-> (d3/select "#graph svg")
           (.on "click" (fn [event]
-                           (when (or (= "svg" (.-tagName (.-target event)))
-                                     (some-> (.-target event) .-classList (.contains "graph")))
-                                 (clear-selection!))))))
+                           (let [target (.-target event)]
+                                (when-not (.closest target ".node")
+                                          (clear-selection!)))))))
 
 ;; Graph controls
 (defn reset-graph! []
@@ -825,4 +825,6 @@
                        :filterPlannerItems planner/filter-items!
                        :clearPlannerSelection planner/clear-selection!
                        :setPlannerView planner/set-view!
-                       :copyPlannerOutput planner/copy-output!})
+                       :copyPlannerOutput planner/copy-output!
+                       :setExportFormat export/set-format!
+                       :copyExport export/copy-export!})

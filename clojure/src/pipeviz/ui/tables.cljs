@@ -183,8 +183,22 @@
                                          (sort values)))
                        "</div></div></span>"))))
 
+(defn- close-all-filter-dropdowns! []
+       (doseq [group (array-seq (.querySelectorAll js/document ".filter-group.open"))]
+              (remove-class! group "open")))
+
 (defn- setup-filter-handlers! [container-id apply-filter-fn]
        (when-let [container ($id container-id)]
+                 ;; Click on header toggles dropdown
+                 (doseq [header (array-seq (.querySelectorAll container ".filter-group-header"))]
+                        (on! header "click" (fn [e]
+                                                (.stopPropagation e)
+                                                (let [group (.-parentElement header)
+                                                      was-open (.contains (.-classList group) "open")]
+                                                     (close-all-filter-dropdowns!)
+                                                     (when-not was-open
+                                                               (add-class! group "open"))))))
+                 ;; Click on tag selects/deselects filter
                  (doseq [tag (array-seq (.querySelectorAll container ".filter-tag"))]
                         (on! tag "click" (fn [e]
                                              (.stopPropagation e)
@@ -253,7 +267,9 @@
       (when-let [pipeline-search ($id "pipeline-search")]
                 (on! pipeline-search "keyup" (fn [_] (filter-pipelines!))))
       (when-let [datasource-search ($id "datasource-search")]
-                (on! datasource-search "keyup" (fn [_] (filter-datasources!)))))
+                (on! datasource-search "keyup" (fn [_] (filter-datasources!))))
+      ;; Close filter dropdowns when clicking outside
+      (on! js/document "click" (fn [_] (close-all-filter-dropdowns!))))
 
 (defn render-all! []
       (render-pipelines-table!)

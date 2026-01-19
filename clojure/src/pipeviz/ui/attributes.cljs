@@ -21,10 +21,7 @@
   (clear-graph-highlight! "#attribute-graph" :clusters? true)
   ;; Hide details panel
   (when-let [col ($id "attribute-details-col")]
-    (set! (.-display (.-style col)) "none"))
-  (when-let [graph-col ($id "attribute-graph-col")]
-    (remove-class! graph-col "col-md-8")
-    (add-class! graph-col "col-md-12")))
+    (remove-class! col "visible")))
 
 (defn show-datasource-in-attribute-panel! [ds]
   (swap! state/attributes assoc :selected-attribute nil)
@@ -38,28 +35,59 @@
     ;; Clear previous highlighting
     (clear-graph-highlight! "#attribute-graph" :clusters? true)
 
-    ;; Highlight connected clusters
-    (-> (.select d3 "#attribute-graph")
-        (.selectAll ".cluster")
-        (.each (fn []
-                 (this-as this
-                   (let [cluster (.select d3 this)
-                         title (-> cluster (.select "title") .text)]
-                     (when (and title (str/starts-with? title "cluster_"))
-                       (let [cluster-id (subs title 8)]
-                         (cond
-                           (= cluster-id ds-id)
-                           (.classed cluster "cluster-highlighted" true)
+    ;; Highlight connected clusters, dim others
+    (let [all-connected-ds (conj connected-ids ds-id)]
+      (-> (.select d3 "#attribute-graph")
+          (.selectAll ".cluster")
+          (.each (fn []
+                   (this-as this
+                     (let [cluster (.select d3 this)
+                           title (-> cluster (.select "title") .text)]
+                       (when (and title (str/starts-with? title "cluster_"))
+                         (let [cluster-id (subs title 8)]
+                           (cond
+                             (= cluster-id ds-id)
+                             (-> cluster (.classed "cluster-highlighted" true) (.classed "cluster-dimmed" false))
 
-                           (connected-ids cluster-id)
-                           (.classed cluster "cluster-connected" true)))))))))
+                             (connected-ids cluster-id)
+                             (-> cluster (.classed "cluster-connected" true) (.classed "cluster-dimmed" false))
+
+                             :else
+                             (.classed cluster "cluster-dimmed" true)))))))))
+
+      ;; Dim nodes not in connected datasources
+      (-> (.select d3 "#attribute-graph")
+          (.selectAll ".node")
+          (.each (fn []
+                   (this-as this
+                     (let [node (.select d3 this)
+                           title (-> node (.select "title") .text)]
+                       (when title
+                         ;; Node belongs to a datasource if its ID starts with that datasource's ID
+                         (let [belongs-to-connected? (some #(str/starts-with? title (str % "__")) all-connected-ds)]
+                           (if belongs-to-connected?
+                             (.classed node "node-dimmed" false)
+                             (.classed node "node-dimmed" true)))))))))
+
+      ;; Dim edges not between connected datasources
+      (-> (.select d3 "#attribute-graph")
+          (.selectAll ".edge")
+          (.each (fn []
+                   (this-as this
+                     (let [edge (.select d3 this)
+                           title (-> edge (.select "title") .text)
+                           parts (when title (str/split title #"->"))
+                           from-node (when (>= (count parts) 2) (str/trim (first parts)))
+                           to-node (when (>= (count parts) 2) (str/trim (second parts)))
+                           node-in-connected? (fn [n]
+                                                (some #(str/starts-with? n (str % "__")) all-connected-ds))]
+                       (if (and (node-in-connected? from-node) (node-in-connected? to-node))
+                         (.classed edge "edge-dimmed" false)
+                         (.classed edge "edge-dimmed" true))))))))
 
     ;; Show details panel
     (when-let [col ($id "attribute-details-col")]
-      (set! (.-display (.-style col)) "block"))
-    (when-let [graph-col ($id "attribute-graph-col")]
-      (remove-class! graph-col "col-md-12")
-      (add-class! graph-col "col-md-8"))
+      (add-class! col "visible"))
 
     ;; Build HTML
     (let [config (:config @state/app)
@@ -245,10 +273,7 @@
 
         ;; Show details panel
         (when-let [col ($id "attribute-details-col")]
-          (set! (.-display (.-style col)) "block"))
-        (when-let [graph-col ($id "attribute-graph-col")]
-          (remove-class! graph-col "col-md-12")
-          (add-class! graph-col "col-md-8"))
+          (add-class! col "visible"))
 
         (set-html! ($id "attribute-details-content") html)
 
@@ -296,23 +321,27 @@
                            (.classed node "node-dimmed" true)))))))
 
         ;; Highlight clusters
-        (-> (.select d3 "#attribute-graph")
-            (.selectAll ".cluster")
-            (.each (fn []
-                     (this-as this
-                       (let [cluster (.select d3 this)
-                             title (-> cluster (.select "title") .text)]
-                         (when (and title (str/starts-with? title "cluster_"))
-                           (let [cluster-id (subs title 8)]
-                             (cond
-                               (= cluster-id attr-id)
-                               (-> cluster (.classed "cluster-highlighted" true) (.classed "cluster-dimmed" false))
+        ;; Check if cluster contains any connected attribute (for datasource/struct parent clusters)
+        (let [cluster-contains-connected? (fn [cluster-id]
+                                            (or (all-connected cluster-id)
+                                                (some #(str/starts-with? % (str cluster-id "__")) all-connected)))]
+          (-> (.select d3 "#attribute-graph")
+              (.selectAll ".cluster")
+              (.each (fn []
+                       (this-as this
+                         (let [cluster (.select d3 this)
+                               title (-> cluster (.select "title") .text)]
+                           (when (and title (str/starts-with? title "cluster_"))
+                             (let [cluster-id (subs title 8)]
+                               (cond
+                                 (= cluster-id attr-id)
+                                 (-> cluster (.classed "cluster-highlighted" true) (.classed "cluster-dimmed" false))
 
-                               (all-connected cluster-id)
-                               (-> cluster (.classed "cluster-connected" true) (.classed "cluster-dimmed" false))
+                                 (cluster-contains-connected? cluster-id)
+                                 (-> cluster (.classed "cluster-connected" true) (.classed "cluster-dimmed" false))
 
-                               :else
-                               (.classed cluster "cluster-dimmed" true)))))))))
+                                 :else
+                                 (.classed cluster "cluster-dimmed" true))))))))))
 
         ;; Highlight edges
         (-> (.select d3 "#attribute-graph")

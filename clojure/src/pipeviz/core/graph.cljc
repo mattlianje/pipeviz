@@ -777,6 +777,251 @@
                 "    \"cleaned_events\" [shape=ellipse style=filled fillcolor=\"" df "\" color=\"" db "\"]\n"
                 "    \"raw_events\" -> \"etl-job\"\n    \"etl-job\" -> \"cleaned_events\"\n}")))
 
+;; Export Functions
+(defn generate-graph-export
+      "Generate JSON-exportable graph structure with nodes and edges"
+      [config]
+      (when config
+            (let [pipelines (or (:pipelines config) [])
+                  datasources (or (:datasources config) [])
+                  clusters (or (:clusters config) [])
+                  node-ids (atom #{})
+                  nodes (atom [])
+                  edges (atom [])
+                  ;; Add pipelines
+                  _ (doseq [p pipelines]
+                          (swap! nodes conj
+                                 (cond-> {:id (:name p) :type "pipeline"}
+                                   (:description p) (assoc :description (:description p))
+                                   (:schedule p) (assoc :schedule (:schedule p))
+                                   (:cluster p) (assoc :cluster (:cluster p))
+                                   (:group p) (assoc :group (:group p))
+                                   (:owner p) (assoc :owner (:owner p))
+                                   (seq (:tags p)) (assoc :tags (:tags p))
+                                   (seq (:links p)) (assoc :links (:links p))
+                                   (seq (:metadata p)) (assoc :metadata (:metadata p))))
+                          (swap! node-ids conj (:name p))
+                          ;; Input edges
+                          (doseq [src (:input_sources p)]
+                                 (swap! edges conj {:source src :target (:name p) :type "data_flow"}))
+                          ;; Output edges
+                          (doseq [out (:output_sources p)]
+                                 (swap! edges conj {:source (:name p) :target out :type "data_flow"}))
+                          ;; Upstream pipeline edges
+                          (doseq [up (:upstream_pipelines p)]
+                                 (swap! edges conj {:source up :target (:name p) :type "pipeline_dependency"})))
+                  ;; Add explicit datasources
+                  _ (doseq [ds datasources]
+                          (swap! nodes conj
+                                 (cond-> {:id (:name ds) :type "datasource"}
+                                   (:description ds) (assoc :description (:description ds))
+                                   (:type ds) (assoc :source_type (:type ds))
+                                   (:cluster ds) (assoc :cluster (:cluster ds))
+                                   (:owner ds) (assoc :owner (:owner ds))
+                                   (seq (:tags ds)) (assoc :tags (:tags ds))
+                                   (seq (:links ds)) (assoc :links (:links ds))
+                                   (seq (:metadata ds)) (assoc :metadata (:metadata ds))))
+                          (swap! node-ids conj (:name ds)))
+                  ;; Add implicit datasources (referenced but not defined)
+                  referenced (->> pipelines
+                                  (mapcat #(concat (:input_sources %) (:output_sources %)))
+                                  set)
+                  _ (doseq [src referenced]
+                          (when-not (@node-ids src)
+                                    (swap! nodes conj {:id src :type "datasource" :implicit true})
+                                    (swap! node-ids conj src)))]
+                 {:nodes @nodes
+                  :edges @edges
+                  :clusters (mapv (fn [c] {:id (:name c) :description (:description c) :parent (:parent c)}) clusters)
+                  :meta {:node_count (count @nodes)
+                         :edge_count (count @edges)
+                         :pipeline_count (count pipelines)
+                         :datasource_count (count (filter #(= "datasource" (:type %)) @nodes))}})))
+
+(defn generate-mermaid-export
+      "Generate Mermaid flowchart format"
+      [config]
+      (when config
+            (let [pipelines (or (:pipelines config) [])
+                  datasources (or (:datasources config) [])
+                  node-ids (atom #{})
+                  pipeline-ids (set (map :name pipelines))
+                  sanitize #(str/replace (or % "") #"[^a-zA-Z0-9]" "_")
+                  ;; Collect all node IDs
+                  _ (doseq [p pipelines]
+                          (swap! node-ids conj (:name p))
+                          (doseq [s (:input_sources p)] (swap! node-ids conj s))
+                          (doseq [s (:output_sources p)] (swap! node-ids conj s)))
+                  _ (doseq [ds datasources] (swap! node-ids conj (:name ds)))
+                  ;; Build Mermaid output
+                  lines (atom ["flowchart LR" "    %% Nodes"])]
+                 ;; Add node definitions
+                 (doseq [id @node-ids]
+                        (let [sid (sanitize id)]
+                             (if (pipeline-ids id)
+                                 (swap! lines conj (str "    " sid "[[\"" id "\"]]"))  ;; Stadium shape for pipelines
+                                 (swap! lines conj (str "    " sid "[(\"" id "\")]"))))) ;; Cylinder for datasources
+                 ;; Add edges section
+                 (swap! lines conj "" "    %% Edges")
+                 (let [edge-set (atom #{})]
+                      (doseq [p pipelines]
+                             (let [pid (sanitize (:name p))]
+                                  ;; Input edges
+                                  (doseq [src (:input_sources p)]
+                                         (let [edge (str "    " (sanitize src) " --> " pid)]
+                                              (when-not (@edge-set edge)
+                                                        (swap! edge-set conj edge)
+                                                        (swap! lines conj edge))))
+                                  ;; Output edges
+                                  (doseq [out (:output_sources p)]
+                                         (let [edge (str "    " pid " --> " (sanitize out))]
+                                              (when-not (@edge-set edge)
+                                                        (swap! edge-set conj edge)
+                                                        (swap! lines conj edge))))
+                                  ;; Upstream pipeline edges (dashed)
+                                  (doseq [up (:upstream_pipelines p)]
+                                         (let [edge (str "    " (sanitize up) " -.-> " pid)]
+                                              (when-not (@edge-set edge)
+                                                        (swap! edge-set conj edge)
+                                                        (swap! lines conj edge)))))))
+                 ;; Add styling
+                 (swap! lines conj "" "    %% Styling")
+                 (swap! lines conj "    classDef pipeline fill:#fff3e0,stroke:#e65100,stroke-width:2px")
+                 (swap! lines conj "    classDef datasource fill:#e3f2fd,stroke:#1565c0,stroke-width:2px")
+                 (let [pipeline-list (str/join "," (map sanitize pipeline-ids))
+                       datasource-list (str/join "," (map sanitize (remove pipeline-ids @node-ids)))]
+                      (when (seq pipeline-list)
+                            (swap! lines conj (str "    class " pipeline-list " pipeline")))
+                      (when (seq datasource-list)
+                            (swap! lines conj (str "    class " datasource-list " datasource"))))
+                 (str/join "\n" @lines))))
+
+;; Stats Functions
+(defn detect-cycles
+      "Detect cycles in the pipeline dependency graph"
+      [pipelines]
+      (let [graph (atom {})
+            pipeline-names (atom #{})
+            ;; Build graph with groups collapsed
+            _ (doseq [p pipelines]
+                     (let [node-name (or (:group p) (:name p))]
+                          (swap! pipeline-names conj node-name)
+                          (when-not (get @graph node-name)
+                                    (swap! graph assoc node-name #{}))))
+            _ (doseq [p pipelines]
+                     (let [node-name (or (:group p) (:name p))]
+                          (doseq [up (:upstream_pipelines p)]
+                                 (when (@pipeline-names up)
+                                       (when-not (get @graph up)
+                                                 (swap! graph assoc up #{}))
+                                       (swap! graph update up conj node-name)))))
+            visited (atom #{})
+            rec-stack (atom #{})
+            cycles (atom [])]
+           ;; DFS to find cycles
+           (letfn [(dfs [node path]
+                        (swap! visited conj node)
+                        (swap! rec-stack conj node)
+                        (let [path (conj path node)
+                              result (atom nil)]
+                             (doseq [neighbor (get @graph node #{})
+                                     :when (nil? @result)]
+                                    (cond
+                                     (not (@visited neighbor))
+                                     (when-let [r (dfs neighbor path)]
+                                               (reset! result r))
+                                     (@rec-stack neighbor)
+                                     (let [cycle-start (.indexOf path neighbor)
+                                           cycle (conj (vec (drop cycle-start path)) neighbor)]
+                                          (reset! result cycle))))
+                             (swap! rec-stack disj node)
+                             @result))]
+                  (doseq [node @pipeline-names
+                          :when (not (@visited node))]
+                         (when-let [cycle (dfs node [])]
+                                   (swap! cycles conj cycle)
+                                   (reset! visited #{})
+                                   (reset! rec-stack #{})
+                                   (doseq [n cycle] (swap! visited conj n)))))
+           @cycles))
+
+(defn compute-stats
+      "Compute comprehensive statistics about the config"
+      [config]
+      (when config
+            (let [pipelines (or (:pipelines config) [])
+                  datasources (or (:datasources config) [])
+                  cycles (detect-cycles pipelines)
+                  ;; Hub detection - count upstream/downstream connections
+                  upstream-counts (atom {})
+                  downstream-counts (atom {})
+                  groups (atom #{})
+                  _ (doseq [p pipelines]
+                          (when (:group p) (swap! groups conj (:group p))))
+                  _ (doseq [p pipelines]
+                          (let [node-name (or (:group p) (:name p))]
+                               ;; Input sources contribute to node's upstream count
+                               (doseq [s (:input_sources p)]
+                                      (swap! downstream-counts update s (fnil inc 0))
+                                      (swap! upstream-counts update node-name (fnil inc 0)))
+                               ;; Output sources
+                               (doseq [s (:output_sources p)]
+                                      (swap! downstream-counts update node-name (fnil inc 0))
+                                      (swap! upstream-counts update s (fnil inc 0)))
+                               ;; Upstream pipelines
+                               (doseq [u (:upstream_pipelines p)]
+                                      (swap! downstream-counts update u (fnil inc 0))
+                                      (swap! upstream-counts update node-name (fnil inc 0)))))
+                  pipeline-names (set (map :name pipelines))
+                  all-nodes (distinct (concat (keys @upstream-counts) (keys @downstream-counts)))
+                  hubs (->> all-nodes
+                            (map (fn [name]
+                                     (let [type (cond
+                                                 (@groups name) "group"
+                                                 (pipeline-names name) "pipeline"
+                                                 :else "datasource")]
+                                          {:name name
+                                           :type type
+                                           :upstream (get @upstream-counts name 0)
+                                           :downstream (get @downstream-counts name 0)
+                                           :total (+ (get @upstream-counts name 0) (get @downstream-counts name 0))})))
+                            (sort-by :total >)
+                            (take 8)
+                            vec)
+                  ;; Orphaned datasources (defined but never referenced)
+                  referenced-sources (->> pipelines
+                                          (mapcat #(concat (:input_sources %) (:output_sources %)))
+                                          set)
+                  orphaned (->> datasources
+                                (remove #(referenced-sources (:name %)))
+                                (map :name)
+                                vec)
+                  ;; Cluster distribution
+                  cluster-counts (reduce (fn [m p]
+                                             (update m (or (:cluster p) "unclustered") (fnil inc 0)))
+                                         {} pipelines)
+                  ;; Datasource type distribution
+                  type-counts (reduce (fn [m ds]
+                                          (update m (or (:type ds) "unknown") (fnil inc 0)))
+                                      {} datasources)
+                  ;; Coverage
+                  schedules-covered (count (filter :schedule pipelines))
+                  airflow-covered (count (filter #(get-in % [:links :airflow]) pipelines))]
+                 {:counts {:pipelines (count pipelines)
+                           :datasources (count datasources)
+                           :clusters (count (remove #(= "unclustered" %) (keys cluster-counts)))}
+                  :cycles cycles
+                  :hubs hubs
+                  :orphaned orphaned
+                  :coverage {:schedules {:covered schedules-covered
+                                         :total (count pipelines)
+                                         :missing (mapv :name (remove :schedule pipelines))}
+                             :airflow {:covered airflow-covered
+                                       :total (count pipelines)
+                                       :missing (mapv :name (remove #(get-in % [:links :airflow]) pipelines))}}
+                  :distributions {:clusters cluster-counts
+                                  :types type-counts}})))
+
 ;; Example Config (used for demo)
 (def example-config
      {:clusters [{:name "user-processing"} {:name "order-management"} {:name "real-time" :parent "order-management"} {:name "analytics"}]

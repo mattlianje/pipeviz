@@ -270,6 +270,11 @@
             flex-wrap: wrap;
             margin-top: 0.75rem;
         }
+        .config-controls .btn {
+            text-transform: none;
+            letter-spacing: normal;
+            border-radius: 4px;
+        }
         .json-status {
             margin-top: 0.5rem;
             font-size: 12px;
@@ -338,17 +343,19 @@
         .graph-col {
             flex: 1;
             min-width: 0;
-        }
-        .graph-col.with-details {
-            flex: 0 0 66.67%;
+            transition: flex 0.2s ease-out;
         }
         .details-col {
-            flex: 0 0 33.33%;
-            display: none;
+            flex: 0 0 0%;
+            width: 0;
+            overflow: hidden;
             background: var(--bg-primary);
+            transition: flex 0.2s ease-out, width 0.2s ease-out;
         }
         .details-col.visible {
-            display: block;
+            flex: 0 0 33.33%;
+            width: auto;
+            overflow: visible;
         }
 
         .graph-container {
@@ -464,7 +471,171 @@
         .badge-input { background: #f3e5f5; color: #7b1fa2; }
         .badge-output { background: #e3f2fd; color: #1565c0; }
         .badge-cluster { background: #e8f5e9; color: #2e7d32; }
+        .badge-tag { background: #fff3cd; color: #856404; }
+        .badge-auto-created { background: var(--bg-secondary); color: var(--text-muted); }
+        .badge-snowflake, .badge-postgres, .badge-database { background: #e3f2fd; color: #1565c0; }
+        .badge-s3, .badge-delta, .badge-parquet { background: #fff3e0; color: #e65100; }
+        .badge-kafka, .badge-api { background: #fce4ec; color: #c2185b; }
+        .badge-unknown { background: var(--bg-secondary); color: var(--text-muted); }
         .group-toggle-section { margin: 1rem 0; }
+
+        /* Data table styles */
+        .table-toolbar {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+        .data-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .data-table tbody tr:nth-child(odd) {
+            background: var(--bg-secondary);
+        }
+        .data-table tbody tr:hover {
+            background: var(--border-color);
+        }
+        .data-table .col-name { width: 180px; font-size: 0.85em; }
+        .data-table .col-name strong { font-size: 0.95em; }
+        .data-table .col-desc { min-width: 180px; max-width: 280px; font-size: 11px; color: var(--text-secondary); }
+        .data-table .col-schedule { white-space: nowrap; }
+        .data-table .col-sources { width: 300px; }
+        .data-table .col-sources > div,
+        .data-table .col-tags > div { white-space: normal; }
+        .data-table .col-sources .badge,
+        .data-table .col-tags .badge { display: inline-block; margin: 0 4px 4px 0; }
+        .data-table .col-cluster { white-space: nowrap; }
+        .data-table .col-tags { min-width: 100px; }
+        .data-table .col-links { min-width: 80px; }
+        .data-table .col-owner { white-space: nowrap; }
+        .data-table .col-metadata { min-width: 150px; }
+        .table-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem;
+            font-size: 13px;
+        }
+        .links-scroll {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        /* Filter bar styles */
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-group {
+            position: relative;
+            display: inline-block;
+        }
+        .filter-group-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--text-muted);
+            transition: all 0.15s;
+        }
+        .filter-group-header:hover {
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+        .filter-group-header.has-active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+        .filter-group-label {
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .filter-group-count {
+            background: var(--bg-primary);
+            color: var(--text-muted);
+            padding: 0 5px;
+            border-radius: 10px;
+            font-size: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+        .filter-group-header.has-active .filter-group-count {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .filter-group-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 100;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-top: 4px;
+            min-width: 150px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .filter-group.open .filter-group-dropdown {
+            display: block;
+        }
+        .filter-group-dropdown-inner {
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-tag {
+            display: block;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: background 0.15s;
+        }
+        .filter-tag:hover {
+            background: var(--bg-secondary);
+        }
+        .filter-tag.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
         .lineage-item, .lineage-link {
             padding: 2px 0;
             font-size: 12px;
@@ -618,6 +789,10 @@
         }
         .edge-dimmed {
             opacity: 0.18 !important;
+            transition: opacity 0.2s ease;
+        }
+        .cluster-dimmed {
+            opacity: 0.25 !important;
             transition: opacity 0.2s ease;
         }
 
@@ -1112,6 +1287,309 @@
                 height: 300px;
             }
         }
+
+        /* Export styles */
+        .export-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .export-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .export-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .export-format-btns {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .export-format-btn {
+            padding: 0.4rem 0.75rem;
+            font-size: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        .export-format-btn:hover {
+            background: var(--bg-primary);
+        }
+        .export-format-btn.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+        .export-copy-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 0.4rem 0.6rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+        }
+        .export-copy-btn:hover {
+            color: var(--text-primary);
+        }
+        .export-copy-btn.copied {
+            border-color: #28a745;
+            color: #28a745;
+        }
+        .export-hint {
+            font-size: 11px;
+            font-style: italic;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+        .export-output {
+            min-height: 500px;
+            max-height: 600px;
+            margin: 0;
+            padding: 0.75rem;
+            font-size: 11px;
+            font-family: monospace;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Stats styles */
+        .stats-summary {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .stats-summary span {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .stats-summary strong {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin-right: 0.25rem;
+        }
+        .stats-row {
+            display: flex;
+            gap: 2.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .chart-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 0;
+        }
+        .chart-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .pie-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .pie-legend {
+            font-size: 11px;
+        }
+        .pie-legend-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+        .pie-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .pie-legend-name {
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .pie-legend-val {
+            color: var(--text-muted);
+        }
+        .stats-section {
+            flex: 1;
+            min-width: 250px;
+            padding: 0;
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .section-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: normal;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .coverage-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .coverage-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .coverage-label {
+            font-size: 11px;
+            color: var(--text-primary);
+            min-width: 90px;
+        }
+        .coverage-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .coverage-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .coverage-bar.good { background: #66bb6a; }
+        .coverage-bar.okay { background: #ffb74d; }
+        .coverage-bar.low { background: #ef5350; }
+        .coverage-pct {
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 35px;
+            text-align: right;
+        }
+        .coverage-pct.good { color: #66bb6a; }
+        .coverage-pct.okay { color: #ffb74d; }
+        .coverage-pct.low { color: #ef5350; }
+        .hub-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .hub-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 11px;
+        }
+        .hub-rank {
+            color: var(--text-muted);
+            min-width: 18px;
+        }
+        .hub-name {
+            flex: 1;
+            color: var(--text-primary);
+        }
+        .hub-name.pipeline { color: #e65100; }
+        .hub-name.datasource { color: #1565c0; }
+        .hub-name.group { color: #2e7d32; }
+        .hub-stats {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        .cycles-warning {
+            padding-left: 0.75rem;
+            border-left: 3px solid #ffb74d;
+            margin-top: 1rem;
+        }
+        .cycles-warning .section-title {
+            color: #e65100;
+        }
+        [data-theme="dark"] .cycles-warning .section-title {
+            color: #ffb74d;
+        }
+        .cycle-count {
+            background: #ffb74d;
+            color: #fff;
+            padding: 0 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 0.5rem;
+        }
+        .cycle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .cycle-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 11px;
+        }
+        .cycle-label {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .cycle-path {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        .missing-scroll {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .missing-block {
+            padding: 0;
+        }
+        .missing-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+        .missing-count {
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+        .missing-names {
+            font-size: 11px;
+            color: var(--text-muted);
+            word-break: break-word;
+        }
+        .missing-names.pipeline { color: #e65100; }
+        .missing-names.orphan { color: #1565c0; }
+        .all-good {
+            padding-left: 0.75rem;
+            border-left: 3px solid #81c784;
+            margin-top: 1rem;
+        }
+        .all-good .section-title {
+            color: #2e7d32;
+        }
+        [data-theme="dark"] .all-good .section-title {
+            color: #81c784;
+        }
     </style>
 </head>
 <body>
@@ -1133,7 +1611,11 @@
             <button class="nav-tab" data-tab="config-pane">Config</button>
             <button class="nav-tab" data-tab="graph-pane">Graph</button>
             <button class="nav-tab" data-tab="attributes-pane">Attributes</button>
+            <button class="nav-tab" data-tab="pipelines-pane">Pipelines</button>
+            <button class="nav-tab" data-tab="datasources-pane">Datasources</button>
             <button class="nav-tab" data-tab="planner-pane">Planner</button>
+            <button class="nav-tab" data-tab="export-pane">Export</button>
+            <button class="nav-tab" data-tab="stats-pane">Stats</button>
             <button class="nav-tab" data-tab="spec-pane">Spec</button>
         </nav>
 
@@ -1312,12 +1794,12 @@
                         Why Clojure
                     </div>
                     <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
-                        Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript. Two reasons:
+                        Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript, for two reasons:
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">Code is data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure beats 10 functions on 10 structures. Your lineage lives in plain JSON that can be versioned, diffed, and reviewed like code. Each team owns their <code>pipeviz.json</code>. Merge them with <code>jq</code> for the org-wide view.</div>
+                            <div><strong style="color: var(--text-primary)">Code-as-data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure vs 10 functions on 10 structures. This style is well suited to spec validation, transformation, and extensibility. Your lineage lives in plain JSON that can be versioned, diffed, and reviewed like code.</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
@@ -1341,6 +1823,32 @@
                 <div style="margin-top: 1rem; font-size: 11px; color: var(--text-muted);">
                     Tip: Auto-load a config with <code>?url=https://yoursite.com/pipeviz.json</code>
                 </div>
+            </div>
+        </div>
+
+        <!-- Pipelines Tab -->
+        <div class="tab-pane" id="pipelines-pane">
+            <div class="table-toolbar">
+                <div class="search-wrapper">
+                    <input type="text" class="search-input" id="pipeline-search" placeholder="Search pipelines..." autocomplete="off">
+                </div>
+                <div class="filter-bar" id="pipeline-filters"></div>
+            </div>
+            <div id="pipelines-table-container">
+                <p class="table-empty">Load a configuration to see your pipelines</p>
+            </div>
+        </div>
+
+        <!-- Datasources Tab -->
+        <div class="tab-pane" id="datasources-pane">
+            <div class="table-toolbar">
+                <div class="search-wrapper">
+                    <input type="text" class="search-input" id="datasource-search" placeholder="Search datasources..." autocomplete="off">
+                </div>
+                <div class="filter-bar" id="datasource-filters"></div>
+            </div>
+            <div id="datasources-table-container">
+                <p class="table-empty">Load a configuration to see your datasources</p>
             </div>
         </div>
 
@@ -1456,6 +1964,35 @@
                     </button>
                     <pre class="planner-output" id="planner-output"></pre>
                 </div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div class="tab-pane" id="export-pane">
+            <div class="export-header">
+                <div class="export-title">Export</div>
+                <div class="export-controls">
+                    <div class="export-format-btns">
+                        <button class="export-format-btn active" data-format="json" onclick="setExportFormat('json')">JSON</button>
+                        <button class="export-format-btn" data-format="mermaid" onclick="setExportFormat('mermaid')">Mermaid</button>
+                        <button class="export-format-btn" data-format="dot" onclick="setExportFormat('dot')">DOT</button>
+                    </div>
+                    <button class="export-copy-btn" onclick="copyExport()" title="Copy to clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="export-hint" id="export-hint">Export your graph as JSON, Mermaid, or DOT format</div>
+            <pre class="export-output" id="export-output">Load a configuration to see the export...</pre>
+        </div>
+
+        <!-- Stats Tab -->
+        <div class="tab-pane" id="stats-pane">
+            <div id="stats-content">
+                <div class="text-muted">Load a configuration to see statistics.</div>
             </div>
         </div>
 
