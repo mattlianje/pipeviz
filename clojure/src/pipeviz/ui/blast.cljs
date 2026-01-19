@@ -2,7 +2,7 @@
   "Blast radius modal"
   (:require ["d3" :as d3]
             [clojure.string :as str]
-            [pipeviz.core :as core]
+            [pipeviz.core.graph :as core]
             [pipeviz.ui.dom :refer [$id on! set-html! add-class! remove-class! icon-copy setup-copy-btn!]]
             [pipeviz.ui.hash :as hash]
             [pipeviz.ui.state :as state]))

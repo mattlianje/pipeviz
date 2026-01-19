@@ -1,7 +1,7 @@
 (ns pipeviz.ui.tables
     "Table rendering and filtering for pipelines and datasources"
     (:require [clojure.string :as str]
-              [pipeviz.core :as core]
+              [pipeviz.core.graph :as core]
               [pipeviz.ui.dom :refer [$id on! set-html! add-class! remove-class!]]
               [pipeviz.ui.state :as state]))
 

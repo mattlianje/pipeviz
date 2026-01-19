@@ -1,7 +1,7 @@
-(ns pipeviz.core
+(ns pipeviz.core.graph
     "Pure domain logic - graph algorithms, validation, DOT generation"
     (:require [clojure.string :as str]
-              [pipeviz.styles :as styles]))
+              [pipeviz.core.styles :as styles]))
 
 (declare format-schedule)
 

@@ -1,4 +1,4 @@
-(ns pipeviz.styles
+(ns pipeviz.core.styles
     "Centralized color palette and style definitions for Pipeviz.")
 
 ;; Core palette

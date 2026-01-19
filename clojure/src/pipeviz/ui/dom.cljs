@@ -2,7 +2,7 @@
     "DOM manipulation helpers"
     (:require ["d3" :as d3]
               [clojure.string :as str]
-              [pipeviz.styles :as styles]))
+              [pipeviz.core.styles :as styles]))
 
 ;; Core DOM helpers
 (defn $id [id] (.getElementById js/document id))

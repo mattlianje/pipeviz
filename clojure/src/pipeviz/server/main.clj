@@ -1,9 +1,9 @@
-(ns pipeviz.server
+(ns pipeviz.server.main
     "Ring server for pipeviz API"
     (:require [clojure.data.json :as json]
               [clojure.java.io :as io]
               [org.httpkit.server :as http]
-              [pipeviz.graph :as graph]
+              [pipeviz.core.graph :as graph]
               [ring.middleware.keyword-params :refer [wrap-keyword-params]]
               [ring.middleware.params :refer [wrap-params]]
               [ring.util.response :as resp])

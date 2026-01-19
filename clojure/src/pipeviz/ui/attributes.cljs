@@ -2,7 +2,7 @@
   "Attribute lineage graph and details panel"
   (:require ["d3" :as d3]
             [clojure.string :as str]
-            [pipeviz.core :as core]
+            [pipeviz.core.graph :as core]
             [pipeviz.ui.dom :refer [$id on! set-html! add-class! remove-class!
                                     icon-copy setup-copy-btn!
                                     clear-graph-highlight! setup-view-toggle!]]

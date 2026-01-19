@@ -2,7 +2,7 @@
   "Planner view for backfill and Airflow analysis"
   (:require ["d3" :as d3]
             [clojure.string :as str]
-            [pipeviz.core :as core]
+            [pipeviz.core.graph :as core]
             [pipeviz.ui.dom :refer [$id on! set-html! add-class! remove-class!
                                     icon-copy icon-check]]
             [pipeviz.ui.hash :as hash]

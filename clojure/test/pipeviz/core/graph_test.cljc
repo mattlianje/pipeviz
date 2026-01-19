@@ -1,7 +1,7 @@
-(ns pipeviz.core-test
+(ns pipeviz.core.graph-test
     (:require [clojure.string :as str]
               [clojure.test :refer [deftest is testing]]
-              [pipeviz.core :as core]))
+              [pipeviz.core.graph :as core]))
 
 ;; =============================================================================
 ;; Cron Tests

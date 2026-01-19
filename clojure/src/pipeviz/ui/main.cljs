@@ -3,8 +3,8 @@
     (:require ["d3" :as d3]
               ["d3-graphviz" :as d3-graphviz]
               [clojure.string :as str]
-              [pipeviz.core :as core]
-              [pipeviz.styles :as styles]
+              [pipeviz.core.graph :as core]
+              [pipeviz.core.styles :as styles]
               [pipeviz.ui.attributes :as attributes]
               [pipeviz.ui.blast :as blast]
               [pipeviz.ui.dom :as dom :refer [$id on! set-html! add-class! remove-class! toggle-class!
