@@ -358,3 +358,97 @@
       (is (str/includes? dot "\"etl-2\""))
       (is (not (str/includes? dot "group:etl"))))))
 
+;; Topological sort / Execution waves tests
+(deftest kahns-waves-test
+  (testing "simple linear chain"
+    (let [nodes #{"a" "b" "c"}
+          edges [["a" "b"] ["b" "c"]]
+          waves (graph/kahns-waves nodes edges)]
+      (is (= [["a"] ["b"] ["c"]] waves))))
+
+  (testing "parallel nodes"
+    (let [nodes #{"a" "b" "c" "d"}
+          edges [["a" "b"] ["a" "c"] ["b" "d"] ["c" "d"]]
+          waves (graph/kahns-waves nodes edges)]
+      (is (= 3 (count waves)))
+      (is (= ["a"] (first waves)))
+      (is (= #{"b" "c"} (set (second waves))))
+      (is (= ["d"] (last waves)))))
+
+  (testing "returns nil for cyclic graph"
+    (let [nodes #{"a" "b" "c"}
+          edges [["a" "b"] ["b" "c"] ["c" "a"]]]
+      (is (nil? (graph/kahns-waves nodes edges))))))
+
+(deftest compute-execution-waves-test
+  (testing "computes waves for selected pipelines"
+    (let [result (graph/compute-execution-waves (:pipelines test-config) ["ingest"])]
+      (is (some? result))
+      (is (vector? (:waves result)))
+      (is (>= (:node-count result) 1))))
+
+  (testing "includes downstream pipelines"
+    (let [result (graph/compute-execution-waves (:pipelines test-config) ["ingest"])]
+      (is (= 3 (:node-count result)))
+      (is (some #(some (fn [n] (= "transform" n)) %) (:waves result)))
+      (is (some #(some (fn [n] (= "load" n)) %) (:waves result)))))
+
+  (testing "returns nil for empty selection"
+    (is (nil? (graph/compute-execution-waves (:pipelines test-config) [])))))
+
+;; Blast radius tests
+(deftest build-blast-radius-graph-test
+  (testing "builds graph structure"
+    (let [g (graph/build-blast-radius-graph test-config)]
+      (is (map? (:downstream g)))
+      (is (map? (:node-types g)))
+      (is (= :pipeline ((:node-types g) "ingest")))
+      (is (= :datasource ((:node-types g) "raw")))))
+
+  (testing "downstream includes data flow"
+    (let [g (graph/build-blast-radius-graph test-config)]
+      (is (contains? ((:downstream g) "ingest") "raw"))
+      (is (contains? ((:downstream g) "raw") "transform")))))
+
+(deftest blast-radius-for-node-test
+  (testing "computes blast radius from pipeline"
+    (let [g (graph/build-blast-radius-graph test-config)
+          result (graph/blast-radius-for-node g "ingest")]
+      (is (= "ingest" (:source result)))
+      (is (= :pipeline (:source-type result)))
+      (is (pos? (:total-affected result)))
+      (is (vector? (:downstream result)))
+      (is (map? (:by-depth result)))))
+
+  (testing "blast from datasource"
+    (let [g (graph/build-blast-radius-graph test-config)
+          result (graph/blast-radius-for-node g "raw")]
+      (is (= "raw" (:source result)))
+      (is (= :datasource (:source-type result)))
+      (is (some #(= "transform" (:name %)) (:downstream result)))))
+
+  (testing "returns nil for nil node"
+    (let [g (graph/build-blast-radius-graph test-config)]
+      (is (nil? (graph/blast-radius-for-node g nil))))))
+
+;; Backfill analysis tests
+(deftest generate-backfill-analysis-test
+  (testing "generates backfill plan"
+    (let [result (graph/generate-backfill-analysis test-config ["ingest"])]
+      (is (= ["ingest"] (:nodes result)))
+      (is (pos? (:total-waves result)))
+      (is (vector? (:waves result)))
+      (is (vector? (:edges result)))))
+
+  (testing "includes downstream in waves"
+    (let [result (graph/generate-backfill-analysis test-config ["ingest"])]
+      (is (>= (:total-downstream-pipelines result) 2))
+      (is (some #(some (fn [p] (= "transform" (:name p))) (:pipelines %)) (:waves result)))))
+
+  (testing "returns nil for empty selection"
+    (is (nil? (graph/generate-backfill-analysis test-config []))))
+
+  (testing "throws for non-pipeline nodes"
+    (is (thrown? #?(:clj Exception :cljs js/Error)
+                 (graph/generate-backfill-analysis test-config ["raw"])))))
+

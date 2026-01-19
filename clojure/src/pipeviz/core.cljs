@@ -1,6 +1,7 @@
 (ns pipeviz.core
   "Browser entry point - DOM and d3 interop only"
   (:require [pipeviz.graph :as graph]
+            [pipeviz.styles :as styles]
             [clojure.string :as str]
             ["d3" :as d3]
             ["d3-graphviz" :as d3-graphviz]))
@@ -62,6 +63,11 @@
     (swap! state assoc :blast-radius-cache blast-data)
     blast-data))
 
+(defn- precompute-all! [config]
+  (precompute-lineage! config)
+  (precompute-attribute-lineage! config)
+  (precompute-blast-radius! config))
+
 ;; DOM helpers
 (defn $id [id] (.getElementById js/document id))
 (defn on! [el event f] (when el (.addEventListener el event f)))
@@ -72,6 +78,51 @@
 
 (defn dark? []
   (= "dark" (.getAttribute js/document.documentElement "data-theme")))
+
+;; SVG icons
+(def ^:private icon-copy "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'/><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/></svg>")
+(def ^:private icon-check "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>")
+
+(defn- setup-copy-btn! [btn text]
+  (on! btn "click"
+       (fn [_]
+         (-> (js/navigator.clipboard.writeText text)
+             (.then (fn []
+                      (add-class! btn "copied")
+                      (set! (.-innerHTML btn) icon-check)
+                      (js/setTimeout #(do (remove-class! btn "copied")
+                                          (set! (.-innerHTML btn) icon-copy))
+                                     1500)))))))
+
+(defn- clear-graph-highlight! [graph-selector & {:keys [clusters?] :or {clusters? false}}]
+  (let [graph (d3/select graph-selector)]
+    (-> graph (.selectAll ".node")
+        (.classed "node-highlighted" false)
+        (.classed "node-connected" false)
+        (.classed "node-dimmed" false))
+    (-> graph (.selectAll ".edge")
+        (.classed "edge-highlighted" false)
+        (.classed "edge-dimmed" false))
+    (when clusters?
+      (-> graph (.selectAll ".cluster")
+          (.classed "cluster-highlighted" false)
+          (.classed "cluster-connected" false)
+          (.classed "cluster-dimmed" false)))))
+
+(defn- setup-view-toggle! [container]
+  (when-let [slider (.querySelector container ".lineage-toggle-slider")]
+    (on! slider "click"
+         (fn [_]
+           (let [is-json (.toggle (.-classList slider) "json-active")
+                 tree (.querySelector container ".lineage-tree-view")
+                 json (.querySelector container ".lineage-json-view")
+                 tree-label (.querySelector container ".lineage-toggle-label[data-view='tree']")
+                 json-label (.querySelector container ".lineage-toggle-label[data-view='json']")]
+             (if is-json
+               (do (add-class! tree "hidden") (remove-class! json "hidden")
+                   (remove-class! tree-label "active") (add-class! json-label "active"))
+               (do (remove-class! tree "hidden") (add-class! json "hidden")
+                   (add-class! tree-label "active") (remove-class! json-label "active"))))))))
 
 ;; URL hash helpers for direct node linking
 (defn parse-hash []
@@ -114,8 +165,8 @@
 
 (defn update-hash-with-planner-state [view pipelines]
   (let [hash-str (build-hash-string {:tab "planner"
-                                      :view (name view)
-                                      :pipelines pipelines})]
+                                     :view (name view)
+                                     :pipelines pipelines})]
     (.replaceState js/history nil "" (str "#" hash-str))))
 
 (defn update-hash-with-node [node-name]
@@ -331,17 +382,7 @@
 (defn clear-selection! []
   (swap! state assoc :selected-node nil)
   (update-hash-with-node nil)
-  ;; Clear node classes
-  (-> (d3/select "#graph")
-      (.selectAll ".node")
-      (.classed "node-highlighted" false)
-      (.classed "node-connected" false)
-      (.classed "node-dimmed" false))
-  ;; Clear edge classes
-  (-> (d3/select "#graph")
-      (.selectAll ".edge")
-      (.classed "edge-dimmed" false)
-      (.classed "edge-highlighted" false))
+  (clear-graph-highlight! "#graph")
   ;; Hide details panel and re-render graph to fit new container size
   (let [was-visible (.contains (.-classList ($id "details-col")) "visible")]
     (remove-class! ($id "graph-col") "with-details")
@@ -363,7 +404,7 @@
             escaped-name (str/replace group-name "'" "\\'")
             html (str
                   "<div class='detail-label'>Type</div>"
-                  "<div class='detail-value'><span class='badge' style='background:#fff3e0;color:#e65100'>Group</span></div>"
+                  "<div class='detail-value'><span class='badge' style='" (styles/badge-style :group) "'>Group</span></div>"
 
                   ;; Action buttons
                   "<div class='node-actions'>"
@@ -392,7 +433,7 @@
                          "</div>"))
 
                   ;; Expand/Collapse button
-                  "<div style='margin: 1rem 0'>"
+                  "<div class='group-toggle-section'>"
                   "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" group-name "\")'>"
                   (if collapsed? "▶ Expand Group" "▼ Collapse Group")
                   "</button>"
@@ -410,11 +451,9 @@
                     (str "<div class='detail-label'>Upstream (" (count upstream) ")</div>"
                          "<div class='detail-value'>"
                          (str/join "" (map (fn [{:keys [name depth]}]
-                                             (let [indent (* (dec depth) 12)
-                                                   opacity (max 0.5 (- 1 (* (dec depth) 0.15)))]
-                                               (str "<div class='lineage-link' data-node-name='" name
-                                                    "' style='padding-left:" indent "px;opacity:" opacity "'>"
-                                                    name "</div>")))
+                                             (str "<div class='lineage-link' data-node-name='" name
+                                                  "' style='" (styles/lineage-style depth) "'>"
+                                                  name "</div>"))
                                            (sort-by :depth upstream)))
                          "</div>"))
 
@@ -422,11 +461,9 @@
                     (str "<div class='detail-label'>Downstream (" (count downstream) ")</div>"
                          "<div class='detail-value'>"
                          (str/join "" (map (fn [{:keys [name depth]}]
-                                             (let [indent (* (dec depth) 12)
-                                                   opacity (max 0.5 (- 1 (* (dec depth) 0.15)))]
-                                               (str "<div class='lineage-link' data-node-name='" name
-                                                    "' style='padding-left:" indent "px;opacity:" opacity "'>"
-                                                    name "</div>")))
+                                             (str "<div class='lineage-link' data-node-name='" name
+                                                  "' style='" (styles/lineage-style depth) "'>"
+                                                  name "</div>"))
                                            (sort-by :depth downstream)))
                          "</div>"))
 
@@ -557,7 +594,7 @@
                   (when (seq (:tags node-data))
                     (str "<div class='detail-label'>Tags</div>"
                          "<div class='detail-value'>"
-                         (str/join "" (map #(str "<span class='badge' style='background-color:#fff3cd;color:#856404'>" % "</span>") (:tags node-data)))
+                         (str/join "" (map #(str "<span class='badge' style='" (styles/badge-style :tag) "'>" % "</span>") (:tags node-data)))
                          "</div>"))
 
                   (when (and (:links node-data) (seq (:links node-data)))
@@ -572,9 +609,9 @@
                   ;; Group membership with collapse button
                   (when pipeline-group
                     (str "<div class='detail-label'>Group</div>"
-                         "<div class='detail-value'>"
-                         "<span class='badge' style='background:#fff3e0;color:#e65100'>" pipeline-group "</span>"
-                         "<button class='graph-ctrl-btn' style='margin-left:8px' onclick='toggleGroup(\"" pipeline-group "\")'>Collapse Group</button>"
+                         "<div class='detail-value group-membership'>"
+                         "<span class='badge' style='" (styles/badge-style :group) "'>" pipeline-group "</span>"
+                         "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" pipeline-group "\")'>Collapse Group</button>"
                          "</div>"))
 
                   ;; Lineage section with header
@@ -596,11 +633,9 @@
                     (str "<div class='detail-label'>Upstream (" (count upstream) ")</div>"
                          "<div class='detail-value'>"
                          (str/join "" (map (fn [{:keys [name depth]}]
-                                             (let [indent (* (dec depth) 12)
-                                                   opacity (max 0.5 (- 1 (* (dec depth) 0.15)))
-                                                   prefix (if (> depth 1) "└ " "")]
+                                             (let [prefix (if (> depth 1) "└ " "")]
                                                (str "<div class='lineage-link' data-node-name='" name
-                                                    "' style='padding-left:" indent "px;opacity:" opacity "'>"
+                                                    "' style='" (styles/lineage-style depth) "'>"
                                                     prefix name "</div>")))
                                            (sort-by :depth upstream)))
                          "</div>"))
@@ -609,11 +644,9 @@
                     (str "<div class='detail-label'>Downstream (" (count downstream) ")</div>"
                          "<div class='detail-value'>"
                          (str/join "" (map (fn [{:keys [name depth]}]
-                                             (let [indent (* (dec depth) 12)
-                                                   opacity (max 0.5 (- 1 (* (dec depth) 0.15)))
-                                                   prefix (if (> depth 1) "└ " "")]
+                                             (let [prefix (if (> depth 1) "└ " "")]
                                                (str "<div class='lineage-link' data-node-name='" name
-                                                    "' style='padding-left:" indent "px;opacity:" opacity "'>"
+                                                    "' style='" (styles/lineage-style depth) "'>"
                                                     prefix name "</div>")))
                                            (sort-by :depth downstream)))
                          "</div>"))
@@ -624,11 +657,7 @@
 
                   ;; JSON view (starts hidden)
                   "<div class='lineage-json-view hidden'>"
-                  "<button class='json-copy-btn' title='Copy to clipboard'>"
-                  "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>"
-                  "<rect x='9' y='9' width='13' height='13' rx='2' ry='2'/>"
-                  "<path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/>"
-                  "</svg></button>"
+                  "<button class='json-copy-btn' title='Copy to clipboard'>" icon-copy "</button>"
                   "<pre class='lineage-json-pre'>" provenance-json "</pre>"
                   "</div>"
                   "</div>" ;; close lineage-content
@@ -636,41 +665,10 @@
 
         (set-html! ($id "details-content") html)
 
-        ;; Add toggle handler (use classes for visibility to prevent layout jump)
-        (when-let [slider (.querySelector ($id "details-content") ".lineage-toggle-slider")]
-          (on! slider "click" (fn [_]
-                                (let [tree-view (.querySelector ($id "details-content") ".lineage-tree-view")
-                                      json-view (.querySelector ($id "details-content") ".lineage-json-view")
-                                      tree-label (.querySelector ($id "details-content") "[data-view='tree']")
-                                      json-label (.querySelector ($id "details-content") "[data-view='json']")
-                                      is-json (.contains (.-classList slider) "json-active")]
-                                  (if is-json
-                                    (do
-                                      (remove-class! slider "json-active")
-                                      (remove-class! tree-view "hidden")
-                                      (add-class! json-view "hidden")
-                                      (add-class! tree-label "active")
-                                      (remove-class! json-label "active"))
-                                    (do
-                                      (add-class! slider "json-active")
-                                      (add-class! tree-view "hidden")
-                                      (remove-class! json-view "hidden")
-                                      (remove-class! tree-label "active")
-                                      (add-class! json-label "active")))))))
-
-        ;; Add copy button handler
+        ;; Add toggle and copy handlers
+        (setup-view-toggle! ($id "details-content"))
         (when-let [copy-btn (.querySelector ($id "details-content") ".json-copy-btn")]
-          (let [copy-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'/><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/></svg>"
-                check-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>"]
-            (on! copy-btn "click" (fn [_]
-                                    (-> (js/navigator.clipboard.writeText provenance-json)
-                                        (.then (fn []
-                                                 (add-class! copy-btn "copied")
-                                                 (set! (.-innerHTML copy-btn) check-icon)
-                                                 (js/setTimeout #(do
-                                                                   (remove-class! copy-btn "copied")
-                                                                   (set! (.-innerHTML copy-btn) copy-icon))
-                                                                1500))))))))
+          (setup-copy-btn! copy-btn provenance-json))
 
         ;; Add click handlers for lineage links
         (doseq [item (array-seq (.querySelectorAll ($id "details-content") ".lineage-link"))]
@@ -864,10 +862,7 @@
       (if valid?
         (do
           (set-config! config)
-          ;; Precompute lineage and blast radius for fast selection
-          (precompute-lineage! config)
-          (precompute-attribute-lineage! config)
-          (precompute-blast-radius! config)
+          (precompute-all! config)
           (update-json-input! config)
           (render-tables!)
           (switch-tab! "graph-pane"))
@@ -875,18 +870,17 @@
     (catch :default e
       (js/console.error "Failed to parse config:" e))))
 
+(defn- read-file! [file]
+  (let [reader (js/FileReader.)]
+    (set! (.-onload reader) #(load-config! (-> % .-target .-result)))
+    (.readAsText reader file)))
+
 (defn handle-file-drop [e]
   (.preventDefault e)
-  (when-let [file (-> e .-dataTransfer .-files (aget 0))]
-    (let [reader (js/FileReader.)]
-      (set! (.-onload reader) #(load-config! (-> % .-target .-result)))
-      (.readAsText reader file))))
+  (some-> e .-dataTransfer .-files (aget 0) read-file!))
 
 (defn handle-file-select [e]
-  (when-let [file (-> e .-target .-files (aget 0))]
-    (let [reader (js/FileReader.)]
-      (set! (.-onload reader) #(load-config! (-> % .-target .-result)))
-      (.readAsText reader file))))
+  (some-> e .-target .-files (aget 0) read-file!))
 
 ;; Setup
 (defn setup-drop-zone! []
@@ -913,18 +907,16 @@
     (remove-class! status "success")
     (add-class! status (if error? "error" "success"))))
 
+(defn- active-tab []
+  (some-> ($id "main-tabs") (.querySelector ".nav-tab.active") (.getAttribute "data-tab")))
+
 (defn load-example! []
   (set-config! graph/example-config)
-  (precompute-lineage! graph/example-config)
-  (precompute-attribute-lineage! graph/example-config)
-  (precompute-blast-radius! graph/example-config)
+  (precompute-all! graph/example-config)
   (update-json-input! graph/example-config)
   (render-tables!)
   (show-json-status! "Example loaded" false)
-  (when (= "config-pane" (some-> ($id "main-tabs") (.querySelector ".nav-tab.active") (.getAttribute "data-tab")))
-    nil ;; stay on config
-    )
-  (when (not= "config-pane" (some-> ($id "main-tabs") (.querySelector ".nav-tab.active") (.getAttribute "data-tab")))
+  (when-not (= "config-pane" (active-tab))
     (switch-tab! "graph-pane")))
 
 (defn apply-config! []
@@ -938,9 +930,7 @@
             (if valid?
               (do
                 (set-config! config)
-                (precompute-lineage! config)
-                (precompute-attribute-lineage! config)
-                (precompute-blast-radius! config)
+                (precompute-all! config)
                 (render-tables!)
                 (show-json-status! "Config applied successfully" false)
                 (switch-tab! "graph-pane"))
@@ -951,7 +941,7 @@
 (defn format-json! []
   (when-let [input ($id "json-input")]
     (let [json-str (.-value input)]
-      (when (not (empty? json-str))
+      (when (seq json-str)
         (try
           (let [parsed (js/JSON.parse json-str)
                 formatted (js/JSON.stringify parsed nil 2)]
@@ -1235,21 +1225,7 @@
 
 (defn clear-attribute-selection! []
   (swap! attribute-state assoc :selected-attribute nil)
-  ;; Clear highlighting
-  (-> (.select d3 "#attribute-graph")
-      (.selectAll ".node")
-      (.classed "node-highlighted" false)
-      (.classed "node-connected" false)
-      (.classed "node-dimmed" false))
-  (-> (.select d3 "#attribute-graph")
-      (.selectAll ".cluster")
-      (.classed "cluster-highlighted" false)
-      (.classed "cluster-connected" false)
-      (.classed "cluster-dimmed" false))
-  (-> (.select d3 "#attribute-graph")
-      (.selectAll ".edge")
-      (.classed "edge-highlighted" false)
-      (.classed "edge-dimmed" false))
+  (clear-graph-highlight! "#attribute-graph" :clusters? true)
   ;; Hide details panel
   (when-let [col ($id "attribute-details-col")]
     (set! (.-display (.-style col)) "none"))
@@ -1267,20 +1243,7 @@
         connected-ids (set (concat (map :id upstream-list) (map :id downstream-list)))]
 
     ;; Clear previous highlighting
-    (-> (.select d3 "#attribute-graph")
-        (.selectAll ".node")
-        (.classed "node-highlighted" false)
-        (.classed "node-connected" false)
-        (.classed "node-dimmed" false))
-    (-> (.select d3 "#attribute-graph")
-        (.selectAll ".edge")
-        (.classed "edge-highlighted" false)
-        (.classed "edge-dimmed" false))
-    (-> (.select d3 "#attribute-graph")
-        (.selectAll ".cluster")
-        (.classed "cluster-highlighted" false)
-        (.classed "cluster-connected" false)
-        (.classed "cluster-dimmed" false))
+    (clear-graph-highlight! "#attribute-graph" :clusters? true)
 
     ;; Highlight connected clusters
     (-> (.select d3 "#attribute-graph")
@@ -1481,11 +1444,7 @@
 
                       ;; JSON view (starts hidden)
                       "<div class='lineage-json-view hidden'>"
-                      "<button class='json-copy-btn' title='Copy to clipboard'>"
-                      "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>"
-                      "<rect x='9' y='9' width='13' height='13' rx='2' ry='2'/>"
-                      "<path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/>"
-                      "</svg></button>"
+                      "<button class='json-copy-btn' title='Copy to clipboard'>" icon-copy "</button>"
                       "<pre class='lineage-json-pre'>" provenance-json "</pre>"
                       "</div>"
                       "</div>" ;; close lineage-content
@@ -1500,40 +1459,11 @@
 
         (set-html! ($id "attribute-details-content") html)
 
-        ;; Set up toggle handlers (use classes for visibility to prevent layout jump)
+        ;; Set up toggle and copy handlers
         (when has-lineage
-          (when-let [slider (.querySelector ($id "attribute-details-content") ".lineage-toggle-slider")]
-            (on! slider "click" (fn [_]
-                                  (let [is-json (.toggle (.-classList slider) "json-active")
-                                        tree-view (.querySelector ($id "attribute-details-content") ".lineage-tree-view")
-                                        json-view (.querySelector ($id "attribute-details-content") ".lineage-json-view")
-                                        tree-label (.querySelector ($id "attribute-details-content") ".lineage-toggle-label[data-view='tree']")
-                                        json-label (.querySelector ($id "attribute-details-content") ".lineage-toggle-label[data-view='json']")]
-                                    (if is-json
-                                      (do
-                                        (add-class! tree-view "hidden")
-                                        (remove-class! json-view "hidden")
-                                        (remove-class! tree-label "active")
-                                        (add-class! json-label "active"))
-                                      (do
-                                        (remove-class! tree-view "hidden")
-                                        (add-class! json-view "hidden")
-                                        (add-class! tree-label "active")
-                                        (remove-class! json-label "active"))))))))
-
-        ;; Copy button handler
+          (setup-view-toggle! ($id "attribute-details-content")))
         (when-let [copy-btn (.querySelector ($id "attribute-details-content") ".json-copy-btn")]
-          (let [copy-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'/><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/></svg>"
-                check-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>"]
-            (on! copy-btn "click" (fn [_]
-                                    (-> (js/navigator.clipboard.writeText provenance-json)
-                                        (.then (fn []
-                                                 (add-class! copy-btn "copied")
-                                                 (set! (.-innerHTML copy-btn) check-icon)
-                                                 (js/setTimeout #(do
-                                                                   (remove-class! copy-btn "copied")
-                                                                   (set! (.-innerHTML copy-btn) copy-icon))
-                                                                1500))))))))
+          (setup-copy-btn! copy-btn provenance-json))
 
         ;; Click handlers for lineage links
         (doseq [item (array-seq (.querySelectorAll ($id "attribute-details-content") ".lineage-link[data-attr-id]"))]
@@ -1553,20 +1483,7 @@
                                        (map :id upstream)
                                        (map :id downstream)))]
         ;; Clear previous highlighting
-        (-> (.select d3 "#attribute-graph")
-            (.selectAll ".node")
-            (.classed "node-highlighted" false)
-            (.classed "node-connected" false)
-            (.classed "node-dimmed" false))
-        (-> (.select d3 "#attribute-graph")
-            (.selectAll ".cluster")
-            (.classed "cluster-highlighted" false)
-            (.classed "cluster-connected" false)
-            (.classed "cluster-dimmed" false))
-        (-> (.select d3 "#attribute-graph")
-            (.selectAll ".edge")
-            (.classed "edge-highlighted" false)
-            (.classed "edge-dimmed" false))
+        (clear-graph-highlight! "#attribute-graph" :clusters? true)
 
         ;; Highlight nodes
         (-> (.select d3 "#attribute-graph")
@@ -2132,19 +2049,16 @@
 (defn copy-planner-output! []
   (when-let [output ($id "planner-output")]
     (let [text (.-textContent output)]
-      (when (not (str/blank? text))
+      (when-not (str/blank? text)
         (when-let [btn (.querySelector js/document ".planner-copy-btn")]
-          (let [copy-icon (.-innerHTML btn)
-                check-icon "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='20 6 9 17 4 12'/></svg>"]
-            (-> (js/navigator.clipboard.writeText text)
-                (.then (fn []
-                         (add-class! btn "copied")
-                         (set! (.-innerHTML btn) check-icon)
-                         (js/setTimeout #(do
-                                           (remove-class! btn "copied")
-                                           (set! (.-innerHTML btn) copy-icon))
-                                        1500)))
-                (.catch #(js/console.error "Failed to copy:" %)))))))))
+          (-> (js/navigator.clipboard.writeText text)
+              (.then (fn []
+                       (add-class! btn "copied")
+                       (set! (.-innerHTML btn) icon-check)
+                       (js/setTimeout #(do (remove-class! btn "copied")
+                                           (set! (.-innerHTML btn) icon-copy))
+                                      1500)))
+              (.catch #(js/console.error "Failed to copy:" %))))))))
 
 (defn restore-planner-from-hash! []
   (let [{:keys [view pipelines]} (get-planner-state-from-hash)]
@@ -2225,9 +2139,7 @@
   (render-splash!)
   ;; Load example by default
   (set-config! graph/example-config)
-  (precompute-lineage! graph/example-config)
-  (precompute-attribute-lineage! graph/example-config)
-  (precompute-blast-radius! graph/example-config)
+  (precompute-all! graph/example-config)
   (update-json-input! graph/example-config)
   (render-tables!)
   (init-planner!)
@@ -2262,22 +2174,23 @@
   (render-splash!))
 
 ;; Expose to window for HTML onclick handlers
-(set! js/window.toggleTheme toggle-theme!)
-(set! js/window.loadExample load-example!)
-(set! js/window.resetGraph reset-graph!)
-(set! js/window.togglePipelinesOnly toggle-pipelines-only!)
-(set! js/window.toggleGroup toggle-group!)
-(set! js/window.toggleAllGroups toggle-all-groups!)
-(set! js/window.switchTab switch-tab!)
-(set! js/window.applyConfig apply-config!)
-(set! js/window.formatJson format-json!)
-(set! js/window.resetAttributeGraph reset-attribute-graph!)
-(set! js/window.showBlastRadius show-blast-radius!)
-(set! js/window.hideBlastRadiusModal hide-blast-radius-modal!)
-(set! js/window.togglePlannerPicker toggle-planner-picker!)
-(set! js/window.filterPlannerItems filter-planner-items!)
-(set! js/window.clearPlannerSelection clear-planner-selection!)
-(set! js/window.setPlannerView set-planner-view!)
-(set! js/window.copyPlannerOutput copy-planner-output!)
+(js/Object.assign js/window
+                  #js {:toggleTheme toggle-theme!
+                       :loadExample load-example!
+                       :resetGraph reset-graph!
+                       :togglePipelinesOnly toggle-pipelines-only!
+                       :toggleGroup toggle-group!
+                       :toggleAllGroups toggle-all-groups!
+                       :switchTab switch-tab!
+                       :applyConfig apply-config!
+                       :formatJson format-json!
+                       :resetAttributeGraph reset-attribute-graph!
+                       :showBlastRadius show-blast-radius!
+                       :hideBlastRadiusModal hide-blast-radius-modal!
+                       :togglePlannerPicker toggle-planner-picker!
+                       :filterPlannerItems filter-planner-items!
+                       :clearPlannerSelection clear-planner-selection!
+                       :setPlannerView set-planner-view!
+                       :copyPlannerOutput copy-planner-output!})
 
 
