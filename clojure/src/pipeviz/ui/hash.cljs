@@ -68,3 +68,8 @@
 
 (defn clear! []
       (.replaceState js/history nil "" (.-pathname js/window.location)))
+
+(defn get-url-param []
+      "Get ?url= query parameter if present"
+      (let [params (js/URLSearchParams. (.-search js/window.location))]
+           (.get params "url")))

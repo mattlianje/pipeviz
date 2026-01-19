@@ -722,6 +722,40 @@
                                    (and (nil? node) current-selected)
                                    (clear-selection!))))))
 
+;; Load config from URL
+(defn load-from-url! [url]
+      (js/console.log "Loading config from URL:" url)
+      (-> (js/fetch url)
+          (.then (fn [response]
+                     (if (.-ok response)
+                         (.json response)
+                         (throw (js/Error. (str "Failed to fetch: " (.-status response)))))))
+          (.then (fn [json]
+                     (let [config (js->clj json :keywordize-keys true)]
+                          (set-config! config)
+                          (precompute-all! config)
+                          (update-json-input! config)
+                          (render-tables!)
+                          ;; Handle hash state after config loads
+                          (let [{:keys [tab node blast view pipelines]} (hash/parse)]
+                               (cond
+                                blast (do (switch-tab! "graph-pane")
+                                          (js/setTimeout #(blast/show! blast) 200))
+                                node (do (switch-tab! "graph-pane")
+                                         (js/setTimeout select-node-from-hash! 200))
+                                (and (= tab "planner") (or view pipelines))
+                                (do (switch-tab! "planner-pane")
+                                    (js/setTimeout planner/restore-from-hash! 200))
+                                (and tab (not= tab "home"))
+                                (switch-tab! (str tab "-pane")))))))
+          (.catch (fn [err]
+                      (js/console.error "Failed to load config from URL:" err)
+                      ;; Fall back to example config
+                      (set-config! core/example-config)
+                      (precompute-all! core/example-config)
+                      (update-json-input! core/example-config)
+                      (render-tables!)))))
+
 ;; Init
 (defn init []
       (js/console.log "Pipeviz ClojureScript initialized")
@@ -733,36 +767,40 @@
       (attributes/setup-search!)
       (setup-hashchange-listener!)
       (render-splash!)
-  ;; Load example by default
-      (set-config! core/example-config)
-      (precompute-all! core/example-config)
-      (update-json-input! core/example-config)
-      (render-tables!)
       (planner/init!)
-  ;; Handle hash state on page load
-      (let [{:keys [tab node blast view pipelines]} (hash/parse)]
-           (cond
-      ;; If there's a blast in the hash, show blast radius modal
-            blast
-            (do
-             (switch-tab! "graph-pane")
-             (js/setTimeout #(blast/show! blast) 200))
+      ;; Check for ?url= parameter
+      (if-let [url (hash/get-url-param)]
+              (load-from-url! url)
+              ;; Load example by default
+              (do
+               (set-config! core/example-config)
+               (precompute-all! core/example-config)
+               (update-json-input! core/example-config)
+               (render-tables!)
+               ;; Handle hash state on page load
+               (let [{:keys [tab node blast view pipelines]} (hash/parse)]
+                    (cond
+                     ;; If there's a blast in the hash, show blast radius modal
+                     blast
+                     (do
+                      (switch-tab! "graph-pane")
+                      (js/setTimeout #(blast/show! blast) 200))
 
-      ;; If there's a node in the hash, switch to graph and select it
-            node
-            (do
-             (switch-tab! "graph-pane")
-             (js/setTimeout select-node-from-hash! 200))
+                     ;; If there's a node in the hash, switch to graph and select it
+                     node
+                     (do
+                      (switch-tab! "graph-pane")
+                      (js/setTimeout select-node-from-hash! 200))
 
-      ;; If it's the planner tab with view/pipelines, restore state
-            (and (= tab "planner") (or view pipelines))
-            (do
-             (switch-tab! "planner-pane")
-             (js/setTimeout planner/restore-from-hash! 200))
+                     ;; If it's the planner tab with view/pipelines, restore state
+                     (and (= tab "planner") (or view pipelines))
+                     (do
+                      (switch-tab! "planner-pane")
+                      (js/setTimeout planner/restore-from-hash! 200))
 
-      ;; If there's a specific tab in the hash, switch to it
-            (and tab (not= tab "home"))
-            (switch-tab! (str tab "-pane")))))
+                     ;; If there's a specific tab in the hash, switch to it
+                     (and tab (not= tab "home"))
+                     (switch-tab! (str tab "-pane")))))))
 
 (defn reload []
       (when (:config @state/app)

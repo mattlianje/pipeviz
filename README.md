@@ -7,7 +7,7 @@
 
 A JSON spec for lineage. Declare your pipelines, get a graph.
 
-- One HTML file, no backend, no build step
+- No backend required, static hosting
 - Works with any stack: SQL, Spark, Kafka, S3, APIs, shell scripts
 - Each team owns their JSON, merge with `jq` for the org-wide view
 - Column-level lineage built in
@@ -66,20 +66,16 @@ To auto-load a config, use `?url=`:
 https://pipeviz.org?url=https://yoursite.com/pipeviz.json
 ```
 
-To self-host, download [pipeviz.html](https://github.com/mattlianje/pipeviz/blob/master/pipeviz.html) and serve it from anywhere.
-
-<details>
-<summary>View a local JSON file (one-liner)</summary>
+To self-host, build the ClojureScript app and serve statically:
 
 ```bash
-(curl -s https://raw.githubusercontent.com/mattlianje/pipeviz/master/pipeviz.html > /tmp/pipeviz.html && \
-  cp /path/to/your/pipeviz.json /tmp/ && \
-  echo "🛰️ Serving at http://localhost:8000" && \
-  python3 -m http.server 8000 -d /tmp 2>/dev/null & PID=$!; \
-  sleep 0.3; open "http://localhost:8000/pipeviz.html?url=http://localhost:8000/pipeviz.json"; \
-  echo "Press enter to stop..."; read; kill $PID 2>/dev/null; echo "✓ Stopped")
+cd clojure
+npm install
+npx shadow-cljs release app
+# serve clojure/resources/public/ from anywhere
 ```
-</details>
+
+For development with hot reload: `npx shadow-cljs watch app` → http://localhost:8080
 
 ## Attribute Lineage
 Track column-level provenance with `::` notation. Supports infinitely nested complex data-types.
@@ -205,6 +201,63 @@ jq -s '{
 - Blast radius analysis (downstream impact)
 - Mermaid export
 - MCP-ready JSON graph for LLM tooling
+
+## API Server
+
+There's an optional Clojure server if you want programmatic access to the graph:
+
+```bash
+cd clojure
+clj -M -m pipeviz.server.main 3000 path/to/config.json
+```
+
+```
+GET  /api/config              # current config
+POST /api/config              # set config (JSON body)
+GET  /api/dot                 # DOT graph
+GET  /api/lineage?node=X      # lineage for node
+GET  /api/provenance?node=X   # attribute provenance
+```
+
+Wire it into CI. Point an LLM agent at it. Build custom tooling. The graph is just JSON.
+
+## Why Clojure?
+
+- Clojure espouses the same code-as-data core idea as Pipeviz.
+- No required persistence layer. Since Clojure is [homoiconic](https://en.wikipedia.org/wiki/Homoiconicity) you can REPL into, poke at, update, define listeners and hooks on your graph 
+without having to restart your server or drop-down into the relational algebra of CRUD apps and ORM's. Your graph becomes very easy to extend, almost like a living organism.
+
+```clojure
+;; load your config
+(def config (json/read-str (slurp "pipeviz.json") :key-fn keyword))
+
+;; what breaks if "raw_users" goes down?
+(core/downstream-of config "raw_users")
+;; => #{"user-enrichment" "analytics-aggregation" "weekly-rollup"}
+
+;; get the full lineage as data
+(core/full-graph-lineage config "analytics-aggregation")
+;; => {:upstream [{:name "user-enrichment", :depth 1} ...], :downstream [...]}
+
+;; generate DOT, pipe to graphviz
+(spit "graph.dot" (core/generate-dot config))
+```
+
+The graph is a living thing. Define hooks, react to changes:
+
+```clojure
+(def graph (atom config))
+
+;; recompute blast radius whenever the graph changes
+(add-watch graph :blast-radius
+  (fn [_ _ _ new-config]
+    (println "Affected nodes:" (core/downstream-of new-config "raw_users"))))
+
+;; add a pipeline, watch it ripple
+(swap! graph update :pipelines conj
+  {:name "new-etl" :input_sources ["raw_users"] :output_sources ["new_table"]})
+;; => Affected nodes: #{"user-enrichment" "new-etl" "analytics-aggregation" ...}
+```
 
 ## Inspiration
 - The LISP [code-as-data](https://en.wikipedia.org/wiki/Code_as_data) ethos
