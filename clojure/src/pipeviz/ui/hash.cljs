@@ -5,12 +5,13 @@
 (defn parse []
       "Parse current URL hash into a map"
       (let [hash (subs (or (.-hash js/window.location) "") 1)
-            parts (str/split hash #"&")]
+            parts (str/split hash #"&")
+            safe-decode (fn [s] (try (js/decodeURIComponent s) (catch :default _ s)))]
            (reduce (fn [acc part]
                        (cond
                         (str/includes? part "=")
                         (let [[k v] (str/split part #"=" 2)]
-                             (assoc acc (keyword k) (js/decodeURIComponent v)))
+                             (assoc acc (keyword k) (safe-decode v)))
                         (not (str/blank? part))
                         (assoc acc :tab part)
                         :else acc))
@@ -35,9 +36,17 @@
       (:blast (parse)))
 
 (defn get-planner-state []
-      (let [{:keys [view pipelines]} (parse)]
+      (let [parsed (parse)
+            view (:view parsed)
+            ;; Get raw pipelines from hash (before decode) and decode each individually
+            hash (subs (or (.-hash js/window.location) "") 1)
+            pipelines-match (re-find #"pipelines=([^&]*)" hash)
+            raw-pipelines (when pipelines-match (second pipelines-match))
+            pipelines (when raw-pipelines
+                           (mapv #(try (js/decodeURIComponent %) (catch :default _ %))
+                                 (str/split raw-pipelines #",")))]
            {:view (when view (keyword view))
-            :pipelines (when pipelines (str/split pipelines #","))}))
+            :pipelines pipelines}))
 
 (defn set-hash! [hash-str]
       (.replaceState js/history nil "" (if (str/blank? hash-str) "" (str "#" hash-str))))

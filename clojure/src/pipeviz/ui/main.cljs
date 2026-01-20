@@ -123,9 +123,14 @@
                      (remove-class! js/document.body "home-active")
                      (let [current (hash/parse)
                            tab-name (tab-id->hash-name tab-id)
-                           new-hash (if (and (= tab-id "graph-pane") (:node current))
-                                        (hash/build {:tab tab-name :node (:node current)})
-                                        tab-name)]
+                           new-hash (cond
+                                     ;; Preserve node when switching to graph
+                                     (and (= tab-id "graph-pane") (:node current))
+                                     (hash/build {:tab tab-name :node (:node current)})
+                                     ;; Preserve planner state when switching to planner
+                                     (and (= tab-id "planner-pane") (or (:view current) (:pipelines current)))
+                                     (hash/build {:tab tab-name :view (:view current) :pipelines (when (:pipelines current) (str/split (:pipelines current) #","))})
+                                     :else tab-name)]
                           (.replaceState js/history nil "" (str "#" new-hash))))))
   ;; Render graph if switching to graph tab
       (when (and (= tab-id "graph-pane") (:config @state/app))
