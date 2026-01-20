@@ -301,10 +301,10 @@
                                  (str "<div class='lineage-section'><div class='lineage-header'>"
                                       "<span class='detail-label' style='margin-bottom:0'>Lineage</span></div>"
                                       "<div class='lineage-content'><div class='lineage-tree-view'>"
-                                      (lineage-section "↑ Pipelines" upstream-pipelines)
-                                      (lineage-section "↑ Datasources" upstream-datasources)
-                                      (lineage-section "↓ Pipelines" downstream-pipelines)
-                                      (lineage-section "↓ Datasources" downstream-datasources)
+                                      (lineage-section "Upstream Pipelines" upstream-pipelines)
+                                      (lineage-section "Upstream Datasources" upstream-datasources)
+                                      (lineage-section "Downstream Pipelines" downstream-pipelines)
+                                      (lineage-section "Downstream Datasources" downstream-datasources)
                                       (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")
                                       "</div></div></div>")))]
                      (set-html! ($id "details-title") (str group-name " (Group)"))
@@ -420,10 +420,10 @@
                                             (str "<div class='lineage-view-toggle'><span class='lineage-toggle-label active' data-view='tree'>Tree</span>"
                                                  "<div class='lineage-toggle-slider'></div><span class='lineage-toggle-label' data-view='json'>JSON</span></div>"))
                                       "</div><div class='lineage-content'><div class='lineage-tree-view'>"
-                                      (lineage-section "↑ Pipelines" upstream-pipelines true)
-                                      (lineage-section "↑ Datasources" upstream-datasources true)
-                                      (lineage-section "↓ Pipelines" downstream-pipelines true)
-                                      (lineage-section "↓ Datasources" downstream-datasources true)
+                                      (lineage-section "Upstream Pipelines" upstream-pipelines true)
+                                      (lineage-section "Upstream Datasources" upstream-datasources true)
+                                      (lineage-section "Downstream Pipelines" downstream-pipelines true)
+                                      (lineage-section "Downstream Datasources" downstream-datasources true)
                                       (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")))
                             "</div><div class='lineage-json-view hidden'>"
                             "<button class='json-copy-btn' title='Copy to clipboard'>" icon-copy "</button>"
