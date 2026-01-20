@@ -67,7 +67,8 @@
                          :pipelines pipelines})))
 
 (defn clear! []
-      (.replaceState js/history nil "" (.-pathname js/window.location)))
+      (let [search (.-search js/window.location)]
+           (.replaceState js/history nil "" (str (.-pathname js/window.location) search))))
 
 (defn get-url-param []
       "Get ?url= query parameter if present"
