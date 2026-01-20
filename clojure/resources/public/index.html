@@ -25,6 +25,26 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* Subtle scrollbars */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+        *::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        *::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        *::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
         html {
             overflow-y: scroll;
         }
@@ -93,14 +113,14 @@
             padding: 4px;
         }
         .hero-title {
-            font-size: 1.9rem;
+            font-size: 2rem;
             font-weight: 600;
             margin-bottom: 0.25rem;
         }
         .hero-title img {
-            height: 1.4em;
+            height: 1.6em;
             vertical-align: middle;
-            margin-right: 0.4rem;
+            margin-right: 0.35rem;
         }
         .lead {
             color: var(--text-secondary);
