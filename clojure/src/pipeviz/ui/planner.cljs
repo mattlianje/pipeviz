@@ -27,9 +27,16 @@
       (set! (.-textContent label) text))))
 
 (defn- update-count! []
-  (when-let [count-el ($id "planner-picker-count")]
-    (let [n (count (:selected @state/planner))]
-      (set! (.-textContent count-el) (str n " selected")))))
+  (let [{:keys [view selected]} @state/planner
+        n (count selected)]
+    ;; Update footer count
+    (when-let [count-el ($id "planner-picker-count")]
+      (set! (.-textContent count-el) (if (pos? n) (str n " selected") "")))
+    ;; Update button badge
+    (doseq [v ["pipeline" "airflow" "blast"]]
+      (when-let [badge ($id (str "planner-count-" v))]
+        (set! (.-textContent badge)
+              (if (and (= (name view) v) (pos? n)) (str n) ""))))))
 
 (defn toggle-picker! []
   (when-let [dropdown ($id "planner-picker-dropdown")]
@@ -193,30 +200,53 @@
   (update-count!)
   (render-graph!))
 
+(defn- position-dropdown! [view-name]
+  (when-let [dropdown ($id "planner-picker-dropdown")]
+    (when-let [btn (.querySelector js/document (str ".planner-view-btn[data-view='" view-name "']"))]
+      (let [btn-rect (.getBoundingClientRect btn)
+            viewport-width js/window.innerWidth
+            dropdown-width 280
+            ;; Check if dropdown would overflow viewport on the right
+            would-overflow? (> (+ (.-left btn-rect) dropdown-width) (- viewport-width 20))]
+        ;; Reset both left and right first
+        (set! (.-left (.-style dropdown)) "")
+        (set! (.-right (.-style dropdown)) "")
+        (if would-overflow?
+          ;; Align to right edge of container
+          (set! (.-right (.-style dropdown)) "0")
+          ;; Align to left edge of button (relative to container)
+          (let [container (.-parentElement btn)
+                container-rect (.getBoundingClientRect container)
+                left-pos (- (.-left btn-rect) (.-left container-rect))]
+            (set! (.-left (.-style dropdown)) (str left-pos "px"))))))))
+
 (defn set-view! [view-name]
-  (let [view (keyword view-name)]
-    ;; Reset graphviz instance and selection for clean transition
-    (swap! state/planner assoc :view view :selected [] :graphviz nil)
-    ;; Update button states
-    (doseq [btn (array-seq (.querySelectorAll js/document ".planner-view-btn"))]
-      (if (= view-name (.getAttribute btn "data-view"))
-        (add-class! btn "active")
-        (remove-class! btn "active")))
-    ;; Update hint
-    (when-let [hint ($id "planner-hint")]
-      (set! (.-textContent hint) (get hints view)))
-    ;; Repopulate picker and reset graph
-    (populate-picker!)
-    (update-picker-label!)
-    (update-count!)
-    (render-graph!)
-    ;; Show the picker dropdown (like JS version does)
-    (when-let [dropdown ($id "planner-picker-dropdown")]
-      (when-not (.contains (.-classList dropdown) "show")
-        (add-class! dropdown "show")
-        (swap! state/planner assoc :picker-open? true)
-        (when-let [filter-input ($id "planner-picker-filter")]
-          (js/setTimeout #(.focus filter-input) 0))))))
+  (let [view (keyword view-name)
+        current-view (:view @state/planner)
+        same-view? (= view current-view)
+        picker-open? (:picker-open? @state/planner)]
+    ;; If clicking same button and picker is open, close it
+    (if (and same-view? picker-open?)
+      (close-picker!)
+      (do
+        ;; Set view if different
+        (when-not same-view?
+          (swap! state/planner assoc :view view :selected [] :graphviz nil)
+          ;; Update button states
+          (doseq [btn (array-seq (.querySelectorAll js/document ".planner-view-btn"))]
+            (if (= view-name (.getAttribute btn "data-view"))
+              (add-class! btn "active")
+              (remove-class! btn "active")))
+          (update-count!)
+          (render-graph!))
+        ;; Always populate and show picker
+        (populate-picker!)
+        (position-dropdown! view-name)
+        (when-let [dropdown ($id "planner-picker-dropdown")]
+          (add-class! dropdown "show")
+          (swap! state/planner assoc :picker-open? true)
+          (when-let [filter-input ($id "planner-picker-filter")]
+            (js/setTimeout #(.focus filter-input) 0)))))))
 
 (defn copy-output! []
   (when-let [output ($id "planner-output")]
@@ -259,6 +289,6 @@
   (.addEventListener js/document "click"
                      (fn [e]
                        (when (:picker-open? @state/planner)
-                         (let [picker (.closest (.-target e) ".planner-picker")]
+                         (let [picker (.closest (.-target e) ".planner-view-btns")]
                            (when-not picker
                              (close-picker!)))))))

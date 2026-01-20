@@ -85,35 +85,44 @@
             use-dark (if stored (= stored "dark") prefers-dark)]
            (set-theme! use-dark)))
 
+;; Sidebar
+(defn toggle-sidebar! []
+      (when-let [sidebar ($id "sidebar")]
+                (toggle-class! sidebar "collapsed")))
+
 ;; Tabs
 (defn- tab-id->hash-name [tab-id]
        (when tab-id
              (str/replace tab-id #"-pane$" "")))
 
 (defn switch-tab! [tab-id]
-  ;; Update tab buttons
+  ;; Update tab buttons (old nav-tabs)
       (doseq [btn (array-seq (.querySelectorAll js/document ".nav-tab"))]
              (if (= tab-id (.getAttribute btn "data-tab"))
                  (add-class! btn "active")
                  (remove-class! btn "active")))
+  ;; Update sidebar items
+      (doseq [item (array-seq (.querySelectorAll js/document ".sidebar-item"))]
+             (if (= tab-id (.getAttribute item "data-tab"))
+                 (add-class! item "active")
+                 (remove-class! item "active")))
   ;; Update panes
       (doseq [pane (array-seq (.querySelectorAll js/document ".tab-pane"))]
              (if (= tab-id (.-id pane))
                  (add-class! pane "active")
                  (remove-class! pane "active")))
-  ;; Show/hide tabs and update URL hash
-      (when-let [tabs ($id "main-tabs")]
+  ;; Show/hide sidebar based on home tab and update URL hash
+      (when-let [app-layout ($id "app-layout")]
                 (if (= tab-id "home-pane")
                     (do
-                     (add-class! tabs "hidden-on-home")
-        ;; Clear URL hash when going to home
+                     (add-class! app-layout "home-mode")
+                     (add-class! js/document.body "home-active")
                      (hash/clear!))
                     (do
-                     (remove-class! tabs "hidden-on-home")
-        ;; Update hash with tab name (preserving node if on graph tab)
+                     (remove-class! app-layout "home-mode")
+                     (remove-class! js/document.body "home-active")
                      (let [current (hash/parse)
                            tab-name (tab-id->hash-name tab-id)
-              ;; Only preserve node param on graph tab
                            new-hash (if (and (= tab-id "graph-pane") (:node current))
                                         (hash/build {:tab tab-name :node (:node current)})
                                         tab-name)]
@@ -810,6 +819,7 @@
 ;; Expose to window for HTML onclick handlers
 (js/Object.assign js/window
                   #js {:toggleTheme toggle-theme!
+                       :toggleSidebar toggle-sidebar!
                        :loadExample load-example!
                        :resetGraph reset-graph!
                        :togglePipelinesOnly toggle-pipelines-only!

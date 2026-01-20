@@ -23,9 +23,9 @@ build: install
 
 bundle: build
 	bash scripts/bundle.sh
-	@echo "Built dist/pipeviz.html"
+	@cp dist/pipeviz.html dist/index.html
 	@cp dist/pipeviz.html pipeviz.html
-	@echo "Copied to pipeviz.html"
+	@echo "Built dist/index.html + pipeviz.html"
 
 install: node_modules
 

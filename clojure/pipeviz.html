@@ -30,7 +30,7 @@
         }
         body {
             font-family: Verdana, Geneva, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.5;
@@ -50,19 +50,39 @@
             .container { padding: 0.5rem 0.75rem; }
         }
 
-        /* Header */
+        /* Header - static, scrolls with page */
         .header {
             text-align: center;
-            padding: 2.5rem 0 1rem;
-            position: relative;
+            padding: 1rem 2rem 0.75rem;
+            background: var(--bg-primary);
+        }
+
+        /* Inner header for non-home tabs - matches hero exactly */
+        .inner-header {
+            position: fixed;
+            top: 1rem;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 1rem 2rem 0.75rem;
+            background: var(--bg-primary);
+            z-index: 90;
+            pointer-events: none;
+        }
+        .inner-header > * {
+            pointer-events: auto;
+        }
+        .app-layout.home-mode .inner-header {
+            display: none;
         }
         .header-controls {
-            position: absolute;
-            top: 0.5rem;
-            right: 0;
+            position: fixed;
+            top: 0.75rem;
+            right: 1rem;
             display: flex;
             gap: 1rem;
             align-items: center;
+            z-index: 100;
         }
         .header-controls a {
             color: var(--text-muted);
@@ -77,25 +97,25 @@
             padding: 4px;
         }
         .hero-title {
-            font-size: 2.25rem;
-            font-weight: 700;
+            font-size: 1.9rem;
+            font-weight: 600;
             margin-bottom: 0.25rem;
         }
         .hero-title img {
-            height: 1.3em;
+            height: 1.4em;
             vertical-align: middle;
-            margin-right: 0.3rem;
+            margin-right: 0.4rem;
         }
         .lead {
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 12px;
         }
         @media (max-width: 480px) {
-            .hero-title { font-size: 1.75rem; }
-            .lead { font-size: 11px; }
+            .hero-title { font-size: 1.6rem; }
+            .lead { font-size: 10px; }
         }
         .lead span { color: #d63384; }
-        code { color: #d63384; font-family: monospace; font-size: 12px; }
+        code { color: #d63384; font-family: monospace; font-size: 11px; }
 
         /* Home content */
         .home-content {
@@ -115,44 +135,230 @@
             overflow-x: hidden;
         }
 
-        /* Tabs */
-        .nav-tabs {
+        /* App Layout */
+        .app-layout {
             display: flex;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 1rem;
-            gap: 2px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
-        .nav-tabs::-webkit-scrollbar {
+        .app-layout.home-mode {
+            position: static;
+            display: block;
+        }
+        .app-layout.home-mode .sidebar {
             display: none;
         }
-        .nav-tab {
-            padding: 8px 16px;
+        .app-layout.home-mode .main-content {
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 160px;
+            min-width: 160px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding-top: 105px;
+            height: 100%;
+            overflow-y: auto;
+            transition: width 0.2s ease, min-width 0.2s ease;
+            z-index: 100;
+        }
+        .sidebar.collapsed {
+            width: 52px;
+            min-width: 52px;
+        }
+        .sidebar-toggle {
+            position: fixed;
+            top: 0.75rem;
+            left: 0.75rem;
+            z-index: 110;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
             border: none;
             background: transparent;
             color: var(--text-muted);
             cursor: pointer;
-            font-size: 12px;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+        }
+        .sidebar-toggle:hover {
+            opacity: 1;
+            color: var(--text-primary);
+        }
+        .app-layout.home-mode .sidebar-toggle {
+            display: none;
+        }
+        .sidebar-section {
+            padding: 0.35rem 0;
+        }
+        .sidebar-section-title {
+            padding: 4px 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .sidebar.collapsed .sidebar-section-title {
+            display: none;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 6px 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
             font-family: inherit;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            white-space: nowrap;
+            text-align: left;
+            transition: background 0.1s, color 0.1s;
+        }
+        .sidebar-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-primary);
+        }
+        .sidebar-item.active {
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            border-left: 2px solid var(--text-primary);
+            padding-left: 8px;
+        }
+        .sidebar-item svg {
             flex-shrink: 0;
+            opacity: 0.7;
         }
-        .nav-tab:hover {
-            color: var(--text-primary);
-            background: var(--bg-secondary);
+        .sidebar-item.active svg {
+            opacity: 1;
         }
-        .nav-tab.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--text-primary);
+        .sidebar-item span {
+            white-space: nowrap;
+            overflow: hidden;
         }
-        .nav-tabs.hidden-on-home { visibility: hidden; }
+        .sidebar.collapsed .sidebar-item {
+            justify-content: center;
+            padding: 10px 0;
+        }
+        .sidebar.collapsed .sidebar-item span {
+            display: none;
+        }
+        .sidebar.collapsed .sidebar-item.active {
+            border-left: none;
+            border-bottom: 2px solid var(--text-primary);
+            padding-left: 0;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            padding: 8.5rem 2rem 2rem 2rem;
+            overflow-y: auto;
+            height: 100%;
+            background: var(--bg-primary);
+        }
+
+        /* Config item - source indicator */
+        .sidebar-item.config-source {
+            position: relative;
+        }
+        .sidebar-item.config-source::after {
+            content: "source";
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            position: absolute;
+            right: 8px;
+            opacity: 0.7;
+        }
+        .sidebar.collapsed .sidebar-item.config-source::after {
+            display: none;
+        }
+
+        /* Hide old nav-tabs */
+        .nav-tabs { display: none !important; }
         .hidden { display: none !important; }
         .tab-pane { display: none; }
         .tab-pane.active { display: block; }
+
+        /* Mobile: bottom nav */
+        @media (max-width: 768px) {
+            .app-layout {
+                position: static;
+                display: block;
+            }
+            .sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                width: 100% !important;
+                min-width: 100% !important;
+                height: auto;
+                max-height: none;
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 0 !important;
+                z-index: 100;
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+            .sidebar-toggle,
+            .sidebar .sidebar-section-title {
+                display: none !important;
+            }
+            .sidebar .sidebar-section {
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                padding: 0 !important;
+                border: none !important;
+                margin: 0 !important;
+            }
+            .sidebar-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 8px 12px;
+                gap: 4px;
+                font-size: 10px;
+                border-left: none !important;
+            }
+            .sidebar-item span {
+                display: block !important;
+            }
+            .sidebar-item.active {
+                border-left: none !important;
+                border-top: 2px solid var(--text-primary);
+                padding-left: 12px;
+            }
+            .sidebar-item.config-source::after {
+                display: none;
+            }
+            .main-content {
+                padding: 1rem;
+                padding-bottom: 80px;
+                height: auto;
+                overflow-y: visible;
+            }
+        }
 
         /* Hero demo */
         .hero-demo {
@@ -236,7 +442,7 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 0.75rem;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             line-height: 1.5;
         }
@@ -259,7 +465,7 @@
             width: 100%;
             min-height: 400px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             padding: 1rem;
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -451,7 +657,7 @@
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border-color);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 12px;
         }
         .detail-label {
             font-size: 10px;
@@ -545,7 +751,7 @@
             text-align: center;
             color: var(--text-muted);
             padding: 2rem;
-            font-size: 13px;
+            font-size: 12px;
         }
         .links-scroll {
             display: flex;
@@ -846,7 +1052,7 @@
         .search-input {
             width: 100%;
             padding: 8px 12px;
-            font-size: 13px;
+            font-size: 11px;
             font-family: inherit;
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -991,14 +1197,14 @@
             border-bottom: 1px solid var(--border-color);
         }
         .modal-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
             margin: 0;
         }
         .modal-close {
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             cursor: pointer;
             color: var(--text-muted);
             line-height: 1;
@@ -1056,7 +1262,7 @@
             gap: 0.75rem;
         }
         .planner-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
         }
         .planner-controls {
@@ -1065,25 +1271,31 @@
             gap: 0.75rem;
             flex-wrap: wrap;
         }
-        .planner-picker {
-            position: relative;
+        .planner-btn-count {
+            display: inline-block;
+            font-size: 10px;
+            background: var(--accent-color);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 8px;
+            margin-left: 4px;
+            min-width: 16px;
+            min-height: 14px;
+            text-align: center;
+            vertical-align: middle;
         }
-        .planner-picker-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 0.75rem;
-            font-size: 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            cursor: pointer;
-            color: var(--text-primary);
-            min-width: 160px;
-            justify-content: space-between;
+        .planner-btn-count:empty {
+            visibility: hidden;
         }
-        .planner-picker-btn:hover {
-            background: var(--bg-primary);
+        .planner-view-btn svg {
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+        .planner-dropdown-shared {
+            position: absolute;
+            top: 100%;
+            margin-top: 4px;
+            z-index: 1001;
         }
         .planner-picker-dropdown {
             display: none;
@@ -1177,6 +1389,7 @@
             color: var(--text-primary);
         }
         .planner-view-btns {
+            position: relative;
             display: flex;
             gap: 0.25rem;
         }
@@ -1306,7 +1519,7 @@
             gap: 0.75rem;
         }
         .export-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
         }
         .export-controls {
@@ -1384,11 +1597,11 @@
             border-bottom: 1px solid var(--border-color);
         }
         .stats-summary span {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
         }
         .stats-summary strong {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             color: var(--text-primary);
             margin-right: 0.25rem;
         }
@@ -1614,6 +1827,7 @@
             <p class="lead">Easy, elegant lineage from a single <span>.json</span></p>
         </header>
 
+        <!-- Old nav-tabs (hidden, kept for compatibility) -->
         <nav class="nav-tabs hidden-on-home" id="main-tabs">
             <button class="nav-tab active" data-tab="home-pane">Home</button>
             <button class="nav-tab" data-tab="config-pane">Config</button>
@@ -1624,14 +1838,104 @@
             <button class="nav-tab" data-tab="planner-pane">Planner</button>
             <button class="nav-tab" data-tab="export-pane">Export</button>
             <button class="nav-tab" data-tab="stats-pane">Stats</button>
+            <button class="nav-tab" data-tab="merge-pane">Merge</button>
+            <button class="nav-tab" data-tab="server-pane">Server</button>
             <button class="nav-tab" data-tab="spec-pane">Spec</button>
         </nav>
 
+        <div class="app-layout home-mode" id="app-layout">
+            <!-- Sidebar Toggle -->
+            <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <button class="sidebar-item active" data-tab="home-pane" onclick="switchTab('home-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        <span>Home</span>
+                    </button>
+                    <button class="sidebar-item config-source" data-tab="config-pane" onclick="switchTab('config-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Config</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section" style="border-top: 1px solid var(--border-color); margin-top: 0.25rem; padding-top: 0.75rem;">
+                    <div class="sidebar-section-title">Visualize</div>
+                    <button class="sidebar-item" data-tab="graph-pane" onclick="switchTab('graph-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        <span>Graph</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="attributes-pane" onclick="switchTab('attributes-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <span>Attributes</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="planner-pane" onclick="switchTab('planner-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span>Planner</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Data</div>
+                    <button class="sidebar-item" data-tab="pipelines-pane" onclick="switchTab('pipelines-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        <span>Pipelines</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="datasources-pane" onclick="switchTab('datasources-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                        <span>Datasources</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="stats-pane" onclick="switchTab('stats-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <span>Stats</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Tools</div>
+                    <button class="sidebar-item" data-tab="export-pane" onclick="switchTab('export-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Export</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="merge-pane" onclick="switchTab('merge-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+                        <span>Merge</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Docs</div>
+                    <button class="sidebar-item" data-tab="server-pane" onclick="switchTab('server-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                        <span>Server</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="spec-pane" onclick="switchTab('spec-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span>Spec</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Inner header for non-home tabs - uses same classes as hero -->
+                <div class="inner-header">
+                    <h1 class="hero-title">
+                        <img src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png" alt="Pipeviz">
+                        Pipeviz
+                    </h1>
+                    <p class="lead">Easy, elegant lineage from a single <span>.json</span></p>
+                </div>
         <!-- Home Tab -->
         <div class="tab-pane active" id="home-pane">
             <div class="home-content">
                 <!-- Tagline -->
-                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 1rem;">An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.</p>
+                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 1.5rem; margin-bottom: 1rem;">An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.</p>
 
                 <!-- Demo -->
                 <div class="hero-demo">
@@ -1702,19 +2006,19 @@
                     <div class="section-header">How it works</div>
                     <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap">
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">1</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">1</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Define</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
                         </div>
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">2</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">2</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Load</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Drop your file here, or host both files together on any static server</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Drop your file here, or host both files together on any static server</div>
                         </div>
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">3</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">3</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Explore</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Click through the graph, trace dependencies, export DOT for other tools</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Click through the graph, trace dependencies, export DOT for other tools</div>
                         </div>
                     </div>
                 </div>
@@ -1722,7 +2026,7 @@
                 <!-- Superpowers -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header">Superpowers</div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 1rem 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 1rem 0">
                         Each pipeline declares what it reads and writes. Pipeviz stitches these into a complete graph. From there, you get some superpowers for free:
                     </p>
                     <div class="superpowers-grid">
@@ -1762,22 +2066,19 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: flex-start">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                                <line x1="6" y1="18" x2="6.01" y2="18"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Serve via API</strong> with the built-in Clojure webserver. Query your graph programmatically.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
                                 <rect x="4" y="4" width="16" height="16" rx="2"/>
                                 <path d="M9 9h6M9 12h6M9 15h4"/>
                             </svg>
-                            <span><strong style="color: var(--text-primary)">Build MCPs</strong> on top of your graph. LLMs can query your lineage.</span>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
-                                <path d="M3 12h4l3-9 4 18 3-9h4"/>
-                            </svg>
-                            <span><strong style="color: var(--text-primary)">Find critical path</strong> via PERT analysis. Know your pipeline's true bottleneck.</span>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-                            </svg>
-                            <span><strong style="color: var(--text-primary)">Track spend</strong> per node and path. See where your compute budget goes.</span>
+                            <span><strong style="color: var(--text-primary)">Build MCPs</strong> on top of the API. Let LLMs query and reason about your lineage.</span>
                         </div>
                     </div>
                 </div>
@@ -1785,7 +2086,7 @@
                 <!-- Why -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header">Why</div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0">
                         Other solutions ask for a lot.
                         <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary)">OpenLineage</a>/<a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary)">Marquez</a> need agents, a metadata store, scheduler integration.
                         <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary)">Atlas</a> wants a governance platform.
@@ -1799,10 +2100,10 @@
                         <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 20px">
                         Why Clojure
                     </div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
                         Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript, for two main reasons:
                     </p>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 12px; color: var(--text-secondary)">
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
                             <div><strong style="color: var(--text-primary)">Code-as-data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure vs 10 functions on 10 structures. This style is well suited to spec validation, transformation, and extensibility.</div>
@@ -1929,32 +2230,35 @@
             <div class="planner-header">
                 <div class="planner-title">Planner</div>
                 <div class="planner-controls">
-                    <div class="planner-picker">
-                        <button class="planner-picker-btn" onclick="togglePlannerPicker()">
-                            <span id="planner-picker-label">Select pipelines...</span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M6 9l6 6 6-6"/>
-                            </svg>
+                    <div class="planner-view-btns">
+                        <button class="planner-view-btn active" data-view="pipeline" onclick="setPlannerView('pipeline')">
+                            Run Order
+                            <span class="planner-btn-count" id="planner-count-pipeline"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                         </button>
-                        <div class="planner-picker-dropdown" id="planner-picker-dropdown">
+                        <button class="planner-view-btn" data-view="airflow" onclick="setPlannerView('airflow')">
+                            Airflow
+                            <span class="planner-btn-count" id="planner-count-airflow"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <button class="planner-view-btn danger" data-view="blast" onclick="setPlannerView('blast')">
+                            Blast Radius
+                            <span class="planner-btn-count" id="planner-count-blast"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="planner-picker-dropdown planner-dropdown-shared" id="planner-picker-dropdown">
                             <div class="planner-picker-search">
                                 <input type="text" id="planner-picker-filter" placeholder="Filter..." oninput="filterPlannerItems(this.value)">
                             </div>
                             <div class="planner-picker-list" id="planner-picker-list"></div>
                             <div class="planner-picker-footer">
-                                <span id="planner-picker-count">0 selected</span>
-                                <button class="planner-picker-clear" onclick="clearPlannerSelection()">Clear all</button>
+                                <span id="planner-picker-count"></span>
+                                <button class="planner-picker-clear" onclick="clearPlannerSelection()">Clear</button>
                             </div>
                         </div>
                     </div>
-                    <div class="planner-view-btns">
-                        <button class="planner-view-btn active" data-view="pipeline" onclick="setPlannerView('pipeline')">Run Order</button>
-                        <button class="planner-view-btn" data-view="airflow" onclick="setPlannerView('airflow')">Airflow</button>
-                        <button class="planner-view-btn danger" data-view="blast" onclick="setPlannerView('blast')">Blast Radius</button>
-                    </div>
                 </div>
             </div>
-            <div class="planner-hint" id="planner-hint">Select pipelines to plan backfill execution order</div>
             <div class="planner-content">
                 <div class="planner-graph-col">
                     <div class="planner-graph" id="planner-graph">
@@ -2002,6 +2306,165 @@
             </div>
         </div>
 
+        <!-- Merge Tab -->
+        <div class="tab-pane" id="merge-pane">
+            <style>
+                .merge-section { margin-bottom: 1.5rem; }
+                .merge-section h5 { font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
+                .merge-section p { font-size: 12px; color: var(--text-secondary); margin-bottom: 0.5rem; }
+                .merge-code { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; font-size: 11px; line-height: 1.5; overflow-x: auto; margin: 0; }
+                .merge-code code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; color: var(--text-primary); }
+            </style>
+            <div style="max-width: 800px; padding: 1rem 0">
+                <h5 style="margin-bottom: 1rem; font-size: 1.1rem;">Merging Pipeviz Configs</h5>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                    When your data platform spans multiple teams or repositories, you can maintain separate
+                    config files and merge them into a single Pipeviz config using <code>jq</code>.
+                </p>
+
+                <div class="merge-section">
+                    <h5>Basic Merge (Two Files)</h5>
+                    <p>Combine pipelines and datasources from two config files:</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: (.[0].pipelines + .[1].pipelines),
+  datasources: (.[0].datasources + .[1].datasources)
+}' team_a.json team_b.json > combined.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Merge Multiple Files</h5>
+                    <p>Merge all <code>*.pipeviz.json</code> files in a directory:</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: [.[].pipelines[]] | unique_by(.name),
+  datasources: [.[].datasources[]] | unique_by(.name)
+}' configs/*.pipeviz.json > combined.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Merge with Deduplication</h5>
+                    <p>When configs might have overlapping definitions, dedupe by name (last write wins):</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: (
+    [.[].pipelines[]] | group_by(.name) | map(last)
+  ),
+  datasources: (
+    [.[].datasources[]] | group_by(.name) | map(last)
+  )
+}' *.json > merged.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Smart Prefix (Only on Collision)</h5>
+                    <p>Only add prefixes when names actually collide:</p>
+                    <pre class="merge-code"><code># Find colliding names, prefix only those
+jq -s '
+  [
+    (.[0].pipelines | map(. + {_src: "a"})),
+    (.[1].pipelines | map(. + {_src: "b"}))
+  ] | add
+  | group_by(.name)
+  | map(
+      if length > 1 then
+        map(.name = ._src + "_" + .name)
+      else . end
+    )
+  | add
+  | map(del(._src))
+' team_a.json team_b.json</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Tab -->
+        <div class="tab-pane" id="server-pane">
+            <style>
+                .server-section { margin-bottom: 2rem; }
+                .server-section h5 { font-size: 12px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); }
+                .server-section p { font-size: 12px; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.6; }
+                .server-code { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; font-size: 12px; line-height: 1.5; overflow-x: auto; margin: 0.5rem 0; }
+                .server-code code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; color: var(--text-primary); }
+                .server-note { background: var(--bg-secondary); border-left: 3px solid var(--text-muted); padding: 0.75rem 1rem; font-size: 12px; color: var(--text-secondary); margin: 1rem 0; }
+            </style>
+            <div style="max-width: 800px; padding: 1rem 0">
+                <h5 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Self-Hosting Pipeviz</h5>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    The Clojure version includes a server that serves your config as a live dashboard.
+                </p>
+
+                <div class="server-section">
+                    <h5>Quick Start</h5>
+                    <p>Run the server with your config file:</p>
+                    <pre class="server-code"><code># Start server on port 3000 with your config
+clj -M:server 3000 path/to/your-config.json</code></pre>
+                    <p>Then open <code>http://localhost:3000</code> in your browser.</p>
+                </div>
+
+                <div class="server-section">
+                    <h5>Server Options</h5>
+                    <pre class="server-code"><code># Default port (8080) with config
+clj -M:server path/to/config.json
+
+# Custom port
+clj -M:server 3000 path/to/config.json
+
+# Multiple configs (merged automatically)
+clj -M:server 3000 team_a.json team_b.json</code></pre>
+                </div>
+
+                <div class="server-section">
+                    <h5>REPL-Driven Development</h5>
+                    <p>Connect to the nREPL for live exploration and extension:</p>
+                    <pre class="server-code"><code># Start shadow-cljs in watch mode
+npx shadow-cljs watch app
+
+# Connect to the REPL from another terminal
+npx shadow-cljs cljs-repl app</code></pre>
+                    <div class="server-note">
+                        The REPL gives you live access to the running app state. You can modify the graph,
+                        test analysis functions, or prototype new features without restarting.
+                    </div>
+                </div>
+
+                <div class="server-section">
+                    <h5>Extending the Server</h5>
+                    <p>The server exposes a simple HTTP API. Add custom endpoints in <code>src/pipeviz/server/main.clj</code>:</p>
+                    <pre class="server-code"><code>;; Example: Add a custom analysis endpoint
+(defn custom-handler [config]
+  (fn [req]
+    (case (:uri req)
+      "/api/custom" {:status 200
+                     :headers {"Content-Type" "application/json"}
+                     :body (json/write-str (analyze config))}
+      nil)))</code></pre>
+                </div>
+
+                <div class="server-section">
+                    <h5>OpenAPI Spec</h5>
+                    <p>The server includes an OpenAPI specification at <code>resources/openapi.json</code>:</p>
+                    <pre class="server-code"><code># Endpoints documented in the spec:
+GET /api/config      # Returns the loaded Pipeviz config
+GET /api/health      # Health check endpoint</code></pre>
+                    <p>Use this spec with Swagger UI or to generate API clients.</p>
+                </div>
+
+                <div class="server-section">
+                    <h5>Production Deployment</h5>
+                    <p>Build a standalone bundle for deployment:</p>
+                    <pre class="server-code"><code># Build optimized JS bundle
+npx shadow-cljs release release
+
+# Bundle into single HTML file
+./scripts/bundle.sh
+
+# Output: dist/pipeviz.html (single-file, no server needed)</code></pre>
+                    <div class="server-note">
+                        The bundled <code>pipeviz.html</code> is a single file with all JS/CSS inlined.
+                        Perfect for hosting on GitHub Pages, S3, or embedding in internal tools.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Spec Tab -->
         <div class="tab-pane" id="spec-pane">
             <style>
@@ -2009,12 +2472,12 @@
                 .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
                 .spec-table th { background: var(--bg-secondary); }
                 .spec-section { margin-bottom: 2rem; }
-                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
+                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
                 .spec-pre { background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; }
             </style>
             <div style="max-width: 800px; padding: 1rem 0">
                 <div style="margin-bottom: 1.5rem">
-                    <h5 style="font-weight: 600; font-size: 1.25rem; margin-bottom: 0.25rem">Pipeviz JSON Spec</h5>
+                    <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.25rem">Pipeviz JSON Spec</h5>
                     <p style="color: var(--text-secondary); font-size: 13px">
                         Only <code>pipelines</code> is required. Clusters and datasources are auto-created when referenced.
                     </p>
@@ -2202,6 +2665,8 @@
                 </div>
             </div>
         </div>
+            </main>
+        </div> <!-- end app-layout -->
     </div>
 
     <!-- Blast Radius Modal -->
@@ -4105,8 +4570,8 @@ function Dm(a,b){if(0>=b||b>=2+K(a))return Pd.B(Og(Id("",Q.B(w,D(a)))),"");if(r(
 function Fm(a,b,c){if("/(?:)/"===w.j(b))b=Dm(a,c);else if(1>c)b=Og(w.j(a).split(b));else a:for(var d=c,e=Qd;;){if(1===d){b=Pd.B(e,a);break a}var f=Oi(b,a);if(null!=f){var g=a.indexOf(f);f=a.substring(g+K(f));--d;e=Pd.B(e,a.substring(0,g));a=f}else{b=Pd.B(e,a);break a}}if(0===c&&1<K(b))a:for(c=b;;)if(""===(null==c?null:Db(c)))c=null==c?null:Eb(c);else break a;else c=b;return c}function Gm(a,b){return sj(a,b)};var Hm=Vh([Rj,Sj,Ok,ik,Vl,Bk,km,Ol,Uj,El,yk,Ek,Il,Bl,dl,gk,rl,Ck],"#555 #94a3b8 #ff6b35 #616161 #fff3cd #388e3c #e3f2fd #e8f5e9 #856404 #d32f2f #1976d2 #f3e5f5 #d63384 #7b1fa2 #fff3e0 #b0b0b0 #e65100 #999".split(" ")),Im=new p(null,3,[fk,new p(null,4,[$l,"box",Hj,"filled,rounded",Fl,km.j(Hm),Vj,yk.j(Hm)],null),Yl,new p(null,4,[$l,"ellipse",Hj,"filled",Fl,Ek.j(Hm),Vj,Bl.j(Hm)],null),jl,new p(null,4,[$l,"box3d",Hj,"filled",Fl,dl.j(Hm),Vj,Ok.j(Hm)],null)],null),Jm=Ok.j(Hm),Km=new p(null,2,[jl,new p(null,
 2,[Nk,dl.j(Hm),om,rl.j(Hm)],null),ak,new p(null,2,[Nk,Vl.j(Hm),om,Uj.j(Hm)],null)],null);function Lm(a){a=Km.j?Km.j(a):Km.call(null,a);if(r(a)){var b=Ef(a);a=y(b,Nk);b=y(b,om);return["background:",w.j(a),";color:",w.j(b)].join("")}return null}var Mm=Vh([Nj,Aj,bl,kl,Kl,Rk,yj,zl,Zk],[Bl.j(Hm),"#e8eef4","#94a3b8",Bl.j(Hm),"#334155","#dde5ed",Bl.j(Hm),"#ffffff","#e2e8f0"]);
 function Nm(a){var b=r(a)?"":"-default";return new p(null,3,[Fl,function(){var c=We.j(["struct-fill",b].join(""));return c.j?c.j(Mm):c.call(null,Mm)}(),om,function(){var c=We.j(["struct-text",b].join(""));return c.j?c.j(Mm):c.call(null,Mm)}(),Vj,function(){var c=We.j(["struct-border",b].join(""));return c.j?c.j(Mm):c.call(null,Mm)}()],null)}function Om(a,b,c){return jg(function(d,e){return Vh([Fl,Vj,om],[d,e,c])},a,b)}
-var Pm,wr=new T(null,6,5,U,"#c98b8b #d4a574 #c4c474 #7cb47c #6b9dc4 #a88bc4".split(" "),null);Pm=new p(null,2,[lk,Om(new T(null,6,5,U,"#fce4ec #fff3e0 #fffde7 #e8f5e9 #e3f2fd #f3e5f5".split(" "),null),wr,"#495057"),Gl,Om(new T(null,6,5,U,"#4a2a2a #4a3a2a #4a4a2a #2a4a3a #2a3a4a #3a2a4a".split(" "),null),wr,"#e0e0e0")],null);var Rm,xr=new T(null,6,5,U,"#81c784 #64b5f6 #ba68c8 #ffb74d #4dd0e1 #f48fb1".split(" "),null);
-Rm=new p(null,2,[lk,Om(new T(null,6,5,U,"#e8f5e9 #e3f2fd #f3e5f5 #fff3e0 #e0f7fa #fce4ec".split(" "),null),xr,"#495057"),Gl,Om(new T(null,6,5,U,"#1b3d1b #1a2d3d #2d1a2d #3d2d1a #1a3d3d #3d1a2d".split(" "),null),xr,"#e0e0e0")],null);var Tm=new p(null,2,[lk,new p(null,3,[Fl,"#fef3e2",Vj,"#d4915c",om,"#495057"],null),Gl,new p(null,3,[Fl,"#3d2d1a",Vj,"#d4915c",om,"#e0e0e0"],null)],null);function Um(a){var b=Ef(a),c=y(b,Tk);a=function(){var d=null==b?Pd.B(Qd,"Config is nil"):Qd;d=Ia(D(c))?Pd.B(d,"No pipelines defined"):d;return r(Qf(function(e){return null==Y.j(e)},c))?Pd.B(d,"Pipeline missing name"):d}();return new p(null,2,[Ij,ee(a),uk,a],null)}function Vm(a){return Am(r(a)?a:"",/[^a-zA-Z0-9_]/,"_")}function Wm(a){return Am(Am(a,"\\","\\\\"),'"','\\"')}
+var Pm,xr=new T(null,6,5,U,"#c98b8b #d4a574 #c4c474 #7cb47c #6b9dc4 #a88bc4".split(" "),null);Pm=new p(null,2,[lk,Om(new T(null,6,5,U,"#fce4ec #fff3e0 #fffde7 #e8f5e9 #e3f2fd #f3e5f5".split(" "),null),xr,"#495057"),Gl,Om(new T(null,6,5,U,"#4a2a2a #4a3a2a #4a4a2a #2a4a3a #2a3a4a #3a2a4a".split(" "),null),xr,"#e0e0e0")],null);var Rm,wr=new T(null,6,5,U,"#81c784 #64b5f6 #ba68c8 #ffb74d #4dd0e1 #f48fb1".split(" "),null);
+Rm=new p(null,2,[lk,Om(new T(null,6,5,U,"#e8f5e9 #e3f2fd #f3e5f5 #fff3e0 #e0f7fa #fce4ec".split(" "),null),wr,"#495057"),Gl,Om(new T(null,6,5,U,"#1b3d1b #1a2d3d #2d1a2d #3d2d1a #1a3d3d #3d1a2d".split(" "),null),wr,"#e0e0e0")],null);var Tm=new p(null,2,[lk,new p(null,3,[Fl,"#fef3e2",Vj,"#d4915c",om,"#495057"],null),Gl,new p(null,3,[Fl,"#3d2d1a",Vj,"#d4915c",om,"#e0e0e0"],null)],null);function Um(a){var b=Ef(a),c=y(b,Tk);a=function(){var d=null==b?Pd.B(Qd,"Config is nil"):Qd;d=Ia(D(c))?Pd.B(d,"No pipelines defined"):d;return r(Qf(function(e){return null==Y.j(e)},c))?Pd.B(d,"Pipeline missing name"):d}();return new p(null,2,[Ij,ee(a),uk,a],null)}function Vm(a){return Am(r(a)?a:"",/[^a-zA-Z0-9_]/,"_")}function Wm(a){return Am(Am(a,"\\","\\\\"),'"','\\"')}
 function Xm(a,b){var c=Qd,d=Hi([a]);for(a=ig(function(){return function(n){return Vh([cm,Tj],[n,1])}}(c,d),b.j?b.j(a):b.call(null,a));;){if(ee(a))return c;var e=E(a),f=Ef(e),g=y(f,cm),h=y(f,Tj);if(r(d.j?d.j(g):d.call(null,g)))a=$g(a);else{var l=Pd.B(c,new p(null,2,[cm,g,Tj,h],null)),m=Pd.B(d,g);a=hg.B($g(a),Q.B(function(n,q,t,u,v,x,C){return function(B){return Vh([cm,Tj],[B,C+1])}}(c,d,a,e,f,g,h),gg(d,b.j?b.j(g):b.call(null,g))));c=l;d=m}}}function Ym(a,b){return Ii(Q.B(cm,Xm(a,b)))}
 function Zm(a,b){var c=Ra(function(h,l){N(l,0,null);l=N(l,1,null);return r(a.j?a.j(l):a.call(null,l))?sg.D(h,l,Tf(kd,0)):h},Ki(a),b);b=Ra(function(h,l){var m=N(l,0,null);l=N(l,1,null);var n=a.j?a.j(m):a.call(null,m);n=r(n)?a.j?a.j(l):a.call(null,l):n;return r(n)?sg.N(h,m,Tf(Pd,Qd),l):h},Ff,b);for(var d=Qd,e=c;;){var f=we(te,lh(fg(function(){return function(h){return 0===zb(h)}}(d,e,c,b),e)));if(ee(f))return ee(e)?d:null;var g=Pd.B(d,Og(f));e=Ra(function(h,l,m,n,q){return function(t,u){return Ra(function(){return function(v,
 x){return r(v.j?v.j(x):v.call(null,x))?sg.D(v,x,Je):v}}(h,l,m,n,q),Zd.B(t,u),Vc(q,u,Qd))}}(d,e,f,c,b),e,f);d=g}}
@@ -4312,7 +4777,9 @@ Jn(h,H.B("dark",document.documentElement.getAttribute("data-theme"))),C=function
 Yf.N(cj,P,gl,B);return B.renderDot(x)}catch(A){return console.error("Blast radius graph error:",A),ao(d,"\x3cdiv style\x3d'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);'\x3eError rendering graph\x3c/div\x3e")}else return null},100)}bo(c,"show");return c.style.display="flex"}}return null};var Cr=xj(fr);
 function Dr(){var a=Zn("export-output");if(r(a)){var b=mr.j(Hb(cj)),c=function(){var d=Hb(Cr);switch(d instanceof z?d.Da:null){case "mermaid":return d=zr(b),r(d)?d:"Load a configuration to see the Mermaid export...";case "dot":return d=mr.j(Hb(cj)),d=r(d)?tn(d,new p(null,3,[zk,!1,am,!0,bj,Gi],null)):null,r(d)?d:"Load a configuration to see the DOT export...";default:return d=yr(b),r(d)?JSON.stringify(kj(d),null,2):"Load a configuration to see the graph export..."}}();return a.textContent=c}return null}
 ;function Mn(){return H.B("dark",document.documentElement.getAttribute("data-theme"))}var Eo=new p(null,3,[fk,"Select pipelines to plan backfill execution order",Dk,"Maps pipelines to Airflow DAGs based on links",$q,"Select a node to see all downstream dependencies affected by changes"],null);
-function Fo(){var a=Zn("planner-picker-label");if(r(a)){var b=vr.j(Hb(qo)),c=xl.j(Hb(qo));b=ee(b)?H.B(c,$q)?"Select a node...":"Select pipelines...":H.B(c,$q)?E(b):[w.j(K(b))," selected"].join("");a.textContent=b}}function Go(){var a=Zn("planner-picker-count");if(r(a)){var b=K(vr.j(Hb(qo)));a.textContent=[w.j(b)," selected"].join("")}}
+function Fo(){var a=Zn("planner-picker-label");if(r(a)){var b=vr.j(Hb(qo)),c=xl.j(Hb(qo));b=ee(b)?H.B(c,$q)?"Select a node...":"Select pipelines...":H.B(c,$q)?E(b):[w.j(K(b))," selected"].join("");a.textContent=b}}
+function Go(){var a=Hb(qo),b=Ef(a);a=y(b,xl);b=y(b,vr);b=K(b);var c=Zn("planner-picker-count");r(c)&&(c.textContent=0<b?[w.j(b)," selected"].join(""):"");c=D(new T(null,3,5,U,["pipeline","airflow","blast"],null));for(var d=null,e=0,f=0;;)if(f<e){var g=d.Y(null,f),h=Zn(["planner-count-",w.j(g)].join(""));r(h)&&(h.textContent=H.B(Xe(a),g)&&0<b?w.j(b):"");f+=1}else if(c=D(c))le(c)?(d=uc(c),c=vc(c),g=d,e=K(d),d=g):(g=E(c),d=Zn(["planner-count-",w.j(g)].join("")),r(d)&&(d.textContent=H.B(Xe(a),g)&&0<b?
+w.j(b):""),c=G(c),d=null,e=0),f=0;else break}function Kr(){var a=Zn("planner-picker-dropdown");return r(a)?(co(a,"show"),Yf.N(qo,P,dr,!1)):null}
 function Ho(){var a=mr.j(Hb(cj));if(r(a)){var b=Zn("planner-graph"),c=Zn("planner-output"),d=Hb(qo);d=Ef(d);var e=y(d,xl),f=y(d,vr),g=gr.j(Hb(cj));if(r(b)){D(f)&&Bo(e,f);if(ee(f))return Yf.N(qo,P,jr,null),b.innerHTML="\x3cdiv class\x3d'planner-placeholder'\x3eSelect pipelines to see the execution plan\x3c/div\x3e",r(c)?c.textContent="":null;var h=function(){switch(e instanceof z?e.Da:null){case "blast":return In(a,E(f),g);case "airflow":var q=Kn(a,f);return Nn(a,q);default:return Kn(a,f)}}();d=function(){switch(e instanceof
 z?e.Da:null){case "blast":return Jn(h,Mn());case "airflow":return On(h);default:return Ln(h)}}();r(c)&&(c.textContent=JSON.stringify(kj(h),null,2));if(r(d))try{var l=jr.j(Hb(qo)),m=function(){var q=b.clientWidth;return r(q)?q:500}();if(r(l))return l.renderDot(d);b.innerHTML="";var n=xm.select("#planner-graph").graphviz().width(m).height(450).fit(!0).zoom(!1).transition(function(){return xm.transition("planner").duration(300).ease(xm.easeCubicInOut)}).on("end",function(){var q=xm.select("#planner-graph svg"),
 t=q.select("g"),u=xm.zoom().scaleExtent([.1,4]).on("zoom",function(v){return t.attr("transform",v.transform)});return q.call(u)});Yf.N(qo,P,jr,n);return n.renderDot(d)}catch(q){return console.error("Planner graph error:",q),Yf.N(qo,P,jr,null),b.innerHTML="\x3cdiv class\x3d'planner-placeholder'\x3eError rendering graph\x3c/div\x3e"}else return Yf.N(qo,P,jr,null),b.innerHTML="\x3cdiv class\x3d'planner-placeholder'\x3eNo dependencies to visualize\x3c/div\x3e"}else return null}else return null}
@@ -4325,9 +4792,9 @@ function(){for(;;){var Ua=D(sb);if(Ua){if(le(Ua)){var tb=uc(Ua),ob=K(tb),gb=bf(o
 Cm(Y.j(gb)),"'\x3e\x3cinput type\x3d'",Ta,"' name\x3d'planner-item' value\x3d'",w.j(Y.j(gb)),"'",se(Za,Y.j(gb))?" checked":null,"\x3e\x3cspan\x3e",w.j(Y.j(gb)),"\x3c/span\x3e\x3c/label\x3e"].join(""),nb(F(Ua)))}return null}},null)}}(Z,ia,ra,O,I,c,d,e,f,g,h,l,m,n,q,b,b,a,a)(ye(Y,ra))}())].join(""),J(F(O)))}return null}},null)}(ye(E,q))}()),m?["\x3cdiv class\x3d'planner-picker-group'\x3eDatasources\x3c/div\x3e",Bm("",function(){return function J(A){return new Ye(null,function(){for(;;){var I=D(A);if(I){if(le(I)){var O=
 uc(I),R=K(O),X=bf(R);a:for(var M=0;;)if(M<R){var Z=cb(O,M),ia=X;Z=["\x3clabel class\x3d'planner-picker-item' data-name\x3d'",Cm(Y.j(Z)),"'\x3e\x3cinput type\x3d'radio' name\x3d'planner-item' value\x3d'",w.j(Y.j(Z)),"'",se(l,Y.j(Z))?" checked":null,"\x3e\x3cspan\x3e",w.j(Y.j(Z)),"\x3c/span\x3e\x3cspan class\x3d'ds-tag'\x3eds\x3c/span\x3e\x3c/label\x3e"].join("");ia.add(Z);M+=1}else{O=!0;break a}return O?df(of(X),J(vc(I))):df(of(X),null)}X=E(I);return Id(["\x3clabel class\x3d'planner-picker-item' data-name\x3d'",
 Cm(Y.j(X)),"'\x3e\x3cinput type\x3d'radio' name\x3d'planner-item' value\x3d'",w.j(Y.j(X)),"'",se(l,Y.j(X))?" checked":null,"\x3e\x3cspan\x3e",w.j(Y.j(X)),"\x3c/span\x3e\x3cspan class\x3d'ds-tag'\x3eds\x3c/span\x3e\x3c/label\x3e"].join(""),J(F(I)))}return null}},null)}(ye(Y,h))}())].join(""):null].join("");b.innerHTML=t;t=D(Jd(b.querySelectorAll("input")));for(var u=null,v=0,x=0;;)if(x<v){var C=u.Y(null,x);$n(C,"change",Io);x+=1}else if(t=D(t))u=t,le(u)?(t=uc(u),v=vc(u),u=t,C=K(t),t=v,v=C):(C=E(u),
-$n(C,"change",Io),t=G(u),u=null,v=0),x=0;else break}}}
+$n(C,"change",Io),t=G(u),u=null,v=0),x=0;else break}}}function Lr(a){var b=Zn("planner-picker-dropdown");if(r(b)){var c=document.querySelector([".planner-view-btn[data-view\x3d'",w.j(a),"']"].join(""));if(r(c)){a=c.getBoundingClientRect();var d=a.left+280>window.innerWidth-20;b.style.left="";b.style.right="";d?b.style.right="0":(c=c.parentElement.getBoundingClientRect(),b.style.left=[w.j(a.left-c.left),"px"].join(""))}}}
 function Ko(){var a=wo();var b=Ef(a);a=y(b,xl);b=y(b,Tk);a=new p(null,2,[xl,r(a)?We.j(a):null,Tk,r(b)?Em(b,/,/):null],null);b=Ef(a);a=y(b,xl);b=y(b,Tk);if(r(r(a)?a:b)){if(r(a)){Yf.N(qo,P,xl,a);for(var c=D(Jd(document.querySelectorAll(".planner-view-btn"))),d=null,e=0,f=0;;)if(f<e){var g=d.Y(null,f);H.B(Xe(a),g.getAttribute("data-view"))?bo(g,"active"):co(g,"active");f+=1}else if(c=D(c))d=c,le(d)?(c=uc(d),f=vc(d),d=c,e=K(c),c=f):(c=E(d),H.B(Xe(a),c.getAttribute("data-view"))?bo(c,"active"):co(c,"active"),
-c=G(d),d=null,e=0),f=0;else break;c=Zn("planner-hint");r(c)&&(c.textContent=y(Eo,a))}r(b)&&Yf.N(qo,P,vr,Og(b));Jo();Fo();Go();return Ho()}return null}function Lo(){Jo();Fo();document.addEventListener("click",function(a){r(dr.j(Hb(qo)))?r(a.target.closest(".planner-picker"))?a=null:(a=Zn("planner-picker-dropdown"),r(a)?(co(a,"show"),a=Yf.N(qo,P,dr,!1)):a=null):a=null;return a})};var Er=new T(null,8,5,U,"#6b9dc4 #a88bc4 #d4a574 #7cb47c #c98b8b #6bb5b5 #a89080 #8a9aa8".split(" "),null);
+c=G(d),d=null,e=0),f=0;else break;c=Zn("planner-hint");r(c)&&(c.textContent=y(Eo,a))}r(b)&&Yf.N(qo,P,vr,Og(b));Jo();Fo();Go();return Ho()}return null}function Lo(){Jo();Fo();document.addEventListener("click",function(a){return r(dr.j(Hb(qo)))?r(a.target.closest(".planner-view-btns"))?null:Kr():null})};var Er=new T(null,8,5,U,"#6b9dc4 #a88bc4 #d4a574 #7cb47c #c98b8b #6bb5b5 #a89080 #8a9aa8".split(" "),null);
 function Fr(a){if(D(a)){var b=Ee(vj,Q.B(Ml,a));if(0<b){var c=xj(""),d=xj(-90),e=Number.MAX_VALUE;e=D(Q.D(Cj,a,0>=e?$c:re(0)&&re(e)&&re(1)?new bk(null,0,e,1,Math.ceil(e-0),null):new dk(null,0,e,1,null,null,null)));for(var f=null,g=0,h=0;;)if(h<g){var l=f.Y(null,h),m=N(l,0,null);l=N(l,1,null);m=360*Ml.j(m)/b;var n=Hb(d)*Math.PI/180,q=(Hb(d)+m)*Math.PI/180,t=60+59*Math.cos(n);n=60+59*Math.sin(n);var u=60+59*Math.cos(q);q=60+59*Math.sin(q);l=Cd(Er,Le(l,K(Er)));H.B(1,K(a))?Yf.J(c,w,'\x3ccircle cx\x3d"',
 60,Jd(['" cy\x3d"',60,'" r\x3d"',59,'" fill\x3d"',l,'" /\x3e'])):Yf.J(c,w,'\x3cpath d\x3d"M ',60,Jd([" ",60," L ",t," ",n," A ",59," ",59," 0 ",180<m?1:0," 1 ",u," ",q,' Z" fill\x3d"',l,'" /\x3e']));Yf.D(d,vj,m);h+=1}else if(e=D(e))le(e)?(g=uc(e),e=vc(e),f=g,g=K(g)):(f=E(e),g=N(f,0,null),f=N(f,1,null),g=360*Ml.j(g)/b,l=Hb(d)*Math.PI/180,t=(Hb(d)+g)*Math.PI/180,h=60+59*Math.cos(l),l=60+59*Math.sin(l),m=60+59*Math.cos(t),t=60+59*Math.sin(t),f=Cd(Er,Le(f,K(Er))),H.B(1,K(a))?Yf.J(c,w,'\x3ccircle cx\x3d"',
 60,Jd(['" cy\x3d"',60,'" r\x3d"',59,'" fill\x3d"',f,'" /\x3e'])):Yf.J(c,w,'\x3cpath d\x3d"M ',60,Jd([" ",60," L ",h," ",l," A ",59," ",59," 0 ",180<g?1:0," 1 ",m," ",t,' Z" fill\x3d"',f,'" /\x3e'])),Yf.D(d,vj,g),e=G(e),f=null,g=0),h=0;else break;return['\x3csvg width\x3d"',w.j(120),'" height\x3d"',w.j(120),'" viewBox\x3d"0 0 ',w.j(120)," ",w.j(120),'"\x3e',w.j(Hb(c)),"\x3c/svg\x3e"].join("")}}return null}
@@ -4374,9 +4841,10 @@ function Pp(){var a=Zn("pipeline-search");r(a)&&$n(a,"keyup",function(){return O
 function Sp(a){var b=cn(a),c=Ji(rf.J(Q.B(Y,Tk.j(a)),Q.B(Y,tj.j(a)),Jd([lh(lm.j(b)),lh($k.j(b))])));b=hg.B(Ff,function(){return function f(e){return new Ye(null,function(){for(;;){var g=D(e);if(g){if(le(g)){var h=uc(g),l=K(h),m=bf(l);a:for(var n=0;;)if(n<l){var q=cb(h,n),t=m;q=new T(null,2,5,U,[q,mn(a,q)],null);t.add(q);n+=1}else{h=!0;break a}return h?df(of(m),f(vc(g))):df(of(m),null)}m=E(g);return Id(new T(null,2,5,U,[m,mn(a,m)],null),f(F(g)))}return null}},null)}(c)}());Yf.N(cj,P,ir,b)}
 function Tp(a){Sp(a);var b=zn(a);Yf.J(po,P,rr,fl.j(b),Jd([Sm,vk.j(b)]));a=Hn(a);Yf.N(cj,P,gr,a)}function Up(a){document.documentElement.setAttribute("data-theme",r(a)?"dark":"light");localStorage.setItem("theme",r(a)?"dark":"light");var b=Zn("theme-toggle");r(b)&&(b.textContent=r(a)?"☀️":"\ud83c\udf19");Yf.J(cj,P,zk,a,Jd([er,null]));r(Zn("splash-graph"))&&(Vp.O?Vp.O():Vp.call(null));return r(mr.j(Hb(cj)))?Wp.O?Wp.O():Wp.call(null):null}
 function Xp(){var a=localStorage.getItem("theme"),b=window.matchMedia("(prefers-color-scheme: dark)").matches;a=r(a)?H.B(a,"dark"):b;Up(a)}
-function Yp(a){for(var b=D(Jd(document.querySelectorAll(".nav-tab"))),c=null,d=0,e=0;;)if(e<d){var f=c.Y(null,e);H.B(a,f.getAttribute("data-tab"))?bo(f,"active"):co(f,"active");e+=1}else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-tab"))?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;b=D(Jd(document.querySelectorAll(".tab-pane")));c=null;for(e=d=0;;)if(e<d)f=c.Y(null,e),H.B(a,f.id)?bo(f,"active"):co(f,"active"),e+=1;else if(b=D(b))c=b,le(c)?
-(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.id)?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;b=Zn("main-tabs");if(r(b))if(H.B(a,"home-pane"))bo(b,"hidden-on-home"),history.replaceState(null,"",window.location.pathname);else{co(b,"hidden-on-home");var g=wo();b=r(a)?Am(a,/-pane$/,""):null;b=r(function(){var h=H.B(a,"graph-pane");return h?wj.j(g):h}())?xo(new p(null,2,[nl,b,wj,wj.j(g)],null)):b;history.replaceState(null,"",["#",b].join(""))}r(function(){var h=H.B(a,"graph-pane");
-return h?mr.j(Hb(cj)):h}())&&setTimeout(Wp,50);r(function(){var h=H.B(a,"attributes-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(uo,50);r(function(){var h=H.B(a,"planner-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(function(){Jo();return Ho()},50);r(function(){var h=H.B(a,"export-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(Dr,50);return r(function(){var h=H.B(a,"stats-pane");return h?mr.j(Hb(cj)):h}())?setTimeout(Jr,50):null}
+function Yp(a){for(var b=D(Jd(document.querySelectorAll(".nav-tab"))),c=null,d=0,e=0;;)if(e<d){var f=c.Y(null,e);H.B(a,f.getAttribute("data-tab"))?bo(f,"active"):co(f,"active");e+=1}else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-tab"))?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;b=D(Jd(document.querySelectorAll(".sidebar-item")));c=null;for(e=d=0;;)if(e<d)f=c.Y(null,e),H.B(a,f.getAttribute("data-tab"))?bo(f,"active"):co(f,"active"),
+e+=1;else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-tab"))?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;b=D(Jd(document.querySelectorAll(".tab-pane")));c=null;for(e=d=0;;)if(e<d)f=c.Y(null,e),H.B(a,f.id)?bo(f,"active"):co(f,"active"),e+=1;else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.id)?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;b=Zn("app-layout");if(r(b))if(H.B(a,"home-pane"))bo(b,"home-mode"),
+bo(document.body,"home-active"),history.replaceState(null,"",window.location.pathname);else{co(b,"home-mode");co(document.body,"home-active");var g=wo();b=r(a)?Am(a,/-pane$/,""):null;b=r(function(){var h=H.B(a,"graph-pane");return h?wj.j(g):h}())?xo(new p(null,2,[nl,b,wj,wj.j(g)],null)):b;history.replaceState(null,"",["#",b].join(""))}r(function(){var h=H.B(a,"graph-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(Wp,50);r(function(){var h=H.B(a,"attributes-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(uo,
+50);r(function(){var h=H.B(a,"planner-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(function(){Jo();return Ho()},50);r(function(){var h=H.B(a,"export-pane");return h?mr.j(Hb(cj)):h}())&&setTimeout(Dr,50);return r(function(){var h=H.B(a,"stats-pane");return h?mr.j(Hb(cj)):h}())?setTimeout(Jr,50):null}
 function Zp(){for(var a=D(Jd(document.querySelectorAll(".nav-tab"))),b=null,c=0,d=0;;)if(d<c){var e=b.Y(null,d);$n(e,"click",function(h,l,m,n,q){return function(){return Yp(q.getAttribute("data-tab"))}}(a,b,c,d,e));d+=1}else{var f=D(a);if(f){var g=f;le(g)?(a=uc(g),c=vc(g),b=a,g=K(a),a=c,c=g):(e=E(g),$n(e,"click",function(h,l,m,n,q){return function(){return Yp(q.getAttribute("data-tab"))}}(a,b,c,d,e,g,f)),a=G(g),b=null,c=0);d=0}else break}}
 function Vp(){var a=Zn("splash-graph");if(r(a)){vn.O?vn.O():vn.call(null);a=Yl.j(Im);var b=Ef(a);a=y(b,Fl);b=y(b,Vj);var c=fk.j(Im),d=Ef(c);c=y(d,Fl);d=y(d,Vj);a=['digraph {\n    rankdir\x3dLR\n    bgcolor\x3d"transparent"\n    node [fontname\x3d"Arial" fontsize\x3d"10" fontcolor\x3d"#333"]\n    edge [color\x3d"',w.j(Ck.j(Hm)),'"]\n    "raw_events" [shape\x3dellipse style\x3dfilled fillcolor\x3d"',w.j(a),'" color\x3d"',w.j(b),'"]\n    "etl-job" [shape\x3dbox style\x3d"filled,rounded" fillcolor\x3d"',
 w.j(c),'" color\x3d"',w.j(d),'"]\n    "cleaned_events" [shape\x3dellipse style\x3dfilled fillcolor\x3d"',w.j(a),'" color\x3d"',w.j(b),'"]\n    "raw_events" -\x3e "etl-job"\n    "etl-job" -\x3e "cleaned_events"\n}'].join("");return xm.select("#splash-graph").graphviz().width(260).height(110).fit(!0).renderDot(a)}return null}var Wp=function Wp(a){switch(arguments.length){case 0:return Wp.O();case 1:return Wp.j(arguments[0]);default:throw Error(["Invalid arity: ",w.j(arguments.length)].join(""));}};
@@ -4419,15 +4887,15 @@ setTimeout(Ko,200)):r(r(c)?Kf(c,"home"):c)?Yp([w.j(c),"-pane"].join("")):null}).
 Object.assign(window,{resetGraph:function(){var a=jr.j(Hb(cj));r(a)&&a.resetZoom();return fq()},copyExport:function(){var a=Zn("export-output");if(r(a)){a=a.textContent;if(ja(sa(a)))return null;var b=document.querySelector(".export-copy-btn");return r(b)?navigator.clipboard.writeText(a).then(function(){bo(b,"copied");b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3cpolyline points\x3d'20 6 9 17 4 12'/\x3e\x3c/svg\x3e";
 return setTimeout(function(){co(b,"copied");return b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3crect x\x3d'9' y\x3d'9' width\x3d'13' height\x3d'13' rx\x3d'2' ry\x3d'2'/\x3e\x3cpath d\x3d'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/\x3e\x3c/svg\x3e"},1500)}).catch(function(c){return console.error("Failed to copy:",c)}):null}return null},toggleTheme:function(){return Up(Ia(vn.O?vn.O():vn.call(null)))},
 showBlastRadius:Do,filterPlannerItems:function(a){var b=Zn("planner-picker-list");if(r(b)){a=Cm(ka(a));b=D(Jd(b.querySelectorAll(".planner-picker-item")));for(var c=null,d=0,e=0;;)if(e<d){var f=c.Y(null,e),g=f.getAttribute("data-name");ja(sa(a))||la(g,a)?co(f,"hidden"):bo(f,"hidden");e+=1}else if(b=D(b))le(b)?(c=uc(b),b=vc(b),f=c,d=K(c),c=f):(f=E(b),c=f.getAttribute("data-name"),ja(sa(a))||la(c,a)?co(f,"hidden"):bo(f,"hidden"),b=G(b),c=null,d=0),e=0;else return null}else return null},loadExample:function(){Rp(Yn);
-Tp(Yn);mq(Yn);Qp.O?Qp.O():Qp.call(null);pq("Example loaded",!1);var a=H.B;var b=Zn("main-tabs");b=null==b?null:b.querySelector(".nav-tab.active");b=null==b?null:b.getAttribute("data-tab");return a.call(H,"config-pane",b)?null:Yp("graph-pane")},resetAttributeGraph:function(){var a=jr.j(Hb(po));return r(a)?a.resetZoom():null},formatJson:function(){var a=Zn("json-input");if(r(a)){var b=a.value;if(D(b))try{var c=JSON.parse(b),d=JSON.stringify(c,null,2);a.value=d;return pq("Formatted",!1)}catch(e){return pq(["Cannot format - invalid JSON: ",
-w.j(e.message)].join(""),!0)}else return null}else return null},applyConfig:function(){var a=Zn("json-input");if(r(a)){a=a.value;if(ee(a))return pq("Please enter some JSON",!0);try{var b=oj(JSON.parse(a)),c=Um(b),d=Ef(c),e=y(d,Ij),f=y(d,uk);return r(e)?(Rp(b),Tp(b),Qp.O?Qp.O():Qp.call(null),pq("Config applied successfully",!1),Yp("graph-pane")):pq(["Invalid config: ",w.j(E(f))].join(""),!0)}catch(g){return pq(["JSON parse error: ",w.j(g.message)].join(""),!0)}}else return null},setExportFormat:function(a){var b=
-We.j(a);Xf(Cr,b);b=D(Jd(document.querySelectorAll(".export-format-btn")));for(var c=null,d=0,e=0;;)if(e<d){var f=c.Y(null,e);H.B(a,f.getAttribute("data-format"))?bo(f,"active"):co(f,"active");e+=1}else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-format"))?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;return Dr()},togglePipelinesOnly:function(){Yf.J(cj,P,kr,Ia(kr.j(Hb(cj))),Jd([er,null]));var a=Zn("pipelines-only-btn");r(a)&&a.classList.toggle("active");
-return Wp.O()},toggleGroup:function(a){var b=mk.j(Hb(cj));Yf.B(cj,function(c){return P.D(sg.D(c,bj,function(d){return r(d.j?d.j(a):d.call(null,a))?de.B(d,a):Pd.B(d,a)}),er,null)});Wp.O();return r(b)?setTimeout(function(){return sj(b,"group:")?eq(b.substring(6)):cq(b)},350):null},copyPlannerOutput:function(){var a=Zn("planner-output");if(r(a)){a=a.textContent;if(ja(sa(a)))return null;var b=document.querySelector(".planner-copy-btn");return r(b)?navigator.clipboard.writeText(a).then(function(){bo(b,
-"copied");b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3cpolyline points\x3d'20 6 9 17 4 12'/\x3e\x3c/svg\x3e";return setTimeout(function(){co(b,"copied");return b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3crect x\x3d'9' y\x3d'9' width\x3d'13' height\x3d'13' rx\x3d'2' ry\x3d'2'/\x3e\x3cpath d\x3d'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/\x3e\x3c/svg\x3e"},
-1500)}).catch(function(c){return console.error("Failed to copy:",c)}):null}return null},setPlannerView:function(a){var b=We.j(a);Yf.J(qo,P,xl,b,Jd([vr,Qd,jr,null]));for(var c=D(Jd(document.querySelectorAll(".planner-view-btn"))),d=null,e=0,f=0;;)if(f<e){var g=d.Y(null,f);H.B(a,g.getAttribute("data-view"))?bo(g,"active"):co(g,"active");f+=1}else if(c=D(c))d=c,le(d)?(c=uc(d),f=vc(d),d=c,e=K(c),c=f):(c=E(d),H.B(a,c.getAttribute("data-view"))?bo(c,"active"):co(c,"active"),c=G(d),d=null,e=0),f=0;else break;
-a=Zn("planner-hint");r(a)&&(a.textContent=y(Eo,b));Jo();Fo();Go();Ho();b=Zn("planner-picker-dropdown");if(r(b)){if(r(b.classList.contains("show")))return null;bo(b,"show");Yf.N(qo,P,dr,!0);var h=Zn("planner-picker-filter");return r(h)?setTimeout(function(){return h.focus()},0):null}return null},switchTab:Yp,clearPlannerSelection:function(){Yf.N(qo,P,vr,Qd);var a=Zn("planner-picker-list");if(r(a)){a=D(Jd(a.querySelectorAll("input")));for(var b=null,c=0,d=0;;)if(d<c)b.Y(null,d).checked=!1,d+=1;else if(a=
-D(a))b=a,le(b)?(a=uc(b),d=vc(b),b=a,c=K(a),a=d):(E(b).checked=!1,a=G(b),b=null,c=0),d=0;else break}Fo();Go();return Ho()},hideBlastRadiusModal:Co,togglePlannerPicker:function(){var a=Zn("planner-picker-dropdown");if(r(a)){var b=a.classList.contains("show");r(b)?co(a,"show"):bo(a,"show");return Yf.N(qo,P,dr,Ia(b))}return null},toggleAllGroups:function(){var a=mr.j(Hb(cj));if(r(a)){a=Ii(pn(a));var b=bj.j(Hb(cj));b=H.B(a,b);var c=mk.j(Hb(cj));Yf.J(cj,P,bj,b?Gi:a,Jd([er,null]));Wp.O();return r(c)?setTimeout(function(){return sj(c,
-"group:")?eq(c.substring(6)):cq(c)},350):null}return null}});(function(){console.log("Pipeviz ClojureScript initialized");Xp();Zp();oq();kq();Pp.O?Pp.O():Pp.call(null);vo();qq();Vp();Lo();var a=(new URLSearchParams(window.location.search)).get("url");if(r(a))return Wq(a);Rp(Yn);Tp(Yn);mq(Yn);Qp.O?Qp.O():Qp.call(null);a=wo();a=Ef(a);var b=y(a,nl),c=y(a,wj),d=y(a,$q),e=y(a,xl),f=y(a,Tk);return r(d)?(Yp("graph-pane"),setTimeout(function(){return Do(d)},200)):r(c)?(Yp("graph-pane"),setTimeout(aq,200)):r(function(){var g=H.B(b,"planner");return g?r(e)?e:f:g}())?
+Tp(Yn);mq(Yn);Qp.O?Qp.O():Qp.call(null);pq("Example loaded",!1);var a=H.B;var b=Zn("main-tabs");b=null==b?null:b.querySelector(".nav-tab.active");b=null==b?null:b.getAttribute("data-tab");return a.call(H,"config-pane",b)?null:Yp("graph-pane")},resetAttributeGraph:function(){var a=jr.j(Hb(po));return r(a)?a.resetZoom():null},toggleSidebar:function(){var a=Zn("sidebar");return r(a)?r(a)?a.classList.toggle("collapsed"):null:null},formatJson:function(){var a=Zn("json-input");if(r(a)){var b=a.value;if(D(b))try{var c=
+JSON.parse(b),d=JSON.stringify(c,null,2);a.value=d;return pq("Formatted",!1)}catch(e){return pq(["Cannot format - invalid JSON: ",w.j(e.message)].join(""),!0)}else return null}else return null},applyConfig:function(){var a=Zn("json-input");if(r(a)){a=a.value;if(ee(a))return pq("Please enter some JSON",!0);try{var b=oj(JSON.parse(a)),c=Um(b),d=Ef(c),e=y(d,Ij),f=y(d,uk);return r(e)?(Rp(b),Tp(b),Qp.O?Qp.O():Qp.call(null),pq("Config applied successfully",!1),Yp("graph-pane")):pq(["Invalid config: ",w.j(E(f))].join(""),
+!0)}catch(g){return pq(["JSON parse error: ",w.j(g.message)].join(""),!0)}}else return null},setExportFormat:function(a){var b=We.j(a);Xf(Cr,b);b=D(Jd(document.querySelectorAll(".export-format-btn")));for(var c=null,d=0,e=0;;)if(e<d){var f=c.Y(null,e);H.B(a,f.getAttribute("data-format"))?bo(f,"active"):co(f,"active");e+=1}else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-format"))?bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;return Dr()},
+togglePipelinesOnly:function(){Yf.J(cj,P,kr,Ia(kr.j(Hb(cj))),Jd([er,null]));var a=Zn("pipelines-only-btn");r(a)&&a.classList.toggle("active");return Wp.O()},toggleGroup:function(a){var b=mk.j(Hb(cj));Yf.B(cj,function(c){return P.D(sg.D(c,bj,function(d){return r(d.j?d.j(a):d.call(null,a))?de.B(d,a):Pd.B(d,a)}),er,null)});Wp.O();return r(b)?setTimeout(function(){return sj(b,"group:")?eq(b.substring(6)):cq(b)},350):null},copyPlannerOutput:function(){var a=Zn("planner-output");if(r(a)){a=a.textContent;
+if(ja(sa(a)))return null;var b=document.querySelector(".planner-copy-btn");return r(b)?navigator.clipboard.writeText(a).then(function(){bo(b,"copied");b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3cpolyline points\x3d'20 6 9 17 4 12'/\x3e\x3c/svg\x3e";return setTimeout(function(){co(b,"copied");return b.innerHTML="\x3csvg width\x3d'14' height\x3d'14' viewBox\x3d'0 0 24 24' fill\x3d'none' stroke\x3d'currentColor' stroke-width\x3d'2'\x3e\x3crect x\x3d'9' y\x3d'9' width\x3d'13' height\x3d'13' rx\x3d'2' ry\x3d'2'/\x3e\x3cpath d\x3d'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/\x3e\x3c/svg\x3e"},
+1500)}).catch(function(c){return console.error("Failed to copy:",c)}):null}return null},setPlannerView:function(a){var b=We.j(a),c=xl.j(Hb(qo));c=H.B(b,c);var d=dr.j(Hb(qo));if(r(c?d:c))return Kr();if(!c){Yf.J(qo,P,xl,b,Jd([vr,Qd,jr,null]));b=D(Jd(document.querySelectorAll(".planner-view-btn")));c=null;for(var e=d=0;;)if(e<d){var f=c.Y(null,e);H.B(a,f.getAttribute("data-view"))?bo(f,"active"):co(f,"active");e+=1}else if(b=D(b))c=b,le(c)?(b=uc(c),e=vc(c),c=b,d=K(b),b=e):(b=E(c),H.B(a,b.getAttribute("data-view"))?
+bo(b,"active"):co(b,"active"),b=G(c),c=null,d=0),e=0;else break;Go();Ho()}Jo();Lr(a);a=Zn("planner-picker-dropdown");if(r(a)){bo(a,"show");Yf.N(qo,P,dr,!0);var g=Zn("planner-picker-filter");return r(g)?setTimeout(function(){return g.focus()},0):null}return null},switchTab:Yp,clearPlannerSelection:function(){Yf.N(qo,P,vr,Qd);var a=Zn("planner-picker-list");if(r(a)){a=D(Jd(a.querySelectorAll("input")));for(var b=null,c=0,d=0;;)if(d<c)b.Y(null,d).checked=!1,d+=1;else if(a=D(a))b=a,le(b)?(a=uc(b),d=vc(b),
+b=a,c=K(a),a=d):(E(b).checked=!1,a=G(b),b=null,c=0),d=0;else break}Fo();Go();return Ho()},hideBlastRadiusModal:Co,togglePlannerPicker:function(){var a=Zn("planner-picker-dropdown");if(r(a)){var b=a.classList.contains("show");r(b)?co(a,"show"):bo(a,"show");return Yf.N(qo,P,dr,Ia(b))}return null},toggleAllGroups:function(){var a=mr.j(Hb(cj));if(r(a)){a=Ii(pn(a));var b=bj.j(Hb(cj));b=H.B(a,b);var c=mk.j(Hb(cj));Yf.J(cj,P,bj,b?Gi:a,Jd([er,null]));Wp.O();return r(c)?setTimeout(function(){return sj(c,"group:")?
+eq(c.substring(6)):cq(c)},350):null}return null}});(function(){console.log("Pipeviz ClojureScript initialized");Xp();Zp();oq();kq();Pp.O?Pp.O():Pp.call(null);vo();qq();Vp();Lo();var a=(new URLSearchParams(window.location.search)).get("url");if(r(a))return Wq(a);Rp(Yn);Tp(Yn);mq(Yn);Qp.O?Qp.O():Qp.call(null);a=wo();a=Ef(a);var b=y(a,nl),c=y(a,wj),d=y(a,$q),e=y(a,xl),f=y(a,Tk);return r(d)?(Yp("graph-pane"),setTimeout(function(){return Do(d)},200)):r(c)?(Yp("graph-pane"),setTimeout(aq,200)):r(function(){var g=H.B(b,"planner");return g?r(e)?e:f:g}())?
 (Yp("planner-pane"),setTimeout(Ko,200)):r(r(b)?Kf(b,"home"):b)?Yp([w.j(b),"-pane"].join("")):null})();
 }).call(this);    </script>
 </body>

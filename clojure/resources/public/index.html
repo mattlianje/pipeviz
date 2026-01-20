@@ -30,7 +30,7 @@
         }
         body {
             font-family: Verdana, Geneva, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.5;
@@ -50,19 +50,35 @@
             .container { padding: 0.5rem 0.75rem; }
         }
 
-        /* Header */
+        /* Header - static, scrolls with page */
         .header {
             text-align: center;
-            padding: 2.5rem 0 1rem;
-            position: relative;
+            padding: 1rem 2rem 0.75rem;
+            background: var(--bg-primary);
+        }
+
+        /* Inner header for non-home tabs - offset to center in viewport */
+        .inner-header {
+            position: static;
+            text-align: center;
+            padding: 1rem 2rem 0.75rem;
+            background: var(--bg-primary);
+            transform: translateX(-80px); /* half of sidebar width */
+        }
+        .inner-header > * {
+            pointer-events: auto;
+        }
+        .app-layout.home-mode .inner-header {
+            display: none;
         }
         .header-controls {
-            position: absolute;
-            top: 0.5rem;
-            right: 0;
+            position: fixed;
+            top: 0.75rem;
+            right: 1rem;
             display: flex;
             gap: 1rem;
             align-items: center;
+            z-index: 100;
         }
         .header-controls a {
             color: var(--text-muted);
@@ -77,25 +93,25 @@
             padding: 4px;
         }
         .hero-title {
-            font-size: 2.25rem;
-            font-weight: 700;
+            font-size: 1.9rem;
+            font-weight: 600;
             margin-bottom: 0.25rem;
         }
         .hero-title img {
-            height: 1.3em;
+            height: 1.4em;
             vertical-align: middle;
-            margin-right: 0.3rem;
+            margin-right: 0.4rem;
         }
         .lead {
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 12px;
         }
         @media (max-width: 480px) {
-            .hero-title { font-size: 1.75rem; }
-            .lead { font-size: 11px; }
+            .hero-title { font-size: 1.6rem; }
+            .lead { font-size: 10px; }
         }
         .lead span { color: #d63384; }
-        code { color: #d63384; font-family: monospace; font-size: 12px; }
+        code { color: #d63384; font-family: monospace; font-size: 11px; }
 
         /* Home content */
         .home-content {
@@ -115,44 +131,230 @@
             overflow-x: hidden;
         }
 
-        /* Tabs */
-        .nav-tabs {
+        /* App Layout */
+        .app-layout {
             display: flex;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 1rem;
-            gap: 2px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
-        .nav-tabs::-webkit-scrollbar {
+        .app-layout.home-mode {
+            position: static;
+            display: block;
+        }
+        .app-layout.home-mode .sidebar {
             display: none;
         }
-        .nav-tab {
-            padding: 8px 16px;
+        .app-layout.home-mode .main-content {
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 160px;
+            min-width: 160px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding-top: 105px;
+            height: 100%;
+            overflow-y: auto;
+            transition: width 0.2s ease, min-width 0.2s ease;
+            z-index: 100;
+        }
+        .sidebar.collapsed {
+            width: 52px;
+            min-width: 52px;
+        }
+        .sidebar-toggle {
+            position: fixed;
+            top: 0.75rem;
+            left: 0.75rem;
+            z-index: 110;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
             border: none;
             background: transparent;
             color: var(--text-muted);
             cursor: pointer;
-            font-size: 12px;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+        }
+        .sidebar-toggle:hover {
+            opacity: 1;
+            color: var(--text-primary);
+        }
+        .app-layout.home-mode .sidebar-toggle {
+            display: none;
+        }
+        .sidebar-section {
+            padding: 0.35rem 0;
+        }
+        .sidebar-section-title {
+            padding: 4px 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .sidebar.collapsed .sidebar-section-title {
+            display: none;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 6px 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
             font-family: inherit;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            white-space: nowrap;
+            text-align: left;
+            transition: background 0.1s, color 0.1s;
+        }
+        .sidebar-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-primary);
+        }
+        .sidebar-item.active {
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            border-left: 2px solid var(--text-primary);
+            padding-left: 8px;
+        }
+        .sidebar-item svg {
             flex-shrink: 0;
+            opacity: 0.7;
         }
-        .nav-tab:hover {
-            color: var(--text-primary);
-            background: var(--bg-secondary);
+        .sidebar-item.active svg {
+            opacity: 1;
         }
-        .nav-tab.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--text-primary);
+        .sidebar-item span {
+            white-space: nowrap;
+            overflow: hidden;
         }
-        .nav-tabs.hidden-on-home { visibility: hidden; }
+        .sidebar.collapsed .sidebar-item {
+            justify-content: center;
+            padding: 10px 0;
+        }
+        .sidebar.collapsed .sidebar-item span {
+            display: none;
+        }
+        .sidebar.collapsed .sidebar-item.active {
+            border-left: none;
+            border-bottom: 2px solid var(--text-primary);
+            padding-left: 0;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            min-width: 0;
+            padding: 1rem 2rem 2rem 2rem;
+            overflow-y: auto;
+            height: 100%;
+            background: var(--bg-primary);
+        }
+
+        /* Config item - source indicator */
+        .sidebar-item.config-source {
+            position: relative;
+        }
+        .sidebar-item.config-source::after {
+            content: "source";
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            position: absolute;
+            right: 8px;
+            opacity: 0.7;
+        }
+        .sidebar.collapsed .sidebar-item.config-source::after {
+            display: none;
+        }
+
+        /* Hide old nav-tabs */
+        .nav-tabs { display: none !important; }
         .hidden { display: none !important; }
         .tab-pane { display: none; }
         .tab-pane.active { display: block; }
+
+        /* Mobile: bottom nav */
+        @media (max-width: 768px) {
+            .app-layout {
+                position: static;
+                display: block;
+            }
+            .sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                width: 100% !important;
+                min-width: 100% !important;
+                height: auto;
+                max-height: none;
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 0 !important;
+                z-index: 100;
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+            .sidebar-toggle,
+            .sidebar .sidebar-section-title {
+                display: none !important;
+            }
+            .sidebar .sidebar-section {
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                padding: 0 !important;
+                border: none !important;
+                margin: 0 !important;
+            }
+            .sidebar-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 8px 12px;
+                gap: 4px;
+                font-size: 10px;
+                border-left: none !important;
+            }
+            .sidebar-item span {
+                display: block !important;
+            }
+            .sidebar-item.active {
+                border-left: none !important;
+                border-top: 2px solid var(--text-primary);
+                padding-left: 12px;
+            }
+            .sidebar-item.config-source::after {
+                display: none;
+            }
+            .main-content {
+                padding: 1rem;
+                padding-bottom: 80px;
+                height: auto;
+                overflow-y: visible;
+            }
+        }
 
         /* Hero demo */
         .hero-demo {
@@ -236,7 +438,7 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 0.75rem;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             line-height: 1.5;
         }
@@ -259,7 +461,7 @@
             width: 100%;
             min-height: 400px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             padding: 1rem;
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -451,7 +653,7 @@
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border-color);
             font-weight: bold;
-            font-size: 14px;
+            font-size: 12px;
         }
         .detail-label {
             font-size: 10px;
@@ -545,7 +747,7 @@
             text-align: center;
             color: var(--text-muted);
             padding: 2rem;
-            font-size: 13px;
+            font-size: 12px;
         }
         .links-scroll {
             display: flex;
@@ -846,7 +1048,7 @@
         .search-input {
             width: 100%;
             padding: 8px 12px;
-            font-size: 13px;
+            font-size: 11px;
             font-family: inherit;
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -991,14 +1193,14 @@
             border-bottom: 1px solid var(--border-color);
         }
         .modal-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
             margin: 0;
         }
         .modal-close {
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             cursor: pointer;
             color: var(--text-muted);
             line-height: 1;
@@ -1056,7 +1258,7 @@
             gap: 0.75rem;
         }
         .planner-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
         }
         .planner-controls {
@@ -1065,25 +1267,31 @@
             gap: 0.75rem;
             flex-wrap: wrap;
         }
-        .planner-picker {
-            position: relative;
+        .planner-btn-count {
+            display: inline-block;
+            font-size: 10px;
+            background: var(--accent-color);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 8px;
+            margin-left: 4px;
+            min-width: 16px;
+            min-height: 14px;
+            text-align: center;
+            vertical-align: middle;
         }
-        .planner-picker-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 0.75rem;
-            font-size: 12px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            cursor: pointer;
-            color: var(--text-primary);
-            min-width: 160px;
-            justify-content: space-between;
+        .planner-btn-count:empty {
+            visibility: hidden;
         }
-        .planner-picker-btn:hover {
-            background: var(--bg-primary);
+        .planner-view-btn svg {
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+        .planner-dropdown-shared {
+            position: absolute;
+            top: 100%;
+            margin-top: 4px;
+            z-index: 1001;
         }
         .planner-picker-dropdown {
             display: none;
@@ -1177,6 +1385,7 @@
             color: var(--text-primary);
         }
         .planner-view-btns {
+            position: relative;
             display: flex;
             gap: 0.25rem;
         }
@@ -1306,7 +1515,7 @@
             gap: 0.75rem;
         }
         .export-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
         }
         .export-controls {
@@ -1384,11 +1593,11 @@
             border-bottom: 1px solid var(--border-color);
         }
         .stats-summary span {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
         }
         .stats-summary strong {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             color: var(--text-primary);
             margin-right: 0.25rem;
         }
@@ -1614,6 +1823,7 @@
             <p class="lead">Easy, elegant lineage from a single <span>.json</span></p>
         </header>
 
+        <!-- Old nav-tabs (hidden, kept for compatibility) -->
         <nav class="nav-tabs hidden-on-home" id="main-tabs">
             <button class="nav-tab active" data-tab="home-pane">Home</button>
             <button class="nav-tab" data-tab="config-pane">Config</button>
@@ -1624,14 +1834,104 @@
             <button class="nav-tab" data-tab="planner-pane">Planner</button>
             <button class="nav-tab" data-tab="export-pane">Export</button>
             <button class="nav-tab" data-tab="stats-pane">Stats</button>
+            <button class="nav-tab" data-tab="merge-pane">Merge</button>
+            <button class="nav-tab" data-tab="server-pane">Server</button>
             <button class="nav-tab" data-tab="spec-pane">Spec</button>
         </nav>
 
+        <div class="app-layout home-mode" id="app-layout">
+            <!-- Sidebar Toggle -->
+            <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <button class="sidebar-item active" data-tab="home-pane" onclick="switchTab('home-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        <span>Home</span>
+                    </button>
+                    <button class="sidebar-item config-source" data-tab="config-pane" onclick="switchTab('config-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Config</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section" style="border-top: 1px solid var(--border-color); margin-top: 0.25rem; padding-top: 0.75rem;">
+                    <div class="sidebar-section-title">Visualize</div>
+                    <button class="sidebar-item" data-tab="graph-pane" onclick="switchTab('graph-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        <span>Graph</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="attributes-pane" onclick="switchTab('attributes-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <span>Attributes</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="planner-pane" onclick="switchTab('planner-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span>Planner</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Data</div>
+                    <button class="sidebar-item" data-tab="pipelines-pane" onclick="switchTab('pipelines-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        <span>Pipelines</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="datasources-pane" onclick="switchTab('datasources-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                        <span>Datasources</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="stats-pane" onclick="switchTab('stats-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <span>Stats</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Tools</div>
+                    <button class="sidebar-item" data-tab="export-pane" onclick="switchTab('export-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Export</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="merge-pane" onclick="switchTab('merge-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+                        <span>Merge</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Docs</div>
+                    <button class="sidebar-item" data-tab="server-pane" onclick="switchTab('server-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                        <span>Server</span>
+                    </button>
+                    <button class="sidebar-item" data-tab="spec-pane" onclick="switchTab('spec-pane')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span>Spec</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Inner header for non-home tabs - uses same classes as hero -->
+                <div class="inner-header">
+                    <h1 class="hero-title">
+                        <img src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png" alt="Pipeviz">
+                        Pipeviz
+                    </h1>
+                    <p class="lead">Easy, elegant lineage from a single <span>.json</span></p>
+                </div>
         <!-- Home Tab -->
         <div class="tab-pane active" id="home-pane">
             <div class="home-content">
                 <!-- Tagline -->
-                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 1rem;">An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.</p>
+                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 1.5rem; margin-bottom: 1rem;">An open source JSON spec for lineage. Declare your pipelines, get beautiful graphs.</p>
 
                 <!-- Demo -->
                 <div class="hero-demo">
@@ -1702,19 +2002,19 @@
                     <div class="section-header">How it works</div>
                     <div style="display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap">
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">1</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">1</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Define</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Write a <code>pipeviz.json</code> describing your pipelines and data sources</div>
                         </div>
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">2</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">2</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Load</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Drop your file here, or host both files together on any static server</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Drop your file here, or host both files together on any static server</div>
                         </div>
                         <div style="flex: 1; min-width: 140px; text-align: center">
-                            <div style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 0.2rem">3</div>
+                            <div style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.2rem">3</div>
                             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem">Explore</div>
-                            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4">Click through the graph, trace dependencies, export DOT for other tools</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4">Click through the graph, trace dependencies, export DOT for other tools</div>
                         </div>
                     </div>
                 </div>
@@ -1722,7 +2022,7 @@
                 <!-- Superpowers -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header">Superpowers</div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 1rem 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 1rem 0">
                         Each pipeline declares what it reads and writes. Pipeviz stitches these into a complete graph. From there, you get some superpowers for free:
                     </p>
                     <div class="superpowers-grid">
@@ -1762,22 +2062,19 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: flex-start">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                                <line x1="6" y1="18" x2="6.01" y2="18"/>
+                            </svg>
+                            <span><strong style="color: var(--text-primary)">Serve via API</strong> with the built-in Clojure webserver. Query your graph programmatically.</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
                                 <rect x="4" y="4" width="16" height="16" rx="2"/>
                                 <path d="M9 9h6M9 12h6M9 15h4"/>
                             </svg>
-                            <span><strong style="color: var(--text-primary)">Build MCPs</strong> on top of your graph. LLMs can query your lineage.</span>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
-                                <path d="M3 12h4l3-9 4 18 3-9h4"/>
-                            </svg>
-                            <span><strong style="color: var(--text-primary)">Find critical path</strong> via PERT analysis. Know your pipeline's true bottleneck.</span>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-start">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink: 0; margin-top: 2px">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-                            </svg>
-                            <span><strong style="color: var(--text-primary)">Track spend</strong> per node and path. See where your compute budget goes.</span>
+                            <span><strong style="color: var(--text-primary)">Build MCPs</strong> on top of the API. Let LLMs query and reason about your lineage.</span>
                         </div>
                     </div>
                 </div>
@@ -1785,7 +2082,7 @@
                 <!-- Why -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header">Why</div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0">
                         Other solutions ask for a lot.
                         <a href="https://openlineage.io/" target="_blank" style="color: var(--text-secondary)">OpenLineage</a>/<a href="https://marquezproject.ai/" target="_blank" style="color: var(--text-secondary)">Marquez</a> need agents, a metadata store, scheduler integration.
                         <a href="https://atlas.apache.org/" target="_blank" style="color: var(--text-secondary)">Atlas</a> wants a governance platform.
@@ -1796,20 +2093,20 @@
                 <!-- Why Clojure -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header" style="display: flex; align-items: center; gap: 0.5rem">
-                        <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 20px">
+                        <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 24px">
                         Why Clojure
                     </div>
-                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
                         Pipeviz is written in <a href="https://clojure.org/" target="_blank" style="color: var(--text-secondary)">Clojure</a>/<a href="https://clojurescript.org/" target="_blank" style="color: var(--text-secondary)">ClojureScript</a>, a Lisp that runs on the JVM and compiles to JavaScript, for two main reasons:
                     </p>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; color: var(--text-secondary)">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 12px; color: var(--text-secondary)">
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
                             <div><strong style="color: var(--text-primary)">Code-as-data.</strong> Like Clojure, Pipeviz espouses the code-as-data philosophy: 100 functions operating on one data structure vs 10 functions on 10 structures. This style is well suited to spec validation, transformation, and extensibility.</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph.</div>
+                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph (without a DB).</div>
                         </div>
                     </div>
                 </div>
@@ -1929,32 +2226,35 @@
             <div class="planner-header">
                 <div class="planner-title">Planner</div>
                 <div class="planner-controls">
-                    <div class="planner-picker">
-                        <button class="planner-picker-btn" onclick="togglePlannerPicker()">
-                            <span id="planner-picker-label">Select pipelines...</span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M6 9l6 6 6-6"/>
-                            </svg>
+                    <div class="planner-view-btns">
+                        <button class="planner-view-btn active" data-view="pipeline" onclick="setPlannerView('pipeline')">
+                            Run Order
+                            <span class="planner-btn-count" id="planner-count-pipeline"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                         </button>
-                        <div class="planner-picker-dropdown" id="planner-picker-dropdown">
+                        <button class="planner-view-btn" data-view="airflow" onclick="setPlannerView('airflow')">
+                            Airflow
+                            <span class="planner-btn-count" id="planner-count-airflow"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <button class="planner-view-btn danger" data-view="blast" onclick="setPlannerView('blast')">
+                            Blast Radius
+                            <span class="planner-btn-count" id="planner-count-blast"></span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="planner-picker-dropdown planner-dropdown-shared" id="planner-picker-dropdown">
                             <div class="planner-picker-search">
                                 <input type="text" id="planner-picker-filter" placeholder="Filter..." oninput="filterPlannerItems(this.value)">
                             </div>
                             <div class="planner-picker-list" id="planner-picker-list"></div>
                             <div class="planner-picker-footer">
-                                <span id="planner-picker-count">0 selected</span>
-                                <button class="planner-picker-clear" onclick="clearPlannerSelection()">Clear all</button>
+                                <span id="planner-picker-count"></span>
+                                <button class="planner-picker-clear" onclick="clearPlannerSelection()">Clear</button>
                             </div>
                         </div>
                     </div>
-                    <div class="planner-view-btns">
-                        <button class="planner-view-btn active" data-view="pipeline" onclick="setPlannerView('pipeline')">Run Order</button>
-                        <button class="planner-view-btn" data-view="airflow" onclick="setPlannerView('airflow')">Airflow</button>
-                        <button class="planner-view-btn danger" data-view="blast" onclick="setPlannerView('blast')">Blast Radius</button>
-                    </div>
                 </div>
             </div>
-            <div class="planner-hint" id="planner-hint">Select pipelines to plan backfill execution order</div>
             <div class="planner-content">
                 <div class="planner-graph-col">
                     <div class="planner-graph" id="planner-graph">
@@ -2002,6 +2302,165 @@
             </div>
         </div>
 
+        <!-- Merge Tab -->
+        <div class="tab-pane" id="merge-pane">
+            <style>
+                .merge-section { margin-bottom: 1.5rem; }
+                .merge-section h5 { font-size: 12px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
+                .merge-section p { font-size: 12px; color: var(--text-secondary); margin-bottom: 0.5rem; }
+                .merge-code { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; font-size: 11px; line-height: 1.5; overflow-x: auto; margin: 0; }
+                .merge-code code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; color: var(--text-primary); }
+            </style>
+            <div style="max-width: 800px; padding: 1rem 0">
+                <h5 style="margin-bottom: 1rem; font-size: 1.1rem;">Merging Pipeviz Configs</h5>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                    When your data platform spans multiple teams or repositories, you can maintain separate
+                    config files and merge them into a single Pipeviz config using <code>jq</code>.
+                </p>
+
+                <div class="merge-section">
+                    <h5>Basic Merge (Two Files)</h5>
+                    <p>Combine pipelines and datasources from two config files:</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: (.[0].pipelines + .[1].pipelines),
+  datasources: (.[0].datasources + .[1].datasources)
+}' team_a.json team_b.json > combined.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Merge Multiple Files</h5>
+                    <p>Merge all <code>*.pipeviz.json</code> files in a directory:</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: [.[].pipelines[]] | unique_by(.name),
+  datasources: [.[].datasources[]] | unique_by(.name)
+}' configs/*.pipeviz.json > combined.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Merge with Deduplication</h5>
+                    <p>When configs might have overlapping definitions, dedupe by name (last write wins):</p>
+                    <pre class="merge-code"><code>jq -s '{
+  pipelines: (
+    [.[].pipelines[]] | group_by(.name) | map(last)
+  ),
+  datasources: (
+    [.[].datasources[]] | group_by(.name) | map(last)
+  )
+}' *.json > merged.json</code></pre>
+                </div>
+
+                <div class="merge-section">
+                    <h5>Smart Prefix (Only on Collision)</h5>
+                    <p>Only add prefixes when names actually collide:</p>
+                    <pre class="merge-code"><code># Find colliding names, prefix only those
+jq -s '
+  [
+    (.[0].pipelines | map(. + {_src: "a"})),
+    (.[1].pipelines | map(. + {_src: "b"}))
+  ] | add
+  | group_by(.name)
+  | map(
+      if length > 1 then
+        map(.name = ._src + "_" + .name)
+      else . end
+    )
+  | add
+  | map(del(._src))
+' team_a.json team_b.json</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Tab -->
+        <div class="tab-pane" id="server-pane">
+            <style>
+                .server-section { margin-bottom: 2rem; }
+                .server-section h5 { font-size: 12px; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); }
+                .server-section p { font-size: 12px; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.6; }
+                .server-code { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; font-size: 12px; line-height: 1.5; overflow-x: auto; margin: 0.5rem 0; }
+                .server-code code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; color: var(--text-primary); }
+                .server-note { background: var(--bg-secondary); border-left: 3px solid var(--text-muted); padding: 0.75rem 1rem; font-size: 12px; color: var(--text-secondary); margin: 1rem 0; }
+            </style>
+            <div style="max-width: 800px; padding: 1rem 0">
+                <h5 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Self-Hosting Pipeviz</h5>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    The Clojure version includes a server that serves your config as a live dashboard.
+                </p>
+
+                <div class="server-section">
+                    <h5>Quick Start</h5>
+                    <p>Run the server with your config file:</p>
+                    <pre class="server-code"><code># Start server on port 3000 with your config
+clj -M:server 3000 path/to/your-config.json</code></pre>
+                    <p>Then open <code>http://localhost:3000</code> in your browser.</p>
+                </div>
+
+                <div class="server-section">
+                    <h5>Server Options</h5>
+                    <pre class="server-code"><code># Default port (8080) with config
+clj -M:server path/to/config.json
+
+# Custom port
+clj -M:server 3000 path/to/config.json
+
+# Multiple configs (merged automatically)
+clj -M:server 3000 team_a.json team_b.json</code></pre>
+                </div>
+
+                <div class="server-section">
+                    <h5>REPL-Driven Development</h5>
+                    <p>Connect to the nREPL for live exploration and extension:</p>
+                    <pre class="server-code"><code># Start shadow-cljs in watch mode
+npx shadow-cljs watch app
+
+# Connect to the REPL from another terminal
+npx shadow-cljs cljs-repl app</code></pre>
+                    <div class="server-note">
+                        The REPL gives you live access to the running app state. You can modify the graph,
+                        test analysis functions, or prototype new features without restarting.
+                    </div>
+                </div>
+
+                <div class="server-section">
+                    <h5>Extending the Server</h5>
+                    <p>The server exposes a simple HTTP API. Add custom endpoints in <code>src/pipeviz/server/main.clj</code>:</p>
+                    <pre class="server-code"><code>;; Example: Add a custom analysis endpoint
+(defn custom-handler [config]
+  (fn [req]
+    (case (:uri req)
+      "/api/custom" {:status 200
+                     :headers {"Content-Type" "application/json"}
+                     :body (json/write-str (analyze config))}
+      nil)))</code></pre>
+                </div>
+
+                <div class="server-section">
+                    <h5>OpenAPI Spec</h5>
+                    <p>The server includes an OpenAPI specification at <code>resources/openapi.json</code>:</p>
+                    <pre class="server-code"><code># Endpoints documented in the spec:
+GET /api/config      # Returns the loaded Pipeviz config
+GET /api/health      # Health check endpoint</code></pre>
+                    <p>Use this spec with Swagger UI or to generate API clients.</p>
+                </div>
+
+                <div class="server-section">
+                    <h5>Production Deployment</h5>
+                    <p>Build a standalone bundle for deployment:</p>
+                    <pre class="server-code"><code># Build optimized JS bundle
+npx shadow-cljs release release
+
+# Bundle into single HTML file
+./scripts/bundle.sh
+
+# Output: dist/pipeviz.html (single-file, no server needed)</code></pre>
+                    <div class="server-note">
+                        The bundled <code>pipeviz.html</code> is a single file with all JS/CSS inlined.
+                        Perfect for hosting on GitHub Pages, S3, or embedding in internal tools.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Spec Tab -->
         <div class="tab-pane" id="spec-pane">
             <style>
@@ -2009,12 +2468,12 @@
                 .spec-table th, .spec-table td { padding: 6px 10px; border: 1px solid var(--border-color); text-align: left; }
                 .spec-table th { background: var(--bg-secondary); }
                 .spec-section { margin-bottom: 2rem; }
-                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
+                .spec-section h5 { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
                 .spec-pre { background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 12px; font-size: 12px; margin: 0; overflow-x: auto; }
             </style>
             <div style="max-width: 800px; padding: 1rem 0">
                 <div style="margin-bottom: 1.5rem">
-                    <h5 style="font-weight: 600; font-size: 1.25rem; margin-bottom: 0.25rem">Pipeviz JSON Spec</h5>
+                    <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.25rem">Pipeviz JSON Spec</h5>
                     <p style="color: var(--text-secondary); font-size: 13px">
                         Only <code>pipelines</code> is required. Clusters and datasources are auto-created when referenced.
                     </p>
@@ -2202,6 +2661,8 @@
                 </div>
             </div>
         </div>
+            </main>
+        </div> <!-- end app-layout -->
     </div>
 
     <!-- Blast Radius Modal -->
