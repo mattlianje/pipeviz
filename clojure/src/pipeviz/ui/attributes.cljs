@@ -111,7 +111,8 @@
                                                   prefix (if (> depth 1) "└ " "")]
                                               (str "<div class='lineage-link' data-ds-name='" name
                                                    "' style='padding-left: " indent "px; opacity: " opacity ";'>"
-                                                   prefix name "</div>")))
+                                                   (when (seq prefix) (str "<span class='lineage-indent'>" prefix "</span>"))
+                                                   "<span class='lineage-name'>" name "</span></div>")))
                                           upstream-list))
                            "</div>"))
 
@@ -127,7 +128,8 @@
                                                   prefix (if (> depth 1) "└ " "")]
                                               (str "<div class='lineage-link' data-ds-name='" name
                                                    "' style='padding-left: " indent "px; opacity: " opacity ";'>"
-                                                   prefix name "</div>")))
+                                                   (when (seq prefix) (str "<span class='lineage-indent'>" prefix "</span>"))
+                                                   "<span class='lineage-name'>" name "</span></div>")))
                                           downstream-list))
                            "</div>"))
 
@@ -238,7 +240,8 @@
                                                         prefix (if (> depth 1) "└ " "")]
                                                     (str "<div class='lineage-link' data-attr-id='" id
                                                          "' style='padding-left:" indent "px;opacity:" opacity "'>"
-                                                         prefix (:full-name up-attr) "</div>")))))
+                                                         (when (seq prefix) (str "<span class='lineage-indent'>" prefix "</span>"))
+                                                         "<span class='lineage-name'>" (:full-name up-attr) "</span></div>")))))
                                             upstream))
                              "</div>"))
 
@@ -254,7 +257,8 @@
                                                         prefix (if (> depth 1) "└ " "")]
                                                     (str "<div class='lineage-link' data-attr-id='" id
                                                          "' style='padding-left:" indent "px;opacity:" opacity "'>"
-                                                         prefix (:full-name down-attr) "</div>")))))
+                                                         (when (seq prefix) (str "<span class='lineage-indent'>" prefix "</span>"))
+                                                         "<span class='lineage-name'>" (:full-name down-attr) "</span></div>")))))
                                             downstream))
                              "</div>"))
 

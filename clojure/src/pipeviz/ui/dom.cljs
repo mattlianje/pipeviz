@@ -39,7 +39,8 @@
       ([name depth show-prefix?]
        (let [prefix (if (and show-prefix? (> depth 1)) "└ " "")]
             (str "<div class='lineage-link' data-node-name='" name "' style='" (styles/lineage-style depth) "'>"
-                 prefix name "</div>"))))
+                 (when (seq prefix) (str "<span class='lineage-indent'>" prefix "</span>"))
+                 "<span class='lineage-name'>" name "</span></div>"))))
 
 (defn lineage-section
       "Render upstream or downstream lineage section"
