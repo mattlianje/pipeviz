@@ -220,7 +220,8 @@
                          (.each (fn [d]
                                     (this-as this
                                       (let [node (d3/select this)
-                                            title (-> node (.select "title") (.text) str/trim)]
+                                            raw-title (-> node (.select "title") (.text) str/trim)
+                                            title (try (js/decodeURIComponent raw-title) (catch :default _ raw-title))]
                                            (.classed node "node-highlighted" false)
                                            (.classed node "node-connected" false)
                                            (.classed node "node-dimmed" false)
@@ -240,7 +241,8 @@
                          (.each (fn [d]
                                     (this-as this
                                       (let [edge (d3/select this)
-                                            title (-> edge (.select "title") (.text) str/trim)
+                                            raw-title (-> edge (.select "title") (.text) str/trim)
+                                            title (try (js/decodeURIComponent raw-title) (catch :default _ raw-title))
                                             match (re-find #"^(.+?)(?:->|--)\s*(.+?)$" title)]
                                            (.classed edge "edge-dimmed" false)
                                            (when match
@@ -331,7 +333,8 @@
                          (.each (fn [d]
                                     (this-as this
                                       (let [node (d3/select this)
-                                            title (-> node (.select "title") (.text) str/trim)]
+                                            raw-title (-> node (.select "title") (.text) str/trim)
+                                            title (try (js/decodeURIComponent raw-title) (catch :default _ raw-title))]
                                            (.classed node "node-highlighted" false)
                                            (.classed node "node-connected" false)
                                            (.classed node "node-dimmed" false)
@@ -355,7 +358,8 @@
                               (.each (fn [d]
                                          (this-as this
                                            (let [edge (d3/select this)
-                                                 title (-> edge (.select "title") (.text) str/trim)
+                                                 raw-title (-> edge (.select "title") (.text) str/trim)
+                                                 title (try (js/decodeURIComponent raw-title) (catch :default _ raw-title))
                                                  match (re-find #"^(.+?)(?:->|--)\s*(.+?)$" title)]
                                                 (.classed edge "edge-dimmed" false)
                                                 (.classed edge "edge-highlighted" false)
@@ -445,7 +449,8 @@
           (.on "click" (fn [event d]
                            (this-as this
                              (.stopPropagation event)
-                             (let [node-name (-> (d3/select this) (.select "title") (.text))]
+                             (let [raw-title (-> (d3/select this) (.select "title") (.text) str/trim)
+                                   node-name (try (js/decodeURIComponent raw-title) (catch :default _ raw-title))]
                                   (if (str/starts-with? node-name "group:")
                                       (select-group! (subs node-name 6))
                                       (select-node! node-name)))))))
