@@ -61,7 +61,7 @@
         .inner-header {
             position: static;
             text-align: center;
-            padding: 1rem 2rem 0.75rem;
+            padding: 1rem 2rem 1.5rem;
             background: var(--bg-primary);
             transform: translateX(-80px); /* half of sidebar width */
         }
@@ -108,7 +108,7 @@
         }
         @media (max-width: 480px) {
             .hero-title { font-size: 1.6rem; }
-            .lead { font-size: 10px; }
+            .lead { font-size: 11px; }
         }
         .lead span { color: #d63384; }
         code { color: #d63384; font-family: monospace; font-size: 11px; }
@@ -316,7 +316,8 @@
                 border-top: 1px solid var(--border-color);
             }
             .sidebar-toggle,
-            .sidebar .sidebar-section-title {
+            .sidebar .sidebar-section-title,
+            .inner-header {
                 display: none !important;
             }
             .sidebar .sidebar-section {
@@ -349,7 +350,7 @@
                 display: none;
             }
             .main-content {
-                padding: 1rem;
+                padding: 0.5rem;
                 padding-bottom: 80px;
                 height: auto;
                 overflow-y: visible;
@@ -2384,7 +2385,7 @@ jq -s '
             <div style="max-width: 800px; padding: 1rem 0">
                 <h5 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Self-Hosting Pipeviz</h5>
                 <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                    The Clojure version includes a server that serves your config as a live dashboard.
+                    Run a server that serves your config as a live dashboard.
                 </p>
 
                 <div class="server-section">
