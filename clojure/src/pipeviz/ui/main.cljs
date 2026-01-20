@@ -180,7 +180,7 @@
                                             gv (-> (d3/select "#graph")
                                                    (.graphviz)
                                                    (.width width)
-                                                   (.height 500)
+                                                   (.height 650)
                                                    (.fit true)
                                                    (.transition (fn [] (-> (d3/transition "graph")
                                                                            (.duration 300)

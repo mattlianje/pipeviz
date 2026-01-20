@@ -371,7 +371,7 @@
                  (-> (.select d3 "#attribute-graph")
                      (.graphviz)
                      (.width (or (.-offsetWidth container) 800))
-                     (.height 500)
+                     (.height 650)
                      (.fit true)
                      (.zoom true))))
 
