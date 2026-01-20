@@ -57,17 +57,13 @@
             background: var(--bg-primary);
         }
 
-        /* Inner header for non-home tabs - matches hero exactly */
+        /* Inner header for non-home tabs - offset to center in viewport */
         .inner-header {
-            position: fixed;
-            top: 1rem;
-            left: 0;
-            right: 0;
+            position: static;
             text-align: center;
             padding: 1rem 2rem 0.75rem;
             background: var(--bg-primary);
-            z-index: 90;
-            pointer-events: none;
+            transform: translateX(-80px); /* half of sidebar width */
         }
         .inner-header > * {
             pointer-events: auto;
@@ -263,7 +259,7 @@
         .main-content {
             flex: 1;
             min-width: 0;
-            padding: 8.5rem 2rem 2rem 2rem;
+            padding: 1rem 2rem 2rem 2rem;
             overflow-y: auto;
             height: 100%;
             background: var(--bg-primary);
@@ -2097,7 +2093,7 @@
                 <!-- Why Clojure -->
                 <div style="margin-bottom: 2rem">
                     <div class="section-header" style="display: flex; align-items: center; gap: 0.5rem">
-                        <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 20px">
+                        <img src="https://clojure.org/images/clojure-logo-120b.png" alt="Clojure" style="height: 24px">
                         Why Clojure
                     </div>
                     <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 0.75rem 0">
@@ -2110,7 +2106,7 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem">
                             <span style="color: var(--text-muted)">•</span>
-                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph.</div>
+                            <div><strong style="color: var(--text-primary)">No required persistence layer.</strong> Clojure is homoiconic. Your lineage graph is just an <a href="https://github.com/edn-format/edn" target="_blank" style="color: var(--text-secondary)">EDN</a> map. Even when running Pipeviz as a server, you can REPL into a live instance, inspect state, redefine functions on the fly, and add your own hooks and validations that update your graph (without a DB).</div>
                         </div>
                     </div>
                 </div>

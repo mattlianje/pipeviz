@@ -292,13 +292,21 @@
                             "<div class='group-toggle-section'>"
                             "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" group-name "\")'>"
                             (if collapsed? "▶ Expand Group" "▼ Collapse Group") "</button></div>"
-                            "<div class='lineage-section'><div class='lineage-header'>"
-                            "<span class='detail-label' style='margin-bottom:0'>Lineage</span></div>"
-                            "<div class='lineage-content'><div class='lineage-tree-view'>"
-                            (lineage-section "Upstream" upstream)
-                            (lineage-section "Downstream" downstream)
-                            (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")
-                            "</div></div></div>")]
+                ;; Split lineage by type (pipelines vs datasources)
+                            (let [pipeline-names (set (map :name (:pipelines config)))
+                                  upstream-pipelines (filter #(pipeline-names (:name %)) upstream)
+                                  upstream-datasources (filter #(not (pipeline-names (:name %))) upstream)
+                                  downstream-pipelines (filter #(pipeline-names (:name %)) downstream)
+                                  downstream-datasources (filter #(not (pipeline-names (:name %))) downstream)]
+                                 (str "<div class='lineage-section'><div class='lineage-header'>"
+                                      "<span class='detail-label' style='margin-bottom:0'>Lineage</span></div>"
+                                      "<div class='lineage-content'><div class='lineage-tree-view'>"
+                                      (lineage-section "↑ Pipelines" upstream-pipelines)
+                                      (lineage-section "↑ Datasources" upstream-datasources)
+                                      (lineage-section "↓ Pipelines" downstream-pipelines)
+                                      (lineage-section "↓ Datasources" downstream-datasources)
+                                      (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")
+                                      "</div></div></div>")))]
                      (set-html! ($id "details-title") (str group-name " (Group)"))
                      (set-html! ($id "details-content") html)
       ;; Setup click handlers for lineage links
@@ -400,15 +408,23 @@
                                        (badge pipeline-group "" (styles/badge-style :group))
                                        "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" pipeline-group "\")'>Collapse Group</button></div>"))
                 ;; Lineage section
-                            "<div class='lineage-section'><div class='lineage-header'>"
-                            "<span class='detail-label' style='margin-bottom:0'>Lineage</span>"
-                            (when has-lineage
-                                  (str "<div class='lineage-view-toggle'><span class='lineage-toggle-label active' data-view='tree'>Tree</span>"
-                                       "<div class='lineage-toggle-slider'></div><span class='lineage-toggle-label' data-view='json'>JSON</span></div>"))
-                            "</div><div class='lineage-content'><div class='lineage-tree-view'>"
-                            (lineage-section "Upstream" upstream true)
-                            (lineage-section "Downstream" downstream true)
-                            (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")
+                ;; Split lineage by type (pipelines vs datasources)
+                            (let [pipeline-names (set (map :name (:pipelines config)))
+                                  upstream-pipelines (filter #(pipeline-names (:name %)) upstream)
+                                  upstream-datasources (filter #(not (pipeline-names (:name %))) upstream)
+                                  downstream-pipelines (filter #(pipeline-names (:name %)) downstream)
+                                  downstream-datasources (filter #(not (pipeline-names (:name %))) downstream)]
+                                 (str "<div class='lineage-section'><div class='lineage-header'>"
+                                      "<span class='detail-label' style='margin-bottom:0'>Lineage</span>"
+                                      (when has-lineage
+                                            (str "<div class='lineage-view-toggle'><span class='lineage-toggle-label active' data-view='tree'>Tree</span>"
+                                                 "<div class='lineage-toggle-slider'></div><span class='lineage-toggle-label' data-view='json'>JSON</span></div>"))
+                                      "</div><div class='lineage-content'><div class='lineage-tree-view'>"
+                                      (lineage-section "↑ Pipelines" upstream-pipelines true)
+                                      (lineage-section "↑ Datasources" upstream-datasources true)
+                                      (lineage-section "↓ Pipelines" downstream-pipelines true)
+                                      (lineage-section "↓ Datasources" downstream-datasources true)
+                                      (when-not has-lineage "<div class='detail-value text-muted'>No lineage connections</div>")))
                             "</div><div class='lineage-json-view hidden'>"
                             "<button class='json-copy-btn' title='Copy to clipboard'>" icon-copy "</button>"
                             "<pre class='lineage-json-pre'>" provenance-json "</pre>"
