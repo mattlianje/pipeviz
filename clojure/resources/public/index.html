@@ -576,6 +576,13 @@
             border: 1px solid var(--border-color);
             overflow: hidden;
         }
+        /* When sidebar collapsed, add margin to keep canvas same size */
+        .graph-row {
+            transition: margin-right 0.2s ease;
+        }
+        .sidebar.collapsed ~ .main-content .graph-row {
+            margin-right: 108px;
+        }
         .graph-controls {
             position: absolute;
             top: 10px;
