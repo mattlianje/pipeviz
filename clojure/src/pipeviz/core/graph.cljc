@@ -349,10 +349,10 @@
                                           (when style (str " style=" style))
                                           " arrowsize=0.8];"))
                                  deduped-edges))]
-            (str "digraph G {\n  rankdir=LR bgcolor=transparent\n  node [fontname=Arial fontsize=12]\n  edge [fontsize=10]\n\n"
+            (str "digraph G {\n  rankdir=LR bgcolor=transparent overlap=false splines=true\n  node [fontname=Arial fontsize=12]\n  edge [fontsize=10]\n\n"
                  (str/join "\n" (map #(render-cluster % 0) roots)) "\n"
                  (str/join "\n" (map #(render-node % "  ") (nodes-by-cluster "_none"))) "\n"
-                 (str/join "\n" (map #(str "  " %) (make-edges))) "\n  overlap=false splines=true\n}"))))
+                 (str/join "\n" (map #(str "  " %) (make-edges))) "\n}"))))
 
 ;; Attribute Lineage
 (defn- parse-source-ref [ref]
