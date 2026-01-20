@@ -690,12 +690,14 @@
                                                (if dark? "#b0b0b0" "#666") "\" fontsize=\"9\"\n\n"
                                                (str/join "\n" (for [d dags :let [lbl (if (> (count (:pipelines d)) 1)
                                                                                          (str (:dag d) "\\n(" (count (:pipelines d)) " pipelines)")
-                                                                                         (:dag d))]]
-                                                                   (str "        \"" (:dag d) "\" [label=\"" lbl "\" fillcolor=\"" (:fill c)
-                                                                        "\" color=\"" (if (:missing d) "#ccc" (:border c))
-                                                                        "\" fontcolor=\"" (:text c) "\""
-                                                                        (when (:missing d) " style=\"filled,dashed\"")
-                                                                        (when (and (:airflow-url d) (not (:missing d)))
+                                                                                         (:dag d))
+                                                                                 missing? (:missing d)]]
+                                                                   (str "        \"" (:dag d) "\" [label=\"" lbl "\" fillcolor=\""
+                                                                        (if missing? (if dark? "#2a2a2a" "#e8e8e8") (:fill c))
+                                                                        "\" color=\"" (if missing? "#ccc" (:border c))
+                                                                        "\" fontcolor=\"" (if missing? "#999" (:text c)) "\""
+                                                                        (when missing? " style=\"filled,dashed\"")
+                                                                        (when (and (:airflow-url d) (not missing?))
                                                                               (str " href=\"" (:airflow-url d) "\" target=\"_blank\" tooltip=\"Open in Airflow\""))
                                                                         "]")))
                                                "\n    }")))

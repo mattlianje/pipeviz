@@ -281,6 +281,8 @@
                             (detail-row "Type" (badge "Group" "" (styles/badge-style :group)))
                             "<div class='node-actions'>"
                             "<button class='graph-ctrl-btn danger' onclick=\"showBlastRadius('" escaped-name "')\">◉ Blast Radius</button>"
+                            "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" group-name "\")'>"
+                            (if collapsed? "▶ Expand Group" "▼ Collapse Group") "</button>"
                             "</div>"
                             (detail-row (str "Pipelines (" (count members) ")") (badges members "badge-source"))
                             (when (:cluster node)
@@ -289,9 +291,6 @@
                                   (detail-row "Input Sources" (badges (:inputs node) "badge-input")))
                             (when (seq (:outputs node))
                                   (detail-row "Output Sources" (badges (:outputs node) "badge-output")))
-                            "<div class='group-toggle-section'>"
-                            "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" group-name "\")'>"
-                            (if collapsed? "▶ Expand Group" "▼ Collapse Group") "</button></div>"
                 ;; Split lineage by type (pipelines vs datasources)
                             (let [pipeline-names (set (map :name (:pipelines config)))
                                   upstream-pipelines (filter #(pipeline-names (:name %)) upstream)
@@ -386,6 +385,10 @@
                             "<div class='node-actions'>"
                             "<button class='graph-ctrl-btn danger' onclick=\"showBlastRadius('" escaped-name "')\">◉ Blast Radius</button>"
                             "</div>"
+                            (when pipeline-group
+                                  (str "<div class='detail-label'>Group</div><div class='detail-value group-membership'>"
+                                       (badge pipeline-group "" (styles/badge-style :group))
+                                       "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" pipeline-group "\")'>Collapse Group</button></div>"))
                             (when-let [desc (:description node-data)]
                                       (detail-row "Description" desc))
                             (when-let [schedule (:schedule node-data)]
@@ -403,10 +406,6 @@
                                        (str/join "" (map (fn [[k v]] (str "<a href='" v "' target='_blank' class='graph-ctrl-btn link-btn'>" (name k) "</a>"))
                                                          (:links node-data)))
                                        "</div>"))
-                            (when pipeline-group
-                                  (str "<div class='detail-label'>Group</div><div class='detail-value group-membership'>"
-                                       (badge pipeline-group "" (styles/badge-style :group))
-                                       "<button class='graph-ctrl-btn' onclick='toggleGroup(\"" pipeline-group "\")'>Collapse Group</button></div>"))
                 ;; Lineage section
                 ;; Split lineage by type (pipelines vs datasources)
                             (let [pipeline-names (set (map :name (:pipelines config)))
