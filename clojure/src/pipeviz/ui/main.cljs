@@ -772,7 +772,10 @@
                                 (do (switch-tab! "planner-pane")
                                     (js/setTimeout planner/restore-from-hash! 200))
                                 (and tab (not= tab "home"))
-                                (switch-tab! (str tab "-pane")))))))
+                                (switch-tab! (str tab "-pane"))
+                                ;; Default to graph when loading from URL
+                                :else
+                                (switch-tab! "graph-pane"))))))
           (.catch (fn [err]
                       (js/console.error "Failed to load config from URL:" err)
                       ;; Fall back to example config
