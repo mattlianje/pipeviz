@@ -1,0 +1,19 @@
+{
+  "name": "pipeviz-js",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pipeviz JS - Easy, elegant lineage from a single JSON",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fmt": "prettier --write 'src/**/*.js' 'index.html'",
+    "fmt:check": "prettier --check 'src/**/*.js' 'index.html'"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.0",
+    "vite": "^7.3.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}
