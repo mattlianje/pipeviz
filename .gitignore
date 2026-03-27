@@ -1,8 +1,7 @@
 node_modules/
-
 dist/
-
 .vite/
+*.tsbuildinfo
 
 .idea/
 *.swp

@@ -1,0 +1,2563 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pipeviz</title>
+        <link rel="icon" href="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png" />
+        <style>
+            :root {
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8f9fa;
+                --text-primary: #212529;
+                --text-secondary: #6c757d;
+                --text-muted: #828282;
+                --border-color: #dee2e6;
+            }
+            [data-theme='dark'] {
+                --bg-primary: #1a1a1a;
+                --bg-secondary: #252525;
+                --text-primary: #e0e0e0;
+                --text-secondary: #aaa;
+                --text-muted: #888;
+                --border-color: #444;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            /* Subtle scrollbars */
+            * {
+                scrollbar-width: thin;
+                scrollbar-color: var(--border-color) transparent;
+            }
+            *::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            *::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            *::-webkit-scrollbar-thumb {
+                background: var(--border-color);
+                border-radius: 3px;
+            }
+            *::-webkit-scrollbar-thumb:hover {
+                background: var(--text-muted);
+            }
+
+            html {
+                overflow-y: scroll;
+            }
+            body {
+                font-family: Helvetica, Arial, sans-serif;
+                font-size: 13px;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                line-height: 1.5;
+                min-height: 100vh;
+            }
+
+            code,
+            .json-editor,
+            .planner-output,
+            .export-output,
+            .lineage-json-pre,
+            .spec-pre {
+                font-family: Menlo, Consolas, 'Liberation Mono', monospace;
+            }
+            code {
+                font-size: 12px;
+            }
+
+            /* App layout: JSON left, content right */
+            .app-layout {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .json-panel {
+                position: absolute;
+                top: 52px;
+                left: 8px;
+                bottom: 8px;
+                width: 480px;
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-primary);
+                z-index: 60;
+                transform: translateX(0);
+                transition:
+                    transform 0.25s ease,
+                    opacity 0.25s ease;
+                opacity: 1;
+            }
+            .json-panel.hidden {
+                transform: translateX(-110%);
+                opacity: 0;
+                box-shadow: none;
+            }
+            [data-theme='dark'] .json-panel {
+                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+            }
+            [data-theme='dark'] .json-panel.hidden {
+                box-shadow: none;
+            }
+            /* Panel tabs (JSON / Mermaid / DOT) */
+            .json-panel-tabs {
+                display: flex;
+                align-items: stretch;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+                height: 32px;
+                font-size: 11px;
+            }
+            .json-panel-tab {
+                padding: 0 12px;
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                color: var(--text-muted);
+                font-size: 11px;
+                font-weight: 500;
+                font-family: inherit;
+                cursor: pointer;
+                transition: color 0.15s;
+            }
+            .json-panel-tab:hover {
+                color: var(--text-primary);
+            }
+            .json-panel-tab.active {
+                color: var(--text-primary);
+                border-bottom-color: #2563eb;
+            }
+            .json-panel-export {
+                flex: 1;
+                min-height: 0;
+                overflow: auto;
+                display: none;
+                position: relative;
+            }
+            .json-panel-export.active {
+                display: flex;
+                flex-direction: column;
+            }
+            .json-panel-export pre {
+                flex: 1;
+                margin: 0;
+                padding: 0.75rem;
+                font-size: 12px;
+                font-family: Menlo, Consolas, 'Liberation Mono', monospace;
+                white-space: pre-wrap;
+                word-break: break-all;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                overflow: auto;
+            }
+            .json-panel-copy {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                padding: 3px 8px;
+                font-size: 11px;
+                font-family: inherit;
+                color: var(--text-muted);
+                cursor: pointer;
+                transition:
+                    color 0.15s,
+                    border-color 0.15s;
+            }
+            .json-panel-copy:hover {
+                color: var(--text-primary);
+                border-color: var(--text-muted);
+            }
+            .json-panel .json-editor {
+                flex: 1;
+                min-height: 0;
+                resize: none;
+                border: none;
+                border-radius: 0;
+                background: var(--bg-secondary);
+                padding: 0.75rem;
+            }
+            .json-panel .json-editor:focus {
+                box-shadow: none;
+                border: none;
+            }
+            .json-panel-footer {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 0 10px;
+                height: 32px;
+                border-top: 1px solid var(--border-color);
+                flex-shrink: 0;
+                font-size: 11px;
+            }
+            .json-panel-footer .json-status {
+                margin: 0;
+                font-size: 11px;
+            }
+            .json-panel-actions {
+                display: flex;
+                align-items: center;
+                gap: 0;
+                margin-left: auto;
+            }
+            .json-action {
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 11px;
+                font-family: inherit;
+                padding: 2px 4px;
+                border-radius: 3px;
+                transition: color 0.15s;
+            }
+            .json-action:hover {
+                color: var(--text-primary);
+            }
+            .json-action-sep {
+                color: var(--border-color);
+                padding: 0 2px;
+            }
+            .json-panel-close {
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--text-muted);
+                font-size: 15px;
+                line-height: 1;
+                padding: 2px 4px;
+                border-radius: 3px;
+                margin-left: 4px;
+                transition: color 0.15s;
+            }
+            .json-panel-close:hover {
+                color: var(--text-primary);
+            }
+            .main-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                min-width: 0;
+                position: relative;
+            }
+
+            /* Top bar: tabs + toolbar */
+            .top-bar {
+                display: flex;
+                align-items: stretch;
+                justify-content: space-between;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+                height: 40px;
+            }
+            .app-title {
+                display: inline-flex;
+                align-items: center;
+                padding: 0 10px;
+            }
+            .app-logo {
+                width: 20px;
+                height: 20px;
+                opacity: 0.6;
+            }
+            .tab-strip {
+                display: flex;
+                align-items: stretch;
+                gap: 0;
+            }
+            .tab-strip-btn {
+                padding: 0 14px;
+                border: none;
+                background: transparent;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                border-bottom: 2px solid transparent;
+                transition:
+                    color 0.15s,
+                    background 0.15s;
+                display: flex;
+                align-items: center;
+            }
+            .tab-strip-btn:hover {
+                color: var(--text-primary);
+                background: var(--bg-secondary);
+            }
+            .tab-strip-btn.active {
+                color: var(--text-primary);
+                border-bottom-color: #2563eb;
+            }
+            [data-theme='dark'] .tab-strip-btn.active {
+                border-bottom-color: #3b82f6;
+            }
+            .toolbar {
+                display: flex;
+                gap: 2px;
+                align-items: center;
+                padding: 0 8px;
+            }
+            .toolbar-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 13px;
+                font-family: inherit;
+                text-decoration: none;
+                transition: background 0.15s;
+            }
+            .toolbar-btn:hover {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+            }
+            .json-toggle-btn {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 0 12px;
+                height: 100%;
+                border: none;
+                background: transparent;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                transition:
+                    color 0.15s,
+                    background 0.15s;
+            }
+            .json-toggle-btn:hover {
+                color: var(--text-primary);
+                background: var(--bg-secondary);
+            }
+            .json-toggle-icon {
+                font-size: 13px;
+                font-weight: 600;
+                opacity: 0.7;
+            }
+            .tab-strip-sep {
+                width: 1px;
+                align-self: stretch;
+                margin: 10px 2px;
+                background: var(--border-color);
+            }
+
+            /* Auth banner */
+            .auth-banner {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 16px;
+                background: #fffbeb;
+                border-bottom: 1px solid #f59e0b;
+                font-size: 12px;
+                color: #92400e;
+                flex-shrink: 0;
+            }
+            [data-theme='dark'] .auth-banner {
+                background: #451a03;
+                border-bottom-color: #b45309;
+                color: #fbbf24;
+            }
+            .auth-banner a {
+                color: inherit;
+                font-weight: 600;
+                text-decoration: underline;
+                cursor: pointer;
+            }
+            .auth-banner .auth-dismiss {
+                margin-left: auto;
+                background: none;
+                border: none;
+                color: inherit;
+                cursor: pointer;
+                font-size: 14px;
+                opacity: 0.6;
+                padding: 0 4px;
+            }
+            .auth-banner .auth-dismiss:hover {
+                opacity: 1;
+            }
+
+            /* View panes */
+            .view-pane {
+                display: none;
+                flex: 1;
+                min-height: 0;
+                overflow: auto;
+            }
+            .view-pane.active {
+                display: flex;
+                flex-direction: column;
+            }
+            #planner-pane.active {
+                overflow: hidden;
+            }
+
+            .hidden {
+                display: none !important;
+            }
+
+            /* Graph sub-views (Pipeline / Attributes toggle) */
+            .graph-subview {
+                display: none;
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
+            }
+            .graph-subview.active {
+                display: flex;
+                flex-direction: column;
+            }
+            .graph-subview-toggle {
+                display: flex;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                overflow: hidden;
+                flex-shrink: 0;
+            }
+            .graph-subtab {
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                font-family: inherit;
+                border: none;
+                background: transparent;
+                color: var(--text-muted);
+                cursor: pointer;
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+            }
+            .graph-subtab:hover {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+            }
+            .graph-subtab.active {
+                background: var(--text-primary);
+                color: var(--bg-primary);
+            }
+
+            /* JSON editor */
+            .json-editor {
+                width: 100%;
+                min-height: 200px;
+                font-size: 12px;
+                line-height: 1.5;
+                padding: 0.75rem;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                resize: vertical;
+                flex: 1;
+                tab-size: 2;
+            }
+            .json-editor:focus {
+                outline: none;
+                border-color: #2563eb;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            }
+            [data-theme='dark'] .json-editor:focus {
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            }
+            .json-status {
+                font-size: 11px;
+            }
+            .json-status.error {
+                color: #dc3545;
+            }
+            .json-status.success {
+                color: #28a745;
+            }
+
+            /* Buttons */
+            .btn {
+                padding: 5px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-family: inherit;
+                font-weight: 500;
+                border: none;
+                transition: background 0.15s;
+            }
+            .btn-dark {
+                background: #2563eb;
+                color: #fff;
+            }
+            .btn-dark:hover {
+                background: #1d4ed8;
+            }
+            .btn-outline {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border: 1px solid var(--border-color);
+            }
+            .btn-outline:hover {
+                background: var(--border-color);
+            }
+            [data-theme='dark'] .btn-dark {
+                background: #3b82f6;
+            }
+            [data-theme='dark'] .btn-dark:hover {
+                background: #2563eb;
+            }
+
+            @media (max-width: 768px) {
+                .json-panel {
+                    width: calc(100% - 16px);
+                }
+            }
+
+            #file-input {
+                display: none;
+            }
+
+            /* Graph container */
+            .graph-row {
+                display: flex;
+                flex: 1;
+                position: relative;
+                min-height: 0;
+                overflow: hidden;
+            }
+            .graph-col {
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+            }
+            .details-col {
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 340px;
+                background: var(--bg-primary);
+                border-left: 1px solid var(--border-color);
+                box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+                transform: translateX(100%);
+                transition: transform 0.2s ease;
+                z-index: 50;
+                overflow: hidden;
+                border-top-left-radius: 10px;
+            }
+            .details-col.visible {
+                transform: translateX(0);
+            }
+            [data-theme='dark'] .details-col {
+                box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+            }
+
+            .graph-container {
+                background: var(--bg-primary);
+                flex: 1;
+                position: relative;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            .graph-toolbar {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 0.5rem 0.75rem;
+                flex-shrink: 0;
+            }
+            .graph-toolbar .search-wrapper {
+                flex: 1;
+                max-width: 400px;
+                margin-bottom: 0;
+            }
+            .graph-ctrl-btn {
+                padding: 5px 12px;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                cursor: pointer;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                transition: background 0.15s;
+            }
+            .graph-ctrl-btn:hover {
+                background: var(--border-color);
+            }
+            .graph-ctrl-btn.active {
+                background: var(--text-primary);
+                color: var(--bg-primary);
+                border-color: var(--text-primary);
+            }
+            #graph,
+            #attribute-graph {
+                flex: 1;
+                min-height: 0;
+            }
+            #graph svg,
+            #attribute-graph svg,
+            .planner-graph svg {
+                width: 100%;
+                height: 100%;
+            }
+            .legend {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                font-size: 11px;
+                color: var(--text-muted);
+                background: var(--bg-primary);
+                padding: 4px 8px;
+                opacity: 0.9;
+            }
+            .legend-toggle {
+                cursor: pointer;
+            }
+            .legend-toggle:hover {
+                color: var(--text-primary);
+            }
+            .legend-content {
+                display: none;
+                margin-top: 4px;
+                color: var(--text-primary);
+            }
+            .legend-toggle::after {
+                content: ' ▸';
+            }
+            .legend.expanded .legend-toggle::after {
+                content: ' ▾';
+            }
+            .legend.expanded .legend-toggle {
+                color: var(--text-primary);
+            }
+            .legend.expanded .legend-content {
+                display: block;
+            }
+
+            /* Node details drawer */
+            .node-details-panel {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                font-size: 11px;
+            }
+            .node-details-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.6rem 0.75rem;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+            .node-details-header h5 {
+                font-size: 12px;
+                font-weight: 600;
+                margin: 0;
+            }
+            .node-details-close {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                cursor: pointer;
+                color: var(--text-muted);
+                font-size: 14px;
+                transition: background 0.15s;
+            }
+            .node-details-close:hover {
+                background: var(--border-color);
+                color: var(--text-primary);
+            }
+            .node-details-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 0.75rem;
+            }
+            .node-details-panel h5 {
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+                font-weight: 600;
+                font-size: 12px;
+            }
+            .detail-label {
+                font-size: 10px;
+                color: var(--text-muted);
+                margin-top: 0.5rem;
+            }
+            .detail-value {
+                margin-bottom: 0;
+                font-size: 11px;
+                color: var(--text-primary);
+                word-break: break-word;
+            }
+            .badge {
+                display: inline-block;
+                padding: 2px 8px;
+                font-size: 10px;
+                border-radius: 3px;
+                margin-right: 3px;
+                margin-bottom: 3px;
+            }
+            .badge-pipeline {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            .badge-source {
+                background: #f3e5f5;
+                color: #7b1fa2;
+            }
+            .badge-type {
+                background: #e8f5e9;
+                color: #2e7d32;
+            }
+            .badge-input {
+                background: #f3e5f5;
+                color: #7b1fa2;
+            }
+            .badge-output {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            .badge-cluster {
+                background: #e8f5e9;
+                color: #2e7d32;
+            }
+            .badge-tag {
+                background: #fff3cd;
+                color: #856404;
+            }
+            .badge-auto-created {
+                background: var(--bg-secondary);
+                color: var(--text-muted);
+            }
+            .badge-snowflake,
+            .badge-postgres,
+            .badge-database {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            .badge-s3,
+            .badge-delta,
+            .badge-parquet {
+                background: #fff3e0;
+                color: #e65100;
+            }
+            .badge-kafka,
+            .badge-api {
+                background: #fce4ec;
+                color: #c2185b;
+            }
+            .badge-unknown {
+                background: var(--bg-secondary);
+                color: var(--text-muted);
+            }
+            [data-theme='dark'] .badge-pipeline,
+            [data-theme='dark'] .badge-output,
+            [data-theme='dark'] .badge-snowflake,
+            [data-theme='dark'] .badge-postgres,
+            [data-theme='dark'] .badge-database {
+                background: #1e3a5f;
+                color: #90caf9;
+            }
+            [data-theme='dark'] .badge-source,
+            [data-theme='dark'] .badge-input {
+                background: #3a1f4a;
+                color: #ce93d8;
+            }
+            [data-theme='dark'] .badge-type,
+            [data-theme='dark'] .badge-cluster {
+                background: #1b3a1b;
+                color: #a5d6a7;
+            }
+            [data-theme='dark'] .badge-tag {
+                background: #3a3520;
+                color: #ffe082;
+            }
+            [data-theme='dark'] .badge-s3,
+            [data-theme='dark'] .badge-delta,
+            [data-theme='dark'] .badge-parquet {
+                background: #3a2a1a;
+                color: #ffcc80;
+            }
+            [data-theme='dark'] .badge-kafka,
+            [data-theme='dark'] .badge-api {
+                background: #3a1a2a;
+                color: #ef9a9a;
+            }
+            .group-toggle-section {
+                margin: 0.5rem 0;
+            }
+
+            /* Data table styles */
+            .table-toolbar {
+                display: flex;
+                gap: 1rem;
+                align-items: flex-start;
+                flex-wrap: wrap;
+                margin-bottom: 1rem;
+            }
+            .table-container {
+                overflow-x: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+            }
+            .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+            .data-table th,
+            .data-table td {
+                padding: 10px 12px;
+                text-align: left;
+                border-bottom: 1px solid var(--border-color);
+                vertical-align: top;
+            }
+            .data-table th {
+                background: var(--bg-secondary);
+                font-weight: 600;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+                color: var(--text-muted);
+                white-space: nowrap;
+            }
+            .data-table tbody tr:nth-child(odd) {
+                background: var(--bg-secondary);
+            }
+            .data-table tbody tr:hover {
+                background: var(--border-color);
+            }
+            .data-table .col-name {
+                width: 180px;
+                font-size: 0.85em;
+            }
+            .data-table .col-name strong {
+                font-size: 0.95em;
+            }
+            .data-table .col-desc {
+                min-width: 180px;
+                max-width: 280px;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .data-table .col-schedule {
+                white-space: nowrap;
+            }
+            .data-table .col-sources {
+                width: 300px;
+            }
+            .data-table .col-sources > div,
+            .data-table .col-tags > div {
+                white-space: normal;
+            }
+            .data-table .col-sources .badge,
+            .data-table .col-tags .badge {
+                display: inline-block;
+                margin: 0 4px 4px 0;
+            }
+            .data-table .col-cluster {
+                white-space: nowrap;
+            }
+            .data-table .col-tags {
+                min-width: 100px;
+            }
+            .data-table .col-links {
+                min-width: 80px;
+            }
+            .data-table .col-owner {
+                white-space: nowrap;
+            }
+            .data-table .col-metadata {
+                min-width: 150px;
+            }
+            .table-empty {
+                text-align: center;
+                color: var(--text-muted);
+                padding: 2rem;
+                font-size: 12px;
+            }
+            .links-scroll {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            /* Filter bar styles */
+            .filter-bar {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            .filter-group {
+                position: relative;
+                display: inline-block;
+            }
+            .filter-group-header {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 5px 12px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--text-muted);
+                transition: background 0.15s;
+            }
+            .filter-group-header:hover {
+                background: var(--border-color);
+                color: var(--text-primary);
+            }
+            .filter-group-header.has-active {
+                background: var(--text-primary);
+                color: var(--bg-primary);
+                border-color: var(--text-primary);
+            }
+            .filter-group-label {
+                text-transform: uppercase;
+                font-weight: 600;
+                letter-spacing: 0.3px;
+            }
+            .filter-group-count {
+                background: var(--bg-primary);
+                color: var(--text-muted);
+                padding: 0 5px;
+                border-radius: 10px;
+                font-size: 10px;
+                min-width: 18px;
+                text-align: center;
+            }
+            .filter-group-header.has-active .filter-group-count {
+                background: var(--bg-primary);
+                color: var(--text-primary);
+            }
+            .filter-group-dropdown {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                z-index: 100;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                margin-top: 4px;
+                min-width: 150px;
+                max-height: 250px;
+                overflow-y: auto;
+            }
+            .filter-group.open .filter-group-dropdown {
+                display: block;
+            }
+            .filter-group-dropdown-inner {
+                padding: 0.5rem;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .filter-tag {
+                display: block;
+                padding: 4px 8px;
+                font-size: 11px;
+                border-radius: 3px;
+                cursor: pointer;
+                color: var(--text-primary);
+                transition: background 0.15s;
+            }
+            .filter-tag:hover {
+                background: var(--bg-secondary);
+            }
+            .filter-tag.active {
+                background: var(--text-primary);
+                color: var(--bg-primary);
+            }
+            .lineage-item,
+            .lineage-link {
+                display: flex;
+                align-items: baseline;
+                padding: 2px 0;
+                font-size: 12px;
+                cursor: pointer;
+                color: #0366d6;
+            }
+            [data-theme='dark'] .lineage-item,
+            [data-theme='dark'] .lineage-link {
+                color: #58a6ff;
+            }
+            .lineage-item .lineage-name:hover,
+            .lineage-link .lineage-name:hover {
+                text-decoration: underline;
+            }
+            .lineage-indent {
+                color: var(--text-muted);
+                flex-shrink: 0;
+                white-space: pre;
+            }
+            .lineage-name {
+                overflow-x: auto;
+                white-space: nowrap;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .lineage-name::-webkit-scrollbar {
+                display: none;
+            }
+
+            /* Links section */
+            .links-section {
+                margin-bottom: 1rem;
+            }
+
+            /* Tree/JSON toggle */
+            .lineage-view-toggle {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 10px;
+                margin-top: 0.5rem;
+            }
+            .lineage-toggle-label {
+                opacity: 0.5;
+                cursor: pointer;
+            }
+            .lineage-toggle-label.active {
+                opacity: 1;
+                color: var(--text-primary);
+            }
+            .lineage-toggle-slider {
+                position: relative;
+                width: 28px;
+                height: 14px;
+                background: var(--border-color);
+                border-radius: 7px;
+                cursor: pointer;
+            }
+            .lineage-toggle-slider::after {
+                content: '';
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                width: 10px;
+                height: 10px;
+                background: var(--bg-primary);
+                border-radius: 50%;
+            }
+            .lineage-toggle-slider.json-active {
+                background: var(--text-muted);
+            }
+            .lineage-toggle-slider.json-active::after {
+                transform: translateX(14px);
+            }
+            .lineage-json-view {
+                position: relative;
+            }
+            .lineage-json-pre {
+                font-size: 10px;
+                line-height: 1.4;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                padding: 0.5rem;
+                overflow: auto;
+                max-height: 300px;
+            }
+
+            /* Node highlighting */
+            .node-highlighted {
+                stroke: #e65100 !important;
+                stroke-width: 3px !important;
+            }
+            .node-highlighted polygon,
+            .node-highlighted ellipse,
+            .node-highlighted path {
+                fill: #fff3e0 !important;
+            }
+            .node-highlighted text {
+                font-weight: normal !important;
+                stroke: none !important;
+            }
+            .node-highlighted text:not([fill]) {
+                fill: #000;
+            }
+            .node-connected {
+                stroke: #7b1fa2 !important;
+                stroke-width: 1.5px !important;
+            }
+            .node-connected text {
+                font-weight: normal !important;
+                stroke: none !important;
+            }
+            .node-connected text:not([fill]) {
+                fill: #000;
+            }
+            .node-dimmed {
+                opacity: 0.35 !important;
+            }
+            .edge-highlighted path {
+                stroke: #7b1fa2 !important;
+                stroke-width: 2px !important;
+            }
+            .edge-highlighted polygon {
+                stroke: #7b1fa2 !important;
+                fill: #7b1fa2 !important;
+            }
+            .edge-dimmed {
+                opacity: 0.18 !important;
+            }
+            .cluster-dimmed {
+                opacity: 0.25 !important;
+            }
+
+            /* Dark mode adjustments */
+            [data-theme='dark'] .node-highlighted text:not([fill]),
+            [data-theme='dark'] .node-connected text:not([fill]) {
+                fill: #000 !important;
+            }
+            /* Dark mode graph text fix */
+            [data-theme='dark'] #graph text,
+            [data-theme='dark'] #attribute-graph text {
+                fill: #e0e0e0 !important;
+            }
+            [data-theme='dark'] #graph .node text,
+            [data-theme='dark'] #attribute-graph .node text {
+                fill: #1a1a1a !important;
+            }
+            [data-theme='dark'] #graph .graph > polygon,
+            [data-theme='dark'] #attribute-graph .graph > polygon {
+                fill: transparent !important;
+            }
+            [data-theme='dark'] #graph .cluster > polygon,
+            [data-theme='dark'] #graph .cluster > path,
+            [data-theme='dark'] #attribute-graph .cluster > polygon,
+            [data-theme='dark'] #attribute-graph .cluster > path {
+                fill: #2a2a2a !important;
+                stroke: #555 !important;
+            }
+            [data-theme='dark'] #graph .cluster text,
+            [data-theme='dark'] #attribute-graph .cluster text {
+                fill: #e0e0e0 !important;
+            }
+
+            /* Search box */
+            .search-wrapper {
+                position: relative;
+                margin-bottom: 0.75rem;
+                width: 600px;
+                max-width: 100%;
+            }
+            .search-input {
+                width: 100%;
+                padding: 7px 12px;
+                font-size: 12px;
+                font-family: inherit;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+            }
+            .search-input:focus {
+                outline: none;
+                border-color: #2563eb;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            }
+            [data-theme='dark'] .search-input:focus {
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            }
+            .search-results-dropdown {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-top: none;
+                max-height: 300px;
+                overflow-y: auto;
+                z-index: 100;
+                display: none;
+            }
+            .search-results-dropdown.show {
+                display: block;
+            }
+            .search-result-item {
+                padding: 6px 10px;
+                cursor: pointer;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+                color: var(--text-primary);
+            }
+            .search-result-item:last-child {
+                border-bottom: none;
+            }
+            .search-result-item:hover,
+            .search-result-item.selected {
+                background-color: var(--bg-secondary);
+            }
+            .search-result-item .result-type {
+                font-size: 9px;
+                padding: 2px 4px;
+                text-transform: uppercase;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            }
+            .search-result-item .result-type.pipeline {
+                background-color: #e3f2fd;
+                color: #1565c0;
+                border: 1px solid #1565c0;
+            }
+            .search-result-item .result-type.datasource {
+                background-color: #f3e5f5;
+                color: #7b1fa2;
+                border: 1px solid #7b1fa2;
+            }
+            .search-result-item .result-name {
+                font-weight: 400;
+            }
+            .search-result-item .result-match {
+                color: #d84315;
+                font-weight: 600;
+            }
+            .search-result-item.no-match {
+                color: var(--text-muted);
+                font-style: italic;
+                cursor: default;
+            }
+            .search-result-item.no-match:hover {
+                background-color: transparent;
+            }
+
+            /* Node action buttons */
+            .node-actions {
+                display: flex;
+                gap: 0.25rem;
+                margin-bottom: 0.5rem;
+                flex-wrap: wrap;
+            }
+            .graph-ctrl-btn.danger {
+                background: #fef2f2;
+                color: #b91c1c;
+                border-color: #fecaca;
+            }
+            .graph-ctrl-btn.danger:hover {
+                background: #fecaca;
+            }
+            [data-theme='dark'] .graph-ctrl-btn.danger {
+                background: #2a1a1a;
+                color: #f87171;
+                border-color: #7f1d1d;
+            }
+            [data-theme='dark'] .graph-ctrl-btn.danger:hover {
+                background: #3a1a1a;
+            }
+
+            /* Modal styles */
+            .modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+            }
+            .modal.show {
+                display: flex;
+            }
+            .modal-backdrop {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+            }
+            .modal-dialog {
+                position: relative;
+                z-index: 1001;
+                width: 90%;
+                max-width: 1100px;
+                max-height: 90vh;
+            }
+            .modal-dialog.modal-xl {
+                max-width: 1100px;
+            }
+            .modal-content {
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+                overflow: hidden;
+            }
+            .modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .modal-title {
+                font-size: 0.9rem;
+                font-weight: 600;
+                margin: 0;
+            }
+            .modal-close {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 30px;
+                height: 30px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                font-size: 1.1rem;
+                cursor: pointer;
+                color: var(--text-muted);
+                transition: background 0.15s;
+                line-height: 1;
+                padding: 0;
+            }
+            .modal-close:hover {
+                background: var(--border-color);
+                color: var(--text-primary);
+            }
+            .modal-body {
+                padding: 0;
+            }
+            .modal-row {
+                display: flex;
+            }
+            .modal-col-graph {
+                flex: 0 0 66%;
+                height: 500px;
+                background: var(--bg-primary);
+                overflow: hidden;
+            }
+            .modal-col-summary {
+                flex: 0 0 34%;
+                height: 500px;
+                overflow-y: auto;
+                border-left: 1px solid var(--border-color);
+                padding: 1rem;
+            }
+            #blast-radius-graph {
+                width: 100%;
+                height: 100%;
+            }
+            @media (max-width: 768px) {
+                .modal-row {
+                    flex-direction: column;
+                }
+                .modal-col-graph,
+                .modal-col-summary {
+                    flex: none;
+                    width: 100%;
+                    height: 300px;
+                }
+                .modal-col-summary {
+                    border-left: none;
+                    border-top: 1px solid var(--border-color);
+                }
+            }
+
+            /* Planner styles */
+            .planner-header {
+                display: flex;
+                align-items: center;
+                padding: 0.5rem 0.75rem;
+                flex-shrink: 0;
+                gap: 0.5rem;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .planner-body {
+                flex: 1;
+                display: flex;
+                min-height: 0;
+            }
+            .planner-sidebar {
+                flex: 0 0 220px;
+                display: flex;
+                flex-direction: column;
+                border-right: 1px solid var(--border-color);
+                background: var(--bg-secondary);
+            }
+            .planner-sidebar .search-input {
+                border: none;
+                border-bottom: 1px solid var(--border-color);
+                border-radius: 0;
+                padding: 0.5rem 0.6rem;
+                font-size: 12px;
+                background: var(--bg-secondary);
+            }
+            .planner-pipeline-list {
+                flex: 1;
+                overflow-y: auto;
+                min-height: 0;
+            }
+            .planner-picker-group {
+                padding: 0.4rem 0.6rem;
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                letter-spacing: 0.5px;
+            }
+            .planner-picker-item {
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+                padding: 0.3rem 0.6rem;
+                font-size: 12px;
+                cursor: pointer;
+            }
+            .planner-picker-item:hover {
+                background: var(--border-color);
+            }
+            .planner-picker-item.hidden {
+                display: none;
+            }
+            .planner-picker-item input {
+                margin: 0;
+            }
+            .planner-picker-item input:checked + span,
+            .planner-picker-item:has(input:checked) {
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            .planner-picker-item .ds-tag {
+                font-size: 9px;
+                padding: 1px 4px;
+                background: #e3f2fd;
+                color: #1976d2;
+                border-radius: 2px;
+                margin-left: auto;
+            }
+            [data-theme='dark'] .planner-picker-item .ds-tag {
+                background: #1e3a5f;
+                color: #90caf9;
+            }
+            .planner-sidebar-footer {
+                padding: 0.4rem 0.6rem;
+                border-top: 1px solid var(--border-color);
+                font-size: 10px;
+                color: var(--text-muted);
+                display: flex;
+                justify-content: space-between;
+            }
+            .planner-main {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+            }
+            .planner-graph {
+                flex: 2;
+                min-height: 200px;
+                background: var(--bg-primary);
+                overflow: hidden;
+            }
+            .planner-graph svg {
+                width: 100%;
+                height: 100%;
+            }
+            .planner-placeholder {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                color: var(--text-muted);
+                font-size: 12px;
+            }
+            .planner-output-wrap {
+                flex: 1;
+                min-height: 120px;
+                position: relative;
+                border-top: 1px solid var(--border-color);
+            }
+            .planner-output {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0.75rem;
+                font-size: 11px;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border: none;
+                border-radius: 0;
+                overflow: auto;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+            .planner-copy-btn {
+                position: absolute;
+                top: 0.4rem;
+                right: 0.4rem;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                padding: 0.25rem;
+                cursor: pointer;
+                color: var(--text-muted);
+                z-index: 10;
+            }
+            .planner-copy-btn:hover {
+                color: var(--text-primary);
+            }
+            .planner-copy-btn.copied {
+                border-color: #28a745;
+                color: #28a745;
+            }
+            .planner-btn-count {
+                display: inline-block;
+                font-size: 10px;
+                background: #2563eb;
+                color: white;
+                padding: 1px 5px;
+                border-radius: 8px;
+                margin-left: 4px;
+                min-width: 16px;
+                text-align: center;
+            }
+            .planner-btn-count:empty {
+                display: none;
+            }
+
+            /* Stats styles */
+            .stats-summary {
+                display: flex;
+                gap: 2rem;
+                margin-bottom: 1.5rem;
+                padding-bottom: 1rem;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .stats-summary span {
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .stats-summary strong {
+                font-size: 1.1rem;
+                color: var(--text-primary);
+                margin-right: 0.25rem;
+            }
+            .stats-row {
+                display: flex;
+                gap: 2.5rem;
+                margin-bottom: 1.5rem;
+                flex-wrap: wrap;
+            }
+            .chart-box {
+                flex: 1;
+                min-width: 250px;
+                padding: 0;
+            }
+            .chart-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-muted);
+                margin-bottom: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }
+            .pie-container {
+                display: flex;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            .pie-legend {
+                font-size: 11px;
+            }
+            .pie-legend-row {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.35rem;
+            }
+            .pie-legend-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+                flex-shrink: 0;
+            }
+            .pie-legend-name {
+                color: var(--text-primary);
+                flex: 1;
+            }
+            .pie-legend-val {
+                color: var(--text-muted);
+            }
+            .stats-section {
+                flex: 1;
+                min-width: 250px;
+                padding: 0;
+            }
+            .section-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-muted);
+                margin-bottom: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }
+            .section-hint {
+                font-size: 11px;
+                color: var(--text-muted);
+                font-weight: normal;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+            .coverage-bars {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .coverage-row {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+            .coverage-label {
+                font-size: 11px;
+                color: var(--text-primary);
+                min-width: 90px;
+            }
+            .coverage-bar-wrap {
+                flex: 1;
+                height: 8px;
+                background: var(--border-color);
+                border-radius: 4px;
+                overflow: hidden;
+            }
+            .coverage-bar {
+                height: 100%;
+                border-radius: 4px;
+                transition: width 0.3s ease;
+            }
+            .coverage-bar.good {
+                background: #66bb6a;
+            }
+            .coverage-bar.okay {
+                background: #ffb74d;
+            }
+            .coverage-bar.low {
+                background: #ef5350;
+            }
+            .coverage-pct {
+                font-size: 11px;
+                font-weight: 600;
+                min-width: 35px;
+                text-align: right;
+            }
+            .coverage-pct.good {
+                color: #66bb6a;
+            }
+            .coverage-pct.okay {
+                color: #ffb74d;
+            }
+            .coverage-pct.low {
+                color: #ef5350;
+            }
+            .hub-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+            }
+            .hub-row {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 11px;
+            }
+            .hub-rank {
+                color: var(--text-muted);
+                min-width: 18px;
+            }
+            .hub-name {
+                flex: 1;
+                color: var(--text-primary);
+            }
+            .hub-name.pipeline {
+                color: #e65100;
+            }
+            .hub-name.datasource {
+                color: #1565c0;
+            }
+            .hub-name.group {
+                color: #2e7d32;
+            }
+            .hub-stats {
+                color: var(--text-muted);
+                font-size: 10px;
+            }
+            .cycles-warning {
+                padding-left: 0.75rem;
+                border-left: 3px solid #ffb74d;
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+            .cycles-warning .section-title {
+                color: #e65100;
+            }
+            [data-theme='dark'] .cycles-warning .section-title {
+                color: #ffb74d;
+            }
+            .cycle-count {
+                background: #ffb74d;
+                color: #fff;
+                padding: 0 6px;
+                border-radius: 10px;
+                font-size: 10px;
+                margin-left: 0.5rem;
+            }
+            .cycle-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                margin-top: 0.5rem;
+            }
+            .cycle-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.5rem;
+                font-size: 11px;
+            }
+            .cycle-label {
+                color: var(--text-muted);
+                font-weight: 600;
+            }
+            .cycle-path {
+                color: var(--text-primary);
+                word-break: break-word;
+            }
+        </style>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://unpkg.com/@hpcc-js/wasm@2.13.0/dist/graphviz.umd.js"></script>
+        <script src="https://unpkg.com/d3-graphviz@5.0.2/build/d3-graphviz.min.js"></script>
+    </head>
+    <body>
+        <div class="app-layout">
+            <!-- Main area -->
+            <div class="main-area">
+                <!-- JSON Panel (slide-over from left) -->
+                <div class="json-panel" id="json-panel">
+                    <div class="json-panel-tabs">
+                        <button class="json-panel-tab active" onclick="switchPanelTab('json')">JSON</button>
+                        <button class="json-panel-tab" onclick="switchPanelTab('mermaid')">Mermaid</button>
+                        <button class="json-panel-tab" onclick="switchPanelTab('dot')">DOT</button>
+                    </div>
+                    <textarea class="json-editor" id="json-input" placeholder='{ "pipelines": [...] }'></textarea>
+                    <div class="json-panel-export" id="panel-export-mermaid">
+                        <pre id="panel-mermaid-output"></pre>
+                        <button class="json-panel-copy" onclick="copyPanelExport('mermaid')">Copy</button>
+                    </div>
+                    <div class="json-panel-export" id="panel-export-dot">
+                        <pre id="panel-dot-output"></pre>
+                        <button class="json-panel-copy" onclick="copyPanelExport('dot')">Copy</button>
+                    </div>
+                    <div class="json-panel-footer">
+                        <div class="json-status" id="json-status"></div>
+                        <div class="json-panel-actions">
+                            <button class="json-action" onclick="loadExample()">Example</button>
+                            <span class="json-action-sep">·</span>
+                            <button class="json-action" onclick="formatJson()">Format</button>
+                            <span class="json-action-sep">·</span>
+                            <label class="json-action" style="cursor: pointer"
+                                >File<input
+                                    type="file"
+                                    id="file-input"
+                                    accept=".json"
+                                    onchange="loadFromFile(event)"
+                                    style="display: none"
+                            /></label>
+                        </div>
+                        <button class="json-panel-close" onclick="toggleJsonPanel()">&times;</button>
+                    </div>
+                </div>
+                <div class="top-bar">
+                    <nav class="tab-strip">
+                        <span class="app-title" title="pipeviz"
+                            ><img
+                                src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png"
+                                alt="pipeviz"
+                                class="app-logo"
+                        /></span>
+                        <button class="json-toggle-btn" onclick="toggleJsonPanel()" title="Toggle JSON editor (⌘J)">
+                            <span class="json-toggle-icon">{ }</span> Editor
+                        </button>
+                        <span class="tab-strip-sep"></span>
+                        <button class="tab-strip-btn active" onclick="switchView('graph-pane')">Graph</button>
+                        <button class="tab-strip-btn" onclick="switchView('planner-pane')">Planner</button>
+                        <button class="tab-strip-btn" onclick="switchView('pipelines-pane')">Pipelines</button>
+                        <button class="tab-strip-btn" onclick="switchView('datasources-pane')">Datasources</button>
+                        <button class="tab-strip-btn" onclick="switchView('stats-pane')">Stats</button>
+                    </nav>
+                    <div class="toolbar">
+                        <button class="toolbar-btn" onclick="toggleSpecModal()" title="Spec">?</button>
+                        <button class="toolbar-btn" onclick="toggleTheme()" id="theme-toggle" title="Theme">
+                            &#x263C;
+                        </button>
+                        <a
+                            class="toolbar-btn"
+                            href="https://github.com/mattlianje/pipeviz"
+                            target="_blank"
+                            title="GitHub"
+                        >
+                            <svg height="13" width="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                                />
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="auth-banner"></div>
+
+                <!-- Graph -->
+                <div class="view-pane active" id="graph-pane">
+                    <div class="graph-toolbar">
+                        <div class="graph-subview-toggle">
+                            <button class="graph-subtab active" onclick="switchGraphSubview('pipelines')">
+                                Pipelines
+                            </button>
+                            <button class="graph-subtab" onclick="switchGraphSubview('attributes')">Attributes</button>
+                        </div>
+                        <div id="pipeline-toolbar-items" style="display: contents">
+                            <div class="search-wrapper">
+                                <input
+                                    type="text"
+                                    class="search-input"
+                                    id="graph-search"
+                                    placeholder="Search nodes..."
+                                    autocomplete="off"
+                                    oninput="searchNodes(event)"
+                                    onkeydown="searchNodes(event)"
+                                />
+                                <div id="graph-search-results" class="search-results-dropdown"></div>
+                            </div>
+                            <button class="graph-ctrl-btn" id="collapse-all-btn" onclick="toggleCollapseAll()">
+                                Expand All
+                            </button>
+                            <button class="graph-ctrl-btn" id="pipelines-only-btn" onclick="togglePipelinesOnly()">
+                                Hide Datasources
+                            </button>
+                            <span id="group-toggles"></span>
+                        </div>
+                        <div id="attribute-toolbar-items" style="display: none">
+                            <div class="search-wrapper">
+                                <input
+                                    type="text"
+                                    class="search-input"
+                                    id="attribute-search"
+                                    placeholder="Search attributes..."
+                                    autocomplete="off"
+                                    oninput="searchAttributes(event)"
+                                    onkeydown="searchAttributes(event)"
+                                />
+                                <div id="attribute-search-results" class="search-results-dropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="graph-subview active" id="pipelines-subview">
+                        <div class="graph-row">
+                            <div class="graph-col" id="graph-col">
+                                <div class="graph-container">
+                                    <div id="graph"></div>
+                                    <div class="legend">
+                                        <div
+                                            class="legend-toggle"
+                                            onclick="this.parentElement.classList.toggle('expanded')"
+                                        >
+                                            Legend
+                                        </div>
+                                        <div class="legend-content">
+                                            <div>■ = Pipeline</div>
+                                            <div>● = Data Source</div>
+                                            <div style="color: #ff6b35">▣ = Group</div>
+                                            <div>□ = Cluster</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="details-col" id="details-col">
+                                <div class="node-details-panel" id="node-details">
+                                    <div class="node-details-header">
+                                        <h5 id="details-title">Details</h5>
+                                        <button class="node-details-close" onclick="clearSelection()">&times;</button>
+                                    </div>
+                                    <div class="node-details-body" id="details-content"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="graph-subview" id="attributes-subview">
+                        <div class="graph-row">
+                            <div class="graph-col" id="attribute-graph-col">
+                                <div class="graph-container">
+                                    <div id="attribute-graph"></div>
+                                    <div class="legend">
+                                        <div
+                                            class="legend-toggle"
+                                            onclick="this.parentElement.classList.toggle('expanded')"
+                                        >
+                                            Legend
+                                        </div>
+                                        <div class="legend-content">
+                                            <div>▢ = Data Source</div>
+                                            <div>· = Attribute</div>
+                                            <div>→ = Derived from</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="details-col" id="attribute-details-col">
+                                <div class="node-details-panel" id="attribute-details-panel">
+                                    <div class="node-details-header">
+                                        <h5>Details</h5>
+                                        <button class="node-details-close" onclick="clearAttributeSelection()">
+                                            &times;
+                                        </button>
+                                    </div>
+                                    <div class="node-details-body" id="attribute-details-content"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Planner -->
+                <div class="view-pane" id="planner-pane">
+                    <div class="planner-header">
+                        <button class="graph-ctrl-btn" onclick="clearPlannerSelection()">Clear selection</button>
+                    </div>
+                    <div class="planner-body">
+                        <div class="planner-sidebar">
+                            <input
+                                type="text"
+                                class="search-input"
+                                placeholder="Filter pipelines..."
+                                oninput="filterPlannerItems(this.value)"
+                                autocomplete="off"
+                                id="planner-picker-filter"
+                            />
+                            <div class="planner-pipeline-list" id="planner-picker-list"></div>
+                            <div class="planner-sidebar-footer">
+                                <span id="planner-picker-count"></span>
+                                <span id="planner-selected-count"></span>
+                            </div>
+                        </div>
+                        <div class="planner-main">
+                            <div class="planner-graph" id="planner-graph">
+                                <div class="planner-placeholder">Select pipelines to see the execution plan</div>
+                            </div>
+                            <div class="planner-output-wrap">
+                                <button
+                                    class="planner-copy-btn"
+                                    onclick="copyPlannerOutput()"
+                                    title="Copy to clipboard"
+                                >
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                    >
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                    </svg>
+                                </button>
+                                <pre class="planner-output" id="planner-output"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipelines -->
+                <div class="view-pane" id="pipelines-pane">
+                    <div style="padding: 0.75rem">
+                        <div class="table-toolbar">
+                            <div class="search-wrapper">
+                                <input
+                                    type="text"
+                                    class="search-input"
+                                    id="pipeline-search"
+                                    placeholder="Search pipelines..."
+                                    autocomplete="off"
+                                    oninput="filterPipelines()"
+                                />
+                            </div>
+                            <div class="filter-bar" id="pipeline-filters"></div>
+                        </div>
+                        <div id="pipelines-table-container">
+                            <p class="table-empty">Load a configuration to see your pipelines</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datasources -->
+                <div class="view-pane" id="datasources-pane">
+                    <div style="padding: 0.75rem">
+                        <div class="table-toolbar">
+                            <div class="search-wrapper">
+                                <input
+                                    type="text"
+                                    class="search-input"
+                                    id="datasource-search"
+                                    placeholder="Search datasources..."
+                                    autocomplete="off"
+                                    oninput="filterDatasources()"
+                                />
+                            </div>
+                            <div class="filter-bar" id="datasource-filters"></div>
+                        </div>
+                        <div id="datasources-table-container">
+                            <p class="table-empty">Load a configuration to see your datasources</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="view-pane" id="stats-pane">
+                    <div style="padding: 0.75rem">
+                        <div id="stats-content"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- end main-area -->
+        </div>
+        <!-- end app-layout -->
+
+        <!-- Blast Radius Modal -->
+        <div class="modal" id="blast-radius-modal">
+            <div class="modal-backdrop" onclick="hideBlastRadiusModal()"></div>
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <span style="color: #c98b8b">◉</span> Blast Radius:
+                            <span id="blast-radius-node-name"></span>
+                        </h5>
+                        <button type="button" class="modal-close" onclick="hideBlastRadiusModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-row">
+                            <div class="modal-col-graph">
+                                <div id="blast-radius-graph"></div>
+                            </div>
+                            <div class="modal-col-summary">
+                                <div id="blast-radius-summary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spec Modal -->
+        <div class="modal" id="spec-modal">
+            <div class="modal-backdrop" onclick="toggleSpecModal()"></div>
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <style>
+                        .spec-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 12px;
+                            margin: 0.75rem 0 1rem 0;
+                        }
+                        .spec-table th,
+                        .spec-table td {
+                            padding: 6px 10px;
+                            border: 1px solid var(--border-color);
+                            text-align: left;
+                        }
+                        .spec-table th {
+                            background: var(--bg-secondary);
+                        }
+                        .spec-section {
+                            margin-bottom: 1.5rem;
+                        }
+                        .spec-section h5 {
+                            font-weight: 600;
+                            margin-bottom: 0.5rem;
+                            font-size: 0.9rem;
+                        }
+                        .spec-pre {
+                            background: var(--bg-secondary);
+                            border: 1px solid var(--border-color);
+                            border-radius: 6px;
+                            padding: 12px;
+                            font-size: 12px;
+                            margin: 0;
+                            overflow-x: auto;
+                        }
+                    </style>
+                    <div class="modal-header">
+                        <h5 class="modal-title">Pipeviz JSON Spec</h5>
+                        <button type="button" class="modal-close" onclick="toggleSpecModal()">&times;</button>
+                    </div>
+                    <div class="modal-body" style="max-height: 80vh; overflow-y: auto; padding: 1.5rem">
+                        <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 1.5rem">
+                            Only <code>pipelines</code> is required. Clusters and datasources are auto-created when
+                            referenced.
+                        </p>
+
+                        <div class="spec-section">
+                            <h5>Root</h5>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>pipelines</code></td>
+                                    <td>array</td>
+                                    <td>Yes</td>
+                                    <td>Jobs that transform or move data</td>
+                                </tr>
+                                <tr>
+                                    <td><code>datasources</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Tables, files, streams, APIs</td>
+                                </tr>
+                                <tr>
+                                    <td><code>clusters</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Groups for visual organization</td>
+                                </tr>
+                            </table>
+                            <pre class="spec-pre">
+{
+  "clusters": [...],
+  "pipelines": [...],
+  "datasources": [...]
+}</pre
+                            >
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Pipeline</h5>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>name</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Unique identifier</td>
+                                </tr>
+                                <tr>
+                                    <td><code>description</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>input_sources</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Datasources read from</td>
+                                </tr>
+                                <tr>
+                                    <td><code>output_sources</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Datasources written to</td>
+                                </tr>
+                                <tr>
+                                    <td><code>upstream_pipelines</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Pipeline or group names (orange edges)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>cluster</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Cluster name</td>
+                                </tr>
+                                <tr>
+                                    <td><code>group</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Collapse into group node</td>
+                                </tr>
+                                <tr>
+                                    <td><code>schedule</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Free text</td>
+                                </tr>
+                                <tr>
+                                    <td><code>owner</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>tags</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>metadata</code></td>
+                                    <td>object</td>
+                                    <td>No</td>
+                                    <td>Arbitrary key-value</td>
+                                </tr>
+                                <tr>
+                                    <td><code>links</code></td>
+                                    <td>object</td>
+                                    <td>No</td>
+                                    <td>name to URL (<code>airflow</code> key used by planner)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>duration</code></td>
+                                    <td>number</td>
+                                    <td>No</td>
+                                    <td>Runtime in minutes</td>
+                                </tr>
+                                <tr>
+                                    <td><code>cost</code></td>
+                                    <td>number</td>
+                                    <td>No</td>
+                                    <td>Cost per run</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Datasource</h5>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                                Auto-created when referenced. Define explicitly to add metadata.
+                            </p>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>name</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Unique identifier</td>
+                                </tr>
+                                <tr>
+                                    <td><code>description</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>type</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>snowflake, postgres, kafka, s3...</td>
+                                </tr>
+                                <tr>
+                                    <td><code>owner</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>cluster</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>tags</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>metadata</code></td>
+                                    <td>object</td>
+                                    <td>No</td>
+                                    <td>Arbitrary key-value</td>
+                                </tr>
+                                <tr>
+                                    <td><code>links</code></td>
+                                    <td>object</td>
+                                    <td>No</td>
+                                    <td>name to URL</td>
+                                </tr>
+                                <tr>
+                                    <td><code>attributes</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Column-level lineage</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Cluster</h5>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                                Auto-created when referenced. Define explicitly for nesting.
+                            </p>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>name</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Unique identifier</td>
+                                </tr>
+                                <tr>
+                                    <td><code>description</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>parent</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Parent cluster for nesting</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Attribute Lineage</h5>
+                            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 0.5rem">
+                                Add <code>attributes</code> to a datasource. Reference upstream with
+                                <code>source::attr</code>.
+                            </p>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><code>name</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Column/field name</td>
+                                </tr>
+                                <tr>
+                                    <td><code>from</code></td>
+                                    <td>string or array</td>
+                                    <td>No</td>
+                                    <td>Upstream refs</td>
+                                </tr>
+                                <tr>
+                                    <td><code>attributes</code></td>
+                                    <td>array</td>
+                                    <td>No</td>
+                                    <td>Nested child attributes</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Edge Types</h5>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Color</th>
+                                    <th>Source</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td style="color: #555">Gray</td>
+                                    <td><code>input_sources</code> / <code>output_sources</code></td>
+                                    <td>Data flow through datasources</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #ff6b35">Orange</td>
+                                    <td><code>upstream_pipelines</code></td>
+                                    <td>Direct pipeline dependency</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="spec-section">
+                            <h5>Example</h5>
+                            <pre class="spec-pre" style="max-height: 400px; overflow-y: auto">
+{
+  "clusters": [
+    { "name": "ingestion" },
+    { "name": "warehouse" },
+    { "name": "serving", "parent": "warehouse" }
+  ],
+  "pipelines": [
+    {
+      "name": "ingest-events",
+      "input_sources": ["raw_clickstream"],
+      "output_sources": ["events"],
+      "cluster": "ingestion",
+      "schedule": "Every 5 min",
+      "duration": 2,
+      "tags": ["streaming"],
+      "links": { "airflow": "https://airflow.co/dags/ingest_events" }
+    },
+    {
+      "name": "build-profiles",
+      "input_sources": ["events", "raw_users"],
+      "output_sources": ["user_profiles"],
+      "cluster": "warehouse",
+      "schedule": "Daily 02:00",
+      "duration": 45,
+      "cost": 12.50,
+      "owner": "data-team@co.com",
+      "upstream_pipelines": ["ingest-events"],
+      "tags": ["daily", "core"]
+    },
+    {
+      "name": "export-crm",
+      "input_sources": ["user_profiles"],
+      "output_sources": ["salesforce_sync"],
+      "cluster": "serving",
+      "group": "exports",
+      "upstream_pipelines": ["build-profiles"]
+    },
+    {
+      "name": "export-analytics",
+      "input_sources": ["user_profiles"],
+      "output_sources": ["amplitude_sync"],
+      "cluster": "serving",
+      "group": "exports",
+      "upstream_pipelines": ["build-profiles"]
+    }
+  ],
+  "datasources": [
+    {
+      "name": "raw_users",
+      "type": "postgres",
+      "owner": "platform@co.com",
+      "tags": ["pii"],
+      "metadata": { "schema": "public", "table": "users" },
+      "attributes": [
+        { "name": "id" },
+        { "name": "email" },
+        { "name": "created_at" }
+      ]
+    },
+    {
+      "name": "raw_clickstream",
+      "type": "kafka",
+      "metadata": { "topic": "clicks.prod" }
+    },
+    {
+      "name": "events",
+      "type": "s3",
+      "attributes": [
+        { "name": "event_id" },
+        { "name": "user_id", "from": "raw_users::id" },
+        { "name": "event_type" },
+        { "name": "ts" }
+      ]
+    },
+    {
+      "name": "user_profiles",
+      "type": "snowflake",
+      "attributes": [
+        { "name": "user_id", "from": "raw_users::id" },
+        { "name": "email", "from": "raw_users::email" },
+        { "name": "event_count", "from": "events::event_id" },
+        { "name": "last_seen", "from": "events::ts" },
+        { "name": "tenure_days", "from": ["raw_users::created_at", "events::ts"] }
+      ]
+    }
+  ]
+}</pre
+                            >
+                        </div>
+
+                        <div class="spec-section" style="margin-bottom: 0">
+                            <h5>Loading</h5>
+                            <table class="spec-table">
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>JSON panel</td>
+                                    <td>Paste or edit JSON directly, click Apply</td>
+                                </tr>
+                                <tr>
+                                    <td>File</td>
+                                    <td>Load a <code>.json</code> file (or drag and drop)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>?url=</code></td>
+                                    <td>Load from a remote URL</td>
+                                </tr>
+                                <tr>
+                                    <td><code>?config=</code></td>
+                                    <td>Base64-encoded config in the URL</td>
+                                </tr>
+                                <tr>
+                                    <td><code>pipeviz.json</code></td>
+                                    <td>Auto-loaded if present in the same directory</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type="module" src="/src/main.js"></script>
+    </body>
+</html>

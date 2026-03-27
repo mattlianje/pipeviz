@@ -1,0 +1,139 @@
+export function switchTab(paneId) {
+    const appLayout = document.getElementById('app-layout')
+
+    // Hide all panes
+    document.querySelectorAll('.tab-pane').forEach((pane) => {
+        pane.classList.remove('active')
+    })
+
+    // Deactivate all sidebar items
+    document.querySelectorAll('.sidebar-item').forEach((item) => {
+        item.classList.remove('active')
+    })
+
+    // Show target pane
+    const targetPane = document.getElementById(paneId)
+    if (targetPane) {
+        targetPane.classList.add('active')
+    }
+
+    // Activate corresponding sidebar item
+    const sidebarItem = document.querySelector(`.sidebar-item[data-tab="${paneId}"]`)
+    if (sidebarItem) {
+        sidebarItem.classList.add('active')
+    }
+
+    // Update hash
+    const tabName = paneId.replace('-pane', '')
+    const nodeParam = getNodeFromHash()
+    const newHash = nodeParam ? `${tabName}&node=${encodeURIComponent(nodeParam)}` : tabName
+    history.replaceState(null, '', '#' + newHash)
+
+    // Fire custom event for listeners
+    const event = new CustomEvent('tabchange', { detail: { pane: paneId } })
+    document.dispatchEvent(event)
+}
+
+export function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar')
+    sidebar.classList.toggle('collapsed')
+}
+
+export function parseHash() {
+    const hash = window.location.hash.slice(1)
+    if (!hash) return { tab: null, node: null, view: null, pipelines: null, blast: null }
+
+    const parts = hash.split('&')
+    let tab = null
+    let node = null
+    let view = null
+    let pipelines = null
+    let blast = null
+
+    parts.forEach((part) => {
+        if (part.startsWith('node=')) {
+            node = decodeURIComponent(part.slice(5))
+        } else if (part.startsWith('view=')) {
+            view = decodeURIComponent(part.slice(5))
+        } else if (part.startsWith('pipelines=')) {
+            pipelines = decodeURIComponent(part.slice(10))
+                .split(',')
+                .filter((p) => p)
+        } else if (part.startsWith('blast=')) {
+            blast = decodeURIComponent(part.slice(6))
+        } else if (!part.includes('=')) {
+            tab = part
+        }
+    })
+
+    return { tab, node, view, pipelines, blast }
+}
+
+export function getNodeFromHash() {
+    return parseHash().node
+}
+
+export function getPlannerStateFromHash() {
+    const { view, pipelines } = parseHash()
+    return { view, pipelines }
+}
+
+export function getBlastFromHash() {
+    return parseHash().blast
+}
+
+export function updateHashWithBlast(nodeName) {
+    const { tab, node } = parseHash()
+    const currentTab = tab || 'graph'
+    let hash = `#${currentTab}`
+    if (node) {
+        hash += `&node=${encodeURIComponent(node)}`
+    }
+    if (nodeName) {
+        hash += `&blast=${encodeURIComponent(nodeName)}`
+    }
+    history.replaceState(null, '', hash)
+}
+
+export function clearBlastFromHash() {
+    const { tab, node } = parseHash()
+    const currentTab = tab || 'graph'
+    let hash = `#${currentTab}`
+    if (node) {
+        hash += `&node=${encodeURIComponent(node)}`
+    }
+    history.replaceState(null, '', hash)
+}
+
+export function updateHashWithNode(nodeName) {
+    const { tab } = parseHash()
+    const currentTab = tab || 'graph'
+    if (nodeName) {
+        history.replaceState(null, '', `#${currentTab}&node=${encodeURIComponent(nodeName)}`)
+    } else {
+        history.replaceState(null, '', `#${currentTab}`)
+    }
+}
+
+export function updateHashWithPlannerState(view, pipelines) {
+    const currentTab = 'planner'
+    let hash = `#${currentTab}`
+    if (view) {
+        hash += `&view=${encodeURIComponent(view)}`
+    }
+    if (pipelines && pipelines.length > 0) {
+        hash += `&pipelines=${pipelines.map((p) => encodeURIComponent(p)).join(',')}`
+    }
+    history.replaceState(null, '', hash)
+}
+
+export function activateTabFromHash() {
+    const { tab } = parseHash()
+    if (tab) {
+        switchTab(tab + '-pane')
+    }
+}
+
+export function getDefaultTab() {
+    return 'graph-pane'
+}
