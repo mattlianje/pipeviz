@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>pipeviz</title>
+<meta charset="utf-8">
+<link rel="icon" href="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png">
+<style>
+table { table-layout: fixed; }
+pre { overflow-x: auto; background: #f5f5f5; padding: 10px; font-size: 13px; }
+code { background: #f5f5f5; padding: 1px 4px; font-size: 13px; }
+h2 { margin-top: 2em; }
+img { max-width: 100%; }
+</style>
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="520" align="center"><tr><td>
+
+<h1><img src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png" width="40" style="vertical-align: middle;"> pipeviz</h1>
+
+<p>Data lineage from a single JSON file. No backend, no database, no accounts.
+Declare your pipelines and datasources, get a graph and an
+<a href="https://modelcontextprotocol.io">MCP</a> server
+your LLM can query directly. Works with any stack.</p>
+
+<p><a href="https://pipeviz.org">pipeviz.org</a> |
+<a href="https://github.com/mattlianje/pipeviz">GitHub</a></p>
+
+<h2>But seriously, why pipeviz?</h2>
+
+<p><b>Mermaid / hand-drawn diagrams</b> go stale the week after you draw them.
+Nobody updates them. They live in a wiki nobody reads.</p>
+
+<p><b>DOT / Graphviz scripts</b> get the layout right but have no interactivity,
+no blast radius, no lineage queries. You are writing a rendering format, not a spec.</p>
+
+<p><b>OpenLineage / Marquez</b> need runtime agents, a metadata store, and infrastructure.
+Great if you have the team to run it. Most don't.</p>
+
+<p><b>dbt</b> gives you lineage but only for dbt models.
+Your Spark jobs, Kafka streams, and cron scripts are invisible.</p>
+
+<p>Pipeviz is a JSON file you check into git. It works with anything
+because it doesn't care how your pipelines run. You describe what reads
+what and what writes what. Pipeviz computes the rest.</p>
+
+<h2>How it works</h2>
+
+<p>A <b>pipeline</b> reads from input datasources and writes to output datasources.
+A <b>datasource</b> is any data asset: a table, a bucket, an API.
+Pipeviz builds a DAG from these relationships and renders it with Graphviz.</p>
+
+<h2>What you get</h2>
+
+<ul>
+<li>Interactive graph with click-to-highlight lineage</li>
+<li>Blast radius: what breaks if a node goes down, and who to notify</li>
+<li>Backfill planner: topologically sorted parallel stages</li>
+<li>Column-level lineage with nested type support</li>
+<li>Collapsible pipeline groups and clusters</li>
+<li>Focus mode to isolate a subgraph</li>
+<li>An MCP server so your LLM can query all of the above</li>
+</ul>
+
+<p>Pipelines can declare <code>schedule</code>, <code>duration</code>, <code>cost</code>,
+<code>owner</code>, <code>owners</code>, <code>users</code>,
+<code>tags</code>, <code>cluster</code>, and arbitrary <code>links</code>. All optional.</p>
+
+<h2>Minimal example</h2>
+
+<pre>
+{
+  "pipelines": [
+    {
+      "name": "etl-users",
+      "input_sources": ["raw_users"],
+      "output_sources": ["clean_users"]
+    }
+  ],
+  "datasources": [
+    { "name": "raw_users", "type": "postgres" },
+    { "name": "clean_users", "type": "snowflake" }
+  ]
+}
+</pre>
+
+<p>Datasources can carry <code>attributes</code> for column-level lineage.
+Use <code>::</code> on the output side to trace provenance back to a source column:</p>
+
+<pre>
+"attributes": [
+  { "name": "user_id", "from": "raw_users::id" },
+  { "name": "city",    "from": "raw_users::address::city" }
+]
+</pre>
+
+<p>Nodes can be grouped into <code>clusters</code> (which nest).
+Paste or drag-drop JSON into the UI, or load via <code>?url=</code> query param.</p>
+
+<h2>MCP server</h2>
+
+<p>Pipeviz ships a zero-dependency <a href="https://modelcontextprotocol.io">MCP</a> server
+in <code>/mcp</code>. Point it at your pipeviz JSON and your LLM
+gets the full graph as tools.</p>
+
+<p>Add to your Claude Code config (<code>~/.claude.json</code>):</p>
+
+<pre>
+"mcpServers": {
+  "pipeviz": {
+    "command": "node",
+    "args": ["/path/to/pipeviz/mcp/server.js",
+             "/path/to/pipeviz.json"]
+  }
+}
+</pre>
+
+<p>Or pass the config path via <code>PIPEVIZ_CONFIG</code> env var.</p>
+
+<ul>
+<li><code>node_info</code> details of a pipeline or datasource</li>
+<li><code>upstream_of</code> everything that feeds into a node</li>
+<li><code>downstream_of</code> everything downstream of a node</li>
+<li><code>blast_radius</code> what breaks if a node goes down, and who to notify</li>
+<li><code>blast_radius_diagram</code> mermaid flowchart of the blast radius</li>
+<li><code>file_blast_radius</code> blast radius from a source file path (via links.github)</li>
+<li><code>file_blast_radius_diagram</code> mermaid diagram of file blast radius</li>
+<li><code>backfill_order</code> topologically sorted stages to re-run downstream</li>
+<li><code>cluster_info</code> all pipelines and datasources in a cluster</li>
+<li><code>owners_of</code> who owns and uses a node</li>
+<li><code>nodes_by_person</code> what does a person own or use</li>
+<li><code>search_nodes</code> fuzzy search by name</li>
+<li><code>graph_summary</code> high-level counts, groups, clusters</li>
+</ul>
+
+<p>Same JSON as the web UI. No separate config, no database, no state.</p>
+
+<h2>Team workflow</h2>
+
+<p>Each team maintains their own JSON file.
+Merge them with <code>jq</code> for an org-wide view:</p>
+
+<pre>
+jq -s '{
+  pipelines: map(.pipelines) | add,
+  datasources: map(.datasources) | add,
+  clusters: map(.clusters // []) | add
+}' team-a.json team-b.json > all.json
+</pre>
+
+<h2>Screenshots</h2>
+
+<p align="center">
+<img src="pix/pipeviz-2.png" width="520">
+</p>
+<p><small>Graph view with clusters and critical path highlighting</small></p>
+
+<p align="center">
+<img src="pix/pipeviz-attributes.png" width="520">
+</p>
+<p><small>Attribute-level lineage between datasources</small></p>
+
+<hr>
+<p><small>&copy; 2024-2026 Matthieu Court</small></p>
+
+</td></tr></table>
+</body>
+</html>
