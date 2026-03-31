@@ -26,5 +26,6 @@ install:
 clean:
 	rm -rf dist node_modules
 
-publish: build
-	rsync -avz --delete dist/ root@nargothrond.xyz:/var/www/pipeviz.org/
+publish:
+	cd js && $(MAKE) build
+	rsync -avz --delete js/dist/ root@nargothrond.xyz:/var/www/pipeviz.org/

@@ -8,6 +8,8 @@ export const state = {
     showCostLabels: false,
     expandedGroups: new Set(),
     selectedNode: null,
+    focusedNode: null,
+    focusedSet: null,
     cachedUpstreamMap: {},
     cachedDownstreamMap: {},
     cachedLineage: {},
@@ -27,7 +29,8 @@ export function getConfigHash(config) {
 export function getViewStateKey() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
     const expandedGroupsKey = Array.from(state.expandedGroups).sort().join(',')
-    return `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${expandedGroupsKey}`
+    const focusKey = state.focusedNode || ''
+    return `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${expandedGroupsKey}|${focusKey}`
 }
 
 export function clearViewStateCache() {

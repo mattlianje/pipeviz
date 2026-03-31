@@ -485,13 +485,6 @@ export function renderStats() {
             </div>
         </div>
         <div class="stats-row">
-            <div class="stats-section">
-                <div class="section-title">Coverage</div>
-                <div class="coverage-bars">
-                    ${renderCoverageBar('Schedules', stats.coverage.schedules)}
-                    ${renderCoverageBar('Airflow Links', stats.coverage.airflow)}
-                </div>
-            </div>
             ${
                 stats.hubs.length > 0
                     ? `
@@ -515,26 +508,6 @@ export function renderStats() {
                     : ''
             }
         </div>`
-
-    if (stats.cycles.length > 0) {
-        html += `
-            <div class="stats-section cycles-warning">
-                <div class="section-title">⚠ Cycles Detected <span class="cycle-count">${stats.cycles.length}</span></div>
-                <div class="section-hint">Circular dependencies in pipeline graph</div>
-                <div class="cycle-list">
-                    ${stats.cycles
-                        .map(
-                            (cycle, i) => `
-                        <div class="cycle-item">
-                            <span class="cycle-label">#${i + 1}</span>
-                            <span class="cycle-path">${cycle.join(' > ')}</span>
-                        </div>
-                    `
-                        )
-                        .join('')}
-                </div>
-            </div>`
-    }
 
     container.innerHTML = html
 }

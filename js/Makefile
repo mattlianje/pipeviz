@@ -1,4 +1,4 @@
-.PHONY: dev build clean install preview fmt
+.PHONY: dev build clean install preview fmt test
 
 SHELL := /bin/bash
 NVM = source $(HOME)/.nvm/nvm.sh; nvm use --silent &&
@@ -20,6 +20,9 @@ preview:
 
 install:
 	$(NVM) npm install
+
+test:
+	$(NVM) node ../mcp/test.js
 
 clean:
 	rm -rf dist node_modules

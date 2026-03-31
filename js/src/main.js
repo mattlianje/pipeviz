@@ -21,7 +21,9 @@ import {
     selectNodeFromHash,
     restoreBlastRadiusFromHash,
     hideBlastRadiusModal,
-    generateGraphvizDot
+    generateGraphvizDot,
+    focusNode,
+    unfocusNode
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -60,6 +62,8 @@ window.showBlastRadius = showBlastRadius
 window.hideBlastRadiusModal = hideBlastRadiusModal
 window.selectNodeFromHash = selectNodeFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
+window.focusNode = focusNode
+window.unfocusNode = unfocusNode
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph

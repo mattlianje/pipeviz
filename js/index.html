@@ -676,9 +676,13 @@
                 flex-shrink: 0;
             }
             .node-details-header h5 {
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 600;
                 margin: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                min-width: 0;
             }
             .node-details-close {
                 display: flex;
@@ -709,16 +713,124 @@
                 font-weight: 600;
                 font-size: 12px;
             }
+            .detail-actions {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+                margin-bottom: 0.5rem;
+            }
+            .detail-section {
+                padding: 0.5rem 0;
+                border-top: 1px solid var(--border-color);
+            }
             .detail-label {
-                font-size: 10px;
+                font-size: 11px;
+                font-weight: 600;
                 color: var(--text-muted);
-                margin-top: 0.5rem;
+                margin-bottom: 0.35rem;
+                letter-spacing: 0.01em;
+            }
+            .detail-count {
+                display: inline-block;
+                background: var(--bg-secondary);
+                border-radius: 9px;
+                padding: 0 6px;
+                font-size: 10px;
+                font-weight: 500;
+                color: var(--text-muted);
+                vertical-align: middle;
             }
             .detail-value {
                 margin-bottom: 0;
-                font-size: 11px;
+                font-size: 12px;
                 color: var(--text-primary);
                 word-break: break-word;
+            }
+            .detail-props {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+            .detail-prop-key {
+                color: var(--text-muted);
+                padding: 3px 12px 3px 0;
+                white-space: nowrap;
+                vertical-align: top;
+                font-size: 11px;
+            }
+            .detail-prop-val {
+                color: var(--text-primary);
+                padding: 3px 0;
+                word-break: break-word;
+            }
+            .detail-drawer-toggle {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--text-primary);
+                padding: 2px 0;
+                user-select: none;
+            }
+            .detail-drawer-toggle:hover {
+                color: #2563eb;
+            }
+            .detail-drawer-arrow {
+                font-size: 10px;
+                transition: transform 0.15s;
+                display: inline-block;
+            }
+            .detail-drawer[data-open='true'] .detail-drawer-arrow {
+                transform: rotate(90deg);
+            }
+            .detail-drawer-body {
+                display: none;
+                padding-top: 0.4rem;
+            }
+            .detail-drawer[data-open='true'] .detail-drawer-body {
+                display: block;
+            }
+            .detail-subsection {
+                margin-bottom: 0.5rem;
+            }
+            .detail-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .detail-link-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                color: #2563eb;
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 6px;
+                text-decoration: none;
+                transition: background 0.15s, border-color 0.15s;
+            }
+            .detail-link-chip:hover {
+                background: #dbeafe;
+                border-color: #93c5fd;
+            }
+            .detail-link-arrow {
+                font-size: 10px;
+                opacity: 0.6;
+            }
+            [data-theme='dark'] .detail-link-chip {
+                color: #93c5fd;
+                background: #1e3a5f;
+                border-color: #2563eb44;
+            }
+            [data-theme='dark'] .detail-link-chip:hover {
+                background: #1e4a7f;
+                border-color: #2563eb88;
             }
             .badge {
                 display: inline-block;
@@ -1009,10 +1121,17 @@
             .lineage-link {
                 display: flex;
                 align-items: baseline;
-                padding: 2px 0;
+                padding: 3px 6px;
+                margin: 1px 0;
                 font-size: 12px;
                 cursor: pointer;
                 color: #0366d6;
+                border-radius: 4px;
+                transition: background 0.1s;
+            }
+            .lineage-item:hover,
+            .lineage-link:hover {
+                background: var(--bg-secondary);
             }
             [data-theme='dark'] .lineage-item,
             [data-theme='dark'] .lineage-link {
@@ -1043,6 +1162,58 @@
             }
 
             /* Tree/JSON toggle */
+            .focus-banner {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 4px 6px 4px 12px;
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                font-size: 12px;
+                margin-left: auto;
+            }
+            .focus-banner-text {
+                color: #1d4ed8;
+                font-weight: 500;
+            }
+            .focus-banner-exit {
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                font-family: inherit;
+                border: 1px solid #93c5fd;
+                border-radius: 5px;
+                cursor: pointer;
+                background: white;
+                color: #1d4ed8;
+                transition: background 0.15s;
+            }
+            .focus-banner-exit:hover {
+                background: #dbeafe;
+            }
+            [data-theme='dark'] .focus-banner {
+                background: #1e3a5f;
+                border-color: #2563eb44;
+            }
+            [data-theme='dark'] .focus-banner-text {
+                color: #93c5fd;
+            }
+            [data-theme='dark'] .focus-banner-exit {
+                background: #1e293b;
+                border-color: #2563eb44;
+                color: #93c5fd;
+            }
+            [data-theme='dark'] .focus-banner-exit:hover {
+                background: #1e4a7f;
+            }
+            .lineage-section-label {
+                font-size: 11px;
+                font-weight: 500;
+                color: var(--text-muted);
+                margin-top: 0.6rem;
+                margin-bottom: 0.2rem;
+            }
             .lineage-view-toggle {
                 display: flex;
                 align-items: center;
@@ -1127,12 +1298,9 @@
                 opacity: 0.35 !important;
             }
             .edge-highlighted path {
-                stroke: #7b1fa2 !important;
                 stroke-width: 2px !important;
             }
             .edge-highlighted polygon {
-                stroke: #7b1fa2 !important;
-                fill: #7b1fa2 !important;
             }
             .edge-dimmed {
                 opacity: 0.18 !important;
@@ -1710,7 +1878,6 @@
                 min-width: 18px;
             }
             .hub-name {
-                flex: 1;
                 color: var(--text-primary);
             }
             .hub-name.pipeline {
@@ -1879,6 +2046,10 @@
                                 Hide Datasources
                             </button>
                             <span id="group-toggles"></span>
+                            <div id="focus-banner" class="focus-banner" style="display: none">
+                                <span class="focus-banner-text">Focused view</span>
+                                <button class="focus-banner-exit" onclick="unfocusNode()">Show all</button>
+                            </div>
                         </div>
                         <div id="attribute-toolbar-items" style="display: none">
                             <div class="search-wrapper">
@@ -2061,6 +2232,8 @@
                         <div id="stats-content"></div>
                     </div>
                 </div>
+
+<!-- docs pane removed -->
             </div>
             <!-- end main-area -->
         </div>

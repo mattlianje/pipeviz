@@ -61,17 +61,27 @@ export function generateGraphvizDot() {
         pipelines = [...ungroupedPipelines, ...groupedPipelines]
     }
 
+    if (state.focusedSet) {
+        pipelines = pipelines.filter((p) => state.focusedSet.has(p.name))
+    }
+
     const allDataSources = new Map()
-    datasources.forEach((ds) => allDataSources.set(ds.name, ds))
+    if (state.focusedSet) {
+        datasources.forEach((ds) => {
+            if (state.focusedSet.has(ds.name)) allDataSources.set(ds.name, ds)
+        })
+    } else {
+        datasources.forEach((ds) => allDataSources.set(ds.name, ds))
+    }
 
     pipelines.forEach((pipeline) => {
         pipeline.input_sources?.forEach((sourceName) => {
-            if (!allDataSources.has(sourceName)) {
+            if (!allDataSources.has(sourceName) && (!state.focusedSet || state.focusedSet.has(sourceName))) {
                 allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' })
             }
         })
         pipeline.output_sources?.forEach((sourceName) => {
-            if (!allDataSources.has(sourceName)) {
+            if (!allDataSources.has(sourceName) && (!state.focusedSet || state.focusedSet.has(sourceName))) {
                 allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' })
             }
         })
@@ -271,11 +281,27 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
     }
 
     const validNodeNames = new Set(pipelines.map((p) => p.name))
+
+    const memberToGroup = new Map()
+    if (state.groupedView) {
+        pipelines.forEach((p) => {
+            if (p._isGroup && p._members) {
+                p._members.forEach((m) => memberToGroup.set(m, p.name))
+            }
+        })
+    }
+
+    const emittedEdges = new Set()
     dot += '\n'
     pipelines.forEach((pipeline) => {
         pipeline.upstream_pipelines?.forEach((upstream) => {
-            if (validNodeNames.has(upstream)) {
-                dot += `    "${upstream}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`
+            const resolved = validNodeNames.has(upstream) ? upstream : memberToGroup.get(upstream)
+            if (resolved && resolved !== pipeline.name) {
+                const edgeKey = `${resolved}|${pipeline.name}`
+                if (!emittedEdges.has(edgeKey)) {
+                    emittedEdges.add(edgeKey)
+                    dot += `    "${resolved}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`
+                }
             }
         })
     })
@@ -473,6 +499,21 @@ function precomputeAdjacentStates() {
     const currentExpanded = new Set(state.expandedGroups)
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
+    const bulkStates = [
+        new Set(),
+        new Set(groupNames)
+    ]
+    bulkStates.forEach((bulkExpanded) => {
+        const bulkKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${Array.from(bulkExpanded).sort().join(',')}`
+        if (!state.viewStateCache.has(bulkKey)) {
+            const savedExpanded = state.expandedGroups
+            state.expandedGroups = bulkExpanded
+            const bulkDot = generateGraphvizDot()
+            state.expandedGroups = savedExpanded
+            addToViewCache(bulkKey, { dot: bulkDot })
+        }
+    })
+
     let index = 0
     function processNext() {
         if (index >= groupNames.length) return
@@ -535,14 +576,61 @@ export function setupGraphInteractivity(forceRebuild = false) {
                 }
             })
 
-        function getFullChain(node, map, visited = new Set(), depth = 1) {
+        const groupInfo = {}
+        const memberToGroup = {}
+        if (state.groupedView && state.currentConfig?.pipelines) {
+            state.currentConfig.pipelines.forEach((p) => {
+                if (p.group && !state.expandedGroups.has(p.group)) {
+                    if (!groupInfo[p.group]) groupInfo[p.group] = []
+                    memberToGroup[p.name] = p.group
+                    groupInfo[p.group].push({
+                        name: p.name,
+                        inputs: p.input_sources || [],
+                        outputs: p.output_sources || [],
+                        upstreams: (p.upstream_pipelines || []).map((u) => memberToGroup[u] || u)
+                    })
+                }
+            })
+            // Second pass to resolve upstreams that were added before their group was seen
+            Object.values(groupInfo).forEach((members) => {
+                members.forEach((m) => {
+                    m.upstreams = m.upstreams.map((u) => memberToGroup[u] || u)
+                })
+            })
+        }
+
+        function getFullChain(node, map, visited = new Set(), depth = 1, comingFrom = null) {
             if (visited.has(node)) return []
             visited.add(node)
-            const neighbors = map[node] || []
+            let neighbors = map[node] || []
+
+            const members = groupInfo[node]
+            if (members && comingFrom) {
+                const isUpstream = map === state.cachedUpstreamMap
+                if (isUpstream) {
+                    const relevant = members.filter((m) => m.outputs.includes(comingFrom))
+                    if (relevant.length > 0) {
+                        const allowed = new Set()
+                        relevant.forEach((m) => {
+                            m.inputs.forEach((i) => allowed.add(i))
+                            m.upstreams.forEach((u) => allowed.add(u))
+                        })
+                        neighbors = neighbors.filter((n) => allowed.has(n))
+                    }
+                } else {
+                    const relevant = members.filter((m) => m.inputs.includes(comingFrom))
+                    if (relevant.length > 0) {
+                        const allowed = new Set()
+                        relevant.forEach((m) => m.outputs.forEach((o) => allowed.add(o)))
+                        neighbors = neighbors.filter((n) => allowed.has(n))
+                    }
+                }
+            }
+
             let result = []
             neighbors.forEach((n) => {
                 result.push({ name: n, depth: depth })
-                result.push(...getFullChain(n, map, visited, depth + 1))
+                result.push(...getFullChain(n, map, visited, depth + 1, node))
             })
             return result
         }
@@ -836,39 +924,44 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 
     const nodeTypeBadge =
         nodeType === 'Pipeline' ? 'badge-pipeline' : nodeType === 'Data Source' ? 'badge-source' : 'badge-cluster'
-    html = `<div style="margin-bottom: 0.5rem;"><span class="badge ${nodeTypeBadge}">${nodeType}</span></div>`
 
-    html += `<div style="margin-bottom: 0.5rem;">`
-    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">blast-radius</button>`
+    html = `<div class="detail-actions">`
+    html += `<span class="badge ${nodeTypeBadge}">${nodeType}</span>`
     if (nodeType === 'Pipeline Group') {
         const isExpanded = state.expandedGroups.has(nodeName)
-        html += ` <button class="graph-ctrl-btn" onclick="toggleGroup('${nodeName}')">${isExpanded ? 'collapse' : 'expand'}</button>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeName}')">${isExpanded ? 'Collapse' : 'Expand'}</button>`
     }
     if (nodeType === 'Pipeline' && nodeData.group && state.expandedGroups.has(nodeData.group)) {
-        html += ` <button class="graph-ctrl-btn" onclick="toggleGroup('${nodeData.group}')">collapse</button>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeData.group}')">Collapse group</button>`
+    }
+    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">Blast radius</button>`
+    if (state.focusedNode === nodeName) {
+        html += `<button class="graph-ctrl-btn active" onclick="unfocusNode()">Unfocus</button>`
+    } else {
+        html += `<button class="graph-ctrl-btn" onclick="focusNode('${nodeName.replace(/'/g, "\\'")}')">Focus</button>`
     }
     html += `</div>`
 
     if (nodeData.description) {
-        html += `<div class="detail-label">desc</div>`
-        html += `<div class="detail-value">${nodeData.description}</div>`
+        html += `<div class="detail-section"><div class="detail-label">Description</div>`
+        html += `<div class="detail-value">${nodeData.description}</div></div>`
     }
 
-    if (nodeData.schedule) {
-        html += `<div class="detail-label">schedule</div>`
-        html += `<div class="detail-value">${formatSchedule(nodeData.schedule)}</div>`
-    }
-
+    const props = []
+    if (nodeData.schedule) props.push(['Schedule', formatSchedule(nodeData.schedule)])
     if (nodeType === 'Pipeline' || nodeType === 'Pipeline Group') {
-        const parts = []
-        if (nodeData.duration !== undefined) parts.push(`${nodeData.duration}m`)
-        if (nodeData.cost !== undefined) parts.push(`$${nodeData.cost.toFixed(2)}`)
-        if (parts.length) {
-            html += `<div class="detail-label">runtime</div>`
-            html += `<div class="detail-value">${parts.join(' · ')}</div>`
-        }
+        if (nodeData.duration !== undefined) props.push(['Duration', `${nodeData.duration}m`])
+        if (nodeData.cost !== undefined) props.push(['Cost', `$${nodeData.cost.toFixed(2)}`])
     }
-
+    if (nodeData.owners && nodeData.owners.length > 0) {
+        props.push(['Owners', nodeData.owners.join(', ')])
+    } else if (nodeData.owner) {
+        props.push(['Owner', nodeData.owner])
+    }
+    if (nodeData.users && nodeData.users.length > 0) {
+        props.push(['Users', nodeData.users.join(', ')])
+    }
+    if (nodeData.cluster) props.push(['Cluster', `<span class="badge badge-cluster">${nodeData.cluster}</span>`])
     if (nodeData.type) {
         const typeLower = (nodeData.type || '').toLowerCase()
         const typeBadge = ['snowflake', 'postgres', 'database'].includes(typeLower)
@@ -878,52 +971,68 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
               : ['kafka', 'api'].includes(typeLower)
                 ? `badge-${typeLower}`
                 : 'badge-type'
-        html += `<div class="detail-label">type</div>`
-        html += `<div class="detail-value"><span class="badge ${typeBadge}">${nodeData.type}</span></div>`
+        props.push(['Type', `<span class="badge ${typeBadge}">${nodeData.type}</span>`])
     }
-    if (nodeData.owner) {
-        html += `<div class="detail-label">owner</div>`
-        html += `<div class="detail-value">${nodeData.owner}</div>`
+    if (props.length) {
+        html += `<div class="detail-section"><table class="detail-props">`
+        props.forEach(([k, v]) => {
+            html += `<tr><td class="detail-prop-key">${k}</td><td class="detail-prop-val">${v}</td></tr>`
+        })
+        html += `</table></div>`
     }
-    if (nodeData.cluster) {
-        html += `<div class="detail-label">cluster</div>`
-        html += `<div class="detail-value"><span class="badge badge-cluster">${nodeData.cluster}</span></div>`
-    }
-    if (nodeData.input_sources?.length) {
-        html += `<div class="detail-label">inputs</div>`
-        html += `<div class="detail-value">${nodeData.input_sources.map((s) => `<span class="badge badge-input">${s}</span>`).join(' ')}</div>`
-    }
-    if (nodeData.output_sources?.length) {
-        html += `<div class="detail-label">outputs</div>`
-        html += `<div class="detail-value">${nodeData.output_sources.map((s) => `<span class="badge badge-output">${s}</span>`).join(' ')}</div>`
-    }
-    if (nodeData.upstream_pipelines?.length) {
-        html += `<div class="detail-label">upstream</div>`
-        html += `<div class="detail-value">${nodeData.upstream_pipelines.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div>`
-    }
-    if (nodeData._members?.length) {
-        html += `<div class="detail-label">members</div>`
-        html += `<div class="detail-value">${nodeData._members.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div>`
-    }
+
     if (nodeData.tags?.length) {
-        html += `<div class="detail-label">tags</div>`
-        html += `<div class="detail-value">${nodeData.tags.map((t) => `<span class="badge badge-tag">${t}</span>`).join(' ')}</div>`
+        html += `<div class="detail-section"><div class="detail-value">${nodeData.tags.map((t) => `<span class="badge badge-tag">${t}</span>`).join(' ')}</div></div>`
     }
-    if (nodeData.metadata && Object.keys(nodeData.metadata).length) {
-        html += `<div class="detail-label">metadata</div>`
-        html += `<div class="detail-value" style="font-size: 11px;">`
-        Object.entries(nodeData.metadata).forEach(([key, value]) => {
-            html += `<div><span style="color: var(--text-muted);">${key}:</span> ${value}</div>`
-        })
-        html += `</div>`
-    }
+
     if (nodeData.links && Object.keys(nodeData.links).length) {
-        html += `<div class="detail-label">links</div>`
-        html += `<div class="detail-value">`
+        html += `<div class="detail-section"><div class="detail-links">`
         Object.entries(nodeData.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" style="color: #2563eb; text-decoration: none; font-size: 11px;">${name}</a> `
+            html += `<a href="${url}" target="_blank" class="detail-link-chip">${name}<span class="detail-link-arrow">\u2197</span></a>`
         })
-        html += `</div>`
+        html += `</div></div>`
+    }
+
+    const hasConnectionDetails =
+        nodeData._members?.length ||
+        nodeData.input_sources?.length ||
+        nodeData.output_sources?.length ||
+        nodeData.upstream_pipelines?.length ||
+        (nodeData.metadata && Object.keys(nodeData.metadata).length)
+
+    if (hasConnectionDetails) {
+        html += `<div class="detail-section detail-drawer" data-open="false">`
+        html += `<div class="detail-drawer-toggle"><span class="detail-drawer-arrow">&#9656;</span> Connections &amp; details</div>`
+        html += `<div class="detail-drawer-body">`
+
+        if (nodeData._members?.length) {
+            html += `<div class="detail-subsection"><div class="detail-label">Pipelines in this group <span class="detail-count">${nodeData._members.length}</span></div>`
+            html += `<div class="detail-value">${nodeData._members.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div></div>`
+        }
+
+        if (nodeData.input_sources?.length) {
+            html += `<div class="detail-subsection"><div class="detail-label">Reads from <span class="detail-count">${nodeData.input_sources.length}</span></div>`
+            html += `<div class="detail-value">${nodeData.input_sources.map((s) => `<span class="badge badge-input">${s}</span>`).join(' ')}</div></div>`
+        }
+        if (nodeData.output_sources?.length) {
+            html += `<div class="detail-subsection"><div class="detail-label">Writes to <span class="detail-count">${nodeData.output_sources.length}</span></div>`
+            html += `<div class="detail-value">${nodeData.output_sources.map((s) => `<span class="badge badge-output">${s}</span>`).join(' ')}</div></div>`
+        }
+        if (nodeData.upstream_pipelines?.length) {
+            html += `<div class="detail-subsection"><div class="detail-label">Depends on <span class="detail-count">${nodeData.upstream_pipelines.length}</span></div>`
+            html += `<div class="detail-value">${nodeData.upstream_pipelines.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div></div>`
+        }
+
+        if (nodeData.metadata && Object.keys(nodeData.metadata).length) {
+            html += `<div class="detail-subsection"><div class="detail-label">Metadata</div>`
+            html += `<table class="detail-props">`
+            Object.entries(nodeData.metadata).forEach(([key, value]) => {
+                html += `<tr><td class="detail-prop-key">${key}</td><td class="detail-prop-val">${value}</td></tr>`
+            })
+            html += `</table></div>`
+        }
+
+        html += `</div></div>`
     }
 
     const pipelineNames = new Set((state.currentConfig.pipelines || []).map((p) => p.name))
@@ -952,12 +1061,11 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 
     function renderLineageList(items, label) {
         if (items.length === 0) return ''
-        let out = `<div class="detail-label">${label} (${items.length})</div><div class="detail-value">`
+        let out = `<div class="lineage-section-label">${label} <span class="detail-count">${items.length}</span></div><div class="detail-value">`
         items.forEach((x) => {
-            const indent = (x.depth - 1) * 12
-            const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15)
-            const prefix = x.depth > 1 ? '└ ' : ''
-            out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${x.name}</div>`
+            const indent = (x.depth - 1) * 14
+            const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.12)
+            out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${x.name}</div>`
         })
         out += `</div>`
         return out
@@ -1045,28 +1153,45 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         downstreamPipelines.length > 0 ||
         downstreamSources.length > 0
 
+    const totalLineage = upstreamPipelines.length + upstreamSources.length + downstreamPipelines.length + downstreamSources.length
+
     if (hasLineage) {
-        html += `<div class="lineage-view-toggle">
+        html += `<div class="detail-section detail-drawer" data-open="false">`
+        html += `<div class="detail-drawer-toggle"><span class="detail-drawer-arrow">&#9656;</span> Lineage <span class="detail-count">${totalLineage}</span>`
+        html += `<div class="lineage-view-toggle" style="margin-left: auto;">
             <span class="lineage-toggle-label active" data-view="tree">Tree</span>
             <div class="lineage-toggle-slider"></div>
             <span class="lineage-toggle-label" data-view="json">JSON</span>
-        </div>`
+        </div></div>`
+        html += `<div class="detail-drawer-body">`
     }
 
     html += `<div class="lineage-tree-view">`
-    html += renderLineageList(upstreamPipelines, 'upstream pipelines')
-    html += renderLineageList(upstreamSources, 'upstream sources')
-    html += renderLineageList(downstreamPipelines, 'downstream pipelines')
-    html += renderLineageList(downstreamSources, 'downstream sources')
+    html += renderLineageList(upstreamPipelines, 'Upstream pipelines')
+    html += renderLineageList(upstreamSources, 'Upstream sources')
+    html += renderLineageList(downstreamPipelines, 'Downstream pipelines')
+    html += renderLineageList(downstreamSources, 'Downstream sources')
     html += `</div>`
 
     html += `<div class="lineage-json-view" style="display: none;">
-        <div class="detail-label">LINEAGE JSON</div>
         <pre class="lineage-json-pre">${JSON.stringify(lineageJson, null, 2)}</pre>
     </div>`
 
+    if (hasLineage) {
+        html += `</div></div>`
+    }
+
     col.classList.add('visible')
     content.innerHTML = html
+
+    content.querySelectorAll('.detail-drawer-toggle').forEach((toggle) => {
+        toggle.addEventListener('click', function (e) {
+            if (e.target.closest('.lineage-view-toggle')) return
+            const drawer = this.closest('.detail-drawer')
+            const isOpen = drawer.getAttribute('data-open') === 'true'
+            drawer.setAttribute('data-open', isOpen ? 'false' : 'true')
+        })
+    })
 
     const slider = content.querySelector('.lineage-toggle-slider')
     if (slider) {
@@ -1106,6 +1231,58 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
             }
         })
     })
+}
+
+export function focusNode(nodeName) {
+    const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
+    const focusSet = new Set([nodeName])
+    lineage.upstream.forEach((x) => focusSet.add(x.name))
+    lineage.downstream.forEach((x) => focusSet.add(x.name))
+
+    state.focusedNode = nodeName
+    state.focusedSet = focusSet
+
+    const banner = document.getElementById('focus-banner')
+    if (banner) banner.style.display = ''
+
+    updateGraph(true)
+
+    setTimeout(() => {
+        if (state.graphviz) state.graphviz.resetZoom()
+        d3.select('#graph')
+            .selectAll('.node')
+            .each(function () {
+                const title = d3.select(this).select('title').text()
+                if (title === nodeName) {
+                    selectNode(nodeName, this)
+                }
+            })
+    }, 50)
+}
+
+export function unfocusNode() {
+    const prev = state.focusedNode
+    state.focusedNode = null
+    state.focusedSet = null
+
+    const banner = document.getElementById('focus-banner')
+    if (banner) banner.style.display = 'none'
+
+    updateGraph(true)
+
+    setTimeout(() => {
+        if (state.graphviz) state.graphviz.resetZoom()
+        if (prev) {
+            d3.select('#graph')
+                .selectAll('.node')
+                .each(function () {
+                    const title = d3.select(this).select('title').text()
+                    if (title === prev) {
+                        selectNode(prev, this)
+                    }
+                })
+        }
+    }, 50)
 }
 
 export function clearSelection() {
@@ -1336,7 +1513,7 @@ export function resetGraph() {
 
 export function collapseAllGroups() {
     state.expandedGroups.clear()
-    updateGraph()
+    updateGraph(true)
 }
 
 export function toggleCollapseAll() {
@@ -1358,7 +1535,7 @@ export function toggleCollapseAll() {
         btn.classList.add('active')
         btn.textContent = 'Expand All'
     }
-    updateGraph()
+    updateGraph(true)
 }
 
 function getAllGroupNames() {
@@ -1375,7 +1552,7 @@ export function togglePipelinesOnly() {
     const btn = document.getElementById('pipelines-only-btn')
     btn.classList.toggle('active', state.pipelinesOnlyView)
     btn.textContent = state.pipelinesOnlyView ? 'Show Datasources' : 'Hide Datasources'
-    updateGraph()
+    updateGraph(true)
 }
 
 export function setAnalysisMode(mode) {
@@ -1446,7 +1623,7 @@ export function toggleGroup(groupName) {
     } else {
         state.expandedGroups.add(groupName)
     }
-    updateGraph()
+    updateGraph(true)
     showNodeDetails(groupName)
 }
 

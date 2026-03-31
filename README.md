@@ -144,6 +144,53 @@ Track column-level provenance with `::` notation. Supports infinitely nested com
 ```
 </details>
 
+## Spec Reference
+
+### Pipeline fields
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | **Required.** Unique pipeline name |
+| `input_sources` | string[] | Datasources this pipeline reads from |
+| `output_sources` | string[] | Datasources this pipeline writes to |
+| `upstream_pipelines` | string[] | Explicit pipeline-to-pipeline dependencies |
+| `description` | string | Human-readable description |
+| `schedule` | string | Cron expression |
+| `duration` | number | Typical run time in minutes |
+| `cost` | number | Cost per run in dollars |
+| `owner` | string | Single owner (person, team, or handle) |
+| `owners` | string[] | Multiple owners |
+| `users` | string[] | Downstream consumers / stakeholders |
+| `cluster` | string | Logical cluster grouping |
+| `group` | string | Collapsible visual group |
+| `tags` | string[] | Arbitrary tags |
+| `links` | object | External links (`github`, `docs`, `dashboard`, etc.) |
+| `metadata` | object | Arbitrary key-value pairs |
+| `attributes` | object[] | Column-level lineage (see [Attribute Lineage](#attribute-lineage)) |
+
+### Datasource fields
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | **Required.** Unique datasource name |
+| `type` | string | Technology type (`kafka`, `s3`, `snowflake`, `postgres`, `delta`, `parquet`, `api`, etc.) |
+| `description` | string | Human-readable description |
+| `owner` | string | Single owner |
+| `owners` | string[] | Multiple owners |
+| `users` | string[] | Downstream consumers / stakeholders |
+| `cluster` | string | Logical cluster grouping |
+| `tags` | string[] | Arbitrary tags |
+| `links` | object | External links |
+| `metadata` | object | Arbitrary key-value pairs |
+| `attributes` | object[] | Column-level lineage |
+
+### Cluster fields (optional top-level array)
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Cluster name (referenced by pipelines/datasources) |
+| `description` | string | Description |
+
+> Datasources referenced in `input_sources` or `output_sources` that aren't explicitly defined in `datasources` are auto-created.
+> Both `owner` (string) and `owners` (array) are supported — use whichever fits.
+
 ## Merging Team Configs
 
 Each team maintains their own `pipeviz.json`. Merge them with `jq`:
@@ -190,6 +237,40 @@ jq -s '{
 - Blast radius analysis (downstream impact)
 - Mermaid export
 - MCP-ready JSON graph for LLM tooling
+
+## MCP Server
+
+A zero-dependency [MCP](https://modelcontextprotocol.io) server in `/mcp`. Point it at your pipeviz JSON and your LLM gets the full graph as tools.
+
+Add to your Claude Code config (`~/.claude.json`):
+```json
+"mcpServers": {
+  "pipeviz": {
+    "command": "node",
+    "args": ["/path/to/pipeviz/mcp/server.js", "/path/to/pipeviz.json"]
+  }
+}
+```
+
+Or set `PIPEVIZ_CONFIG` env var and omit the second arg.
+
+```
+node_info              Details of a pipeline or datasource
+upstream_of            Everything that feeds into a node
+downstream_of          Everything that consumes a node's output
+blast_radius           What breaks if this node goes down (+ owners to notify)
+blast_radius_diagram   Mermaid flowchart of the blast radius
+file_blast_radius      Blast radius from a source file path (via links.github)
+file_blast_radius_diagram  Mermaid diagram of file blast radius
+backfill_order         Topologically sorted stages to re-run downstream
+cluster_info           All pipelines and datasources in a cluster
+owners_of              Who owns and uses a node
+nodes_by_person        What does a person own or use
+search_nodes           Fuzzy search by name
+graph_summary          High-level counts, groups, clusters
+```
+
+Run tests with `make test` from `js/`.
 
 ## API
 
