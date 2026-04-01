@@ -587,7 +587,8 @@ export function setupGraphInteractivity(forceRebuild = false) {
                         name: p.name,
                         inputs: p.input_sources || [],
                         outputs: p.output_sources || [],
-                        upstreams: (p.upstream_pipelines || []).map((u) => memberToGroup[u] || u)
+                        upstreams: (p.upstream_pipelines || []).map((u) => memberToGroup[u] || u),
+                        downstreamPipelines: []
                     })
                 }
             })
@@ -597,18 +598,45 @@ export function setupGraphInteractivity(forceRebuild = false) {
                     m.upstreams = m.upstreams.map((u) => memberToGroup[u] || u)
                 })
             })
+            // Build reverse mapping: which external pipelines are downstream of each member
+            if (state.currentConfig.pipelines) {
+                state.currentConfig.pipelines.forEach((p) => {
+                    ;(p.upstream_pipelines || []).forEach((u) => {
+                        const groupName = memberToGroup[u]
+                        if (groupName && !memberToGroup[p.name]) {
+                            const member = groupInfo[groupName]?.find((m) => m.name === u)
+                            if (member) member.downstreamPipelines.push(p.name)
+                        }
+                    })
+                })
+            }
         }
 
-        function getFullChain(node, map, visited = new Set(), depth = 1, comingFrom = null) {
+        // When traversing through a group node, figure out which members
+        // are relevant based on what connected us to this group, then only
+        // continue along those members' connections.
+        // `comingFrom` is the previous node name; `entryHints` is an optional
+        // set of source/pipeline names that narrow which members matter
+        // (used when the previous node was also a group).
+        function getFullChain(node, map, visited = new Set(), depth = 1, comingFrom = null, entryHints = null) {
             if (visited.has(node)) return []
             visited.add(node)
             let neighbors = map[node] || []
+            let exitHints = null
 
             const members = groupInfo[node]
             if (members && comingFrom) {
                 const isUpstream = map === state.cachedUpstreamMap
+                // Build the set of names to match against this group's members
+                const connectors = entryHints || [comingFrom]
+
                 if (isUpstream) {
-                    const relevant = members.filter((m) => m.outputs.includes(comingFrom))
+                    const relevant = members.filter(
+                        (m) =>
+                            connectors.some(
+                                (cf) => m.outputs.includes(cf) || m.downstreamPipelines.includes(cf)
+                            )
+                    )
                     if (relevant.length > 0) {
                         const allowed = new Set()
                         relevant.forEach((m) => {
@@ -616,13 +644,25 @@ export function setupGraphInteractivity(forceRebuild = false) {
                             m.upstreams.forEach((u) => allowed.add(u))
                         })
                         neighbors = neighbors.filter((n) => allowed.has(n))
+                        // Prepare hints for the next group upstream: the relevant
+                        // members' inputs and upstream pipeline refs
+                        exitHints = [...allowed]
                     }
                 } else {
-                    const relevant = members.filter((m) => m.inputs.includes(comingFrom))
+                    const relevant = members.filter(
+                        (m) =>
+                            connectors.some(
+                                (cf) => m.inputs.includes(cf) || m.upstreams.includes(cf)
+                            )
+                    )
                     if (relevant.length > 0) {
                         const allowed = new Set()
-                        relevant.forEach((m) => m.outputs.forEach((o) => allowed.add(o)))
+                        relevant.forEach((m) => {
+                            m.outputs.forEach((o) => allowed.add(o))
+                            m.downstreamPipelines.forEach((d) => allowed.add(d))
+                        })
                         neighbors = neighbors.filter((n) => allowed.has(n))
+                        exitHints = [...allowed]
                     }
                 }
             }
@@ -630,7 +670,10 @@ export function setupGraphInteractivity(forceRebuild = false) {
             let result = []
             neighbors.forEach((n) => {
                 result.push({ name: n, depth: depth })
-                result.push(...getFullChain(n, map, visited, depth + 1, node))
+                // If the next node is a group and we have exit hints, pass them
+                // so it knows which members are relevant
+                const hints = (exitHints && groupInfo[n]) ? exitHints : null
+                result.push(...getFullChain(n, map, visited, depth + 1, node, hints))
             })
             return result
         }

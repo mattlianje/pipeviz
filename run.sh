@@ -40,4 +40,5 @@ else
 fi
 
 echo "pipeviz serving at $URL"
-echo "press enter to stop..." && read _ </dev/tty
+echo "press enter to stop..."
+read _ </dev/tty || true
