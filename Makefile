@@ -29,3 +29,5 @@ clean:
 publish:
 	cd js && $(MAKE) build
 	rsync -avz --delete js/dist/ root@nargothrond.xyz:/var/www/pipeviz.org/
+	rsync -avz js/pipeviz.html root@nargothrond.xyz:/var/www/pipeviz.org/pipeviz.html
+	rsync -avz run.sh root@nargothrond.xyz:/var/www/pipeviz.org/run
