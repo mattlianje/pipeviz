@@ -242,12 +242,22 @@ jq -s '{
 
 A zero-dependency [MCP](https://modelcontextprotocol.io) server in `/mcp`. Point it at your pipeviz JSON and your LLM gets the full graph as tools.
 
+### Install (one-liner)
+
+```bash
+curl -s https://pipeviz.org/mcp-install | sh -s /path/to/pipeviz.json
+```
+
+This adds the `pipeviz` MCP server to your `~/.claude.json` via `npx`. Restart Claude Code to pick it up.
+
+### Manual setup
+
 Add to your Claude Code config (`~/.claude.json`):
 ```json
 "mcpServers": {
   "pipeviz": {
-    "command": "node",
-    "args": ["/path/to/pipeviz/mcp/server.js", "/path/to/pipeviz.json"]
+    "command": "npx",
+    "args": ["pipeviz-mcp", "/path/to/pipeviz.json"]
   }
 }
 ```
