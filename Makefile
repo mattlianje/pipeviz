@@ -31,3 +31,4 @@ publish:
 	rsync -avz --delete js/dist/ root@nargothrond.xyz:/var/www/pipeviz.org/
 	rsync -avz js/pipeviz.html root@nargothrond.xyz:/var/www/pipeviz.org/pipeviz.html
 	rsync -avz run.sh root@nargothrond.xyz:/var/www/pipeviz.org/run
+	rsync -avz mcp-install.sh root@nargothrond.xyz:/var/www/pipeviz.org/mcp-install

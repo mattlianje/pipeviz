@@ -1,12 +1,22 @@
 {
   "name": "pipeviz-mcp",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
-  "description": "MCP server for querying pipeviz pipeline lineage",
+  "description": "MCP server for querying pipeviz pipeline lineage graphs",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mattlianje/pipeviz",
+    "directory": "mcp"
+  },
+  "keywords": ["mcp", "pipeviz", "pipeline", "lineage", "dag"],
   "bin": {
     "pipeviz-mcp": "./server.js"
   },
+  "files": [
+    "server.js",
+    "pipeviz.js"
+  ],
   "scripts": {
     "test": "node test.js"
   }
