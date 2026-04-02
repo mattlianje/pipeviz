@@ -144,53 +144,6 @@ Track column-level provenance with `::` notation. Supports infinitely nested com
 ```
 </details>
 
-## Spec Reference
-
-### Pipeline fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | **Required.** Unique pipeline name |
-| `input_sources` | string[] | Datasources this pipeline reads from |
-| `output_sources` | string[] | Datasources this pipeline writes to |
-| `upstream_pipelines` | string[] | Explicit pipeline-to-pipeline dependencies |
-| `description` | string | Human-readable description |
-| `schedule` | string | Cron expression |
-| `duration` | number | Typical run time in minutes |
-| `cost` | number | Cost per run in dollars |
-| `owner` | string | Single owner (person, team, or handle) |
-| `owners` | string[] | Multiple owners |
-| `users` | string[] | Downstream consumers / stakeholders |
-| `cluster` | string | Logical cluster grouping |
-| `group` | string | Collapsible visual group |
-| `tags` | string[] | Arbitrary tags |
-| `links` | object | External links (`github`, `docs`, `dashboard`, etc.) |
-| `metadata` | object | Arbitrary key-value pairs |
-| `attributes` | object[] | Column-level lineage (see [Attribute Lineage](#attribute-lineage)) |
-
-### Datasource fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | **Required.** Unique datasource name |
-| `type` | string | Technology type (`kafka`, `s3`, `snowflake`, `postgres`, `delta`, `parquet`, `api`, etc.) |
-| `description` | string | Human-readable description |
-| `owner` | string | Single owner |
-| `owners` | string[] | Multiple owners |
-| `users` | string[] | Downstream consumers / stakeholders |
-| `cluster` | string | Logical cluster grouping |
-| `tags` | string[] | Arbitrary tags |
-| `links` | object | External links |
-| `metadata` | object | Arbitrary key-value pairs |
-| `attributes` | object[] | Column-level lineage |
-
-### Cluster fields (optional top-level array)
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Cluster name (referenced by pipelines/datasources) |
-| `description` | string | Description |
-
-> Datasources referenced in `input_sources` or `output_sources` that aren't explicitly defined in `datasources` are auto-created.
-> Both `owner` (string) and `owners` (array) are supported — use whichever fits.
-
 ## Merging Team Configs
 
 Each team maintains their own `pipeviz.json`. Merge them with `jq`:
