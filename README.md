@@ -224,7 +224,6 @@ downstream_of          Everything that consumes a node's output
 blast_radius           What breaks if this node goes down (+ owners to notify)
 blast_radius_diagram   Mermaid flowchart of the blast radius
 file_blast_radius      Blast radius from a source file path (via links.github)
-file_blast_radius_diagram  Mermaid diagram of file blast radius
 backfill_order         Topologically sorted stages to re-run downstream
 cluster_info           All pipelines and datasources in a cluster
 owners_of              Who owns and uses a node
