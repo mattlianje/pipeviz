@@ -259,7 +259,7 @@ export function loadJson() {
     try {
         state.currentConfig = JSON.parse(jsonText)
         clearViewStateCache()
-        statusDiv.innerHTML = '<span class="success">Configuration loaded!</span>'
+        statusDiv.innerHTML = ''
 
         renderGraph()
         renderPipelines()

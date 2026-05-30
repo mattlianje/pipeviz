@@ -13,6 +13,11 @@
                 --text-secondary: #6c757d;
                 --text-muted: #828282;
                 --border-color: #dee2e6;
+                --accent: #ec4899;
+                --accent-ring: rgba(236, 72, 153, 0.18);
+                --accent-soft: rgba(236, 72, 153, 0.3);
+                --radius: 4px;
+                --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
             }
             [data-theme='dark'] {
                 --bg-primary: #1a1a1a;
@@ -21,6 +26,10 @@
                 --text-secondary: #aaa;
                 --text-muted: #888;
                 --border-color: #444;
+                --accent: #f472b6;
+                --accent-ring: rgba(244, 114, 182, 0.22);
+                --accent-soft: rgba(244, 114, 182, 0.34);
+                --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             }
 
             * {
@@ -87,7 +96,7 @@
                 width: 480px;
                 border: 1px solid var(--border-color);
                 border-radius: 10px;
-                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+                box-shadow: var(--shadow);
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -105,7 +114,7 @@
                 box-shadow: none;
             }
             [data-theme='dark'] .json-panel {
-                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+                box-shadow: var(--shadow);
             }
             [data-theme='dark'] .json-panel.hidden {
                 box-shadow: none;
@@ -136,7 +145,7 @@
             }
             .json-panel-tab.active {
                 color: var(--text-primary);
-                border-bottom-color: #2563eb;
+                border-bottom-color: var(--accent);
             }
             .json-panel-export {
                 flex: 1;
@@ -265,15 +274,42 @@
                 flex-shrink: 0;
                 height: 40px;
             }
-            .app-title {
+            /* Centered hero title */
+            .app-hero {
+                flex-shrink: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                padding: 22px 16px 18px;
+                text-align: center;
+            }
+            .app-hero-title {
                 display: inline-flex;
                 align-items: center;
-                padding: 0 10px;
+                gap: 12px;
             }
-            .app-logo {
-                width: 20px;
-                height: 20px;
-                opacity: 0.6;
+            .app-hero-logo {
+                width: 34px;
+                height: 34px;
+            }
+            .app-hero-wordmark {
+                margin: 0;
+                font-size: 30px;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                color: var(--text-primary);
+            }
+            .app-hero-tagline {
+                margin: 0;
+                font-size: 14px;
+                color: var(--text-muted);
+            }
+            .app-ext {
+                color: #ec4899;
+            }
+            [data-theme='dark'] .app-ext {
+                color: #f472b6;
             }
             .tab-strip {
                 display: flex;
@@ -302,10 +338,10 @@
             }
             .tab-strip-btn.active {
                 color: var(--text-primary);
-                border-bottom-color: #2563eb;
+                border-bottom-color: var(--accent);
             }
             [data-theme='dark'] .tab-strip-btn.active {
-                border-bottom-color: #3b82f6;
+                border-bottom-color: var(--accent);
             }
             .toolbar {
                 display: flex;
@@ -479,12 +515,12 @@
             }
             .json-editor:focus {
                 outline: none;
-                border-color: #2563eb;
-                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px var(--accent-ring);
             }
             [data-theme='dark'] .json-editor:focus {
-                border-color: #3b82f6;
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px var(--accent-ring);
             }
             .json-status {
                 font-size: 11px;
@@ -508,7 +544,7 @@
                 transition: background 0.15s;
             }
             .btn-dark {
-                background: #2563eb;
+                background: var(--accent);
                 color: #fff;
             }
             .btn-dark:hover {
@@ -523,10 +559,10 @@
                 background: var(--border-color);
             }
             [data-theme='dark'] .btn-dark {
-                background: #3b82f6;
+                background: var(--accent);
             }
             [data-theme='dark'] .btn-dark:hover {
-                background: #2563eb;
+                background: var(--accent);
             }
 
             @media (max-width: 768px) {
@@ -561,7 +597,7 @@
                 width: 340px;
                 background: var(--bg-primary);
                 border-left: 1px solid var(--border-color);
-                box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+                box-shadow: var(--shadow);
                 transform: translateX(100%);
                 transition: transform 0.2s ease;
                 z-index: 50;
@@ -572,7 +608,7 @@
                 transform: translateX(0);
             }
             [data-theme='dark'] .details-col {
-                box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+                box-shadow: var(--shadow);
             }
 
             .graph-container {
@@ -776,7 +812,7 @@
                 user-select: none;
             }
             .detail-drawer-toggle:hover {
-                color: #2563eb;
+                color: var(--accent);
             }
             .detail-drawer-arrow {
                 font-size: 10px;
@@ -808,7 +844,7 @@
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: 500;
-                color: #2563eb;
+                color: var(--accent);
                 background: #eff6ff;
                 border: 1px solid #bfdbfe;
                 border-radius: 6px;
@@ -826,11 +862,11 @@
             [data-theme='dark'] .detail-link-chip {
                 color: #93c5fd;
                 background: #1e3a5f;
-                border-color: #2563eb44;
+                border-color: var(--accent-soft);
             }
             [data-theme='dark'] .detail-link-chip:hover {
                 background: #1e4a7f;
-                border-color: #2563eb88;
+                border-color: var(--accent);
             }
             .badge {
                 display: inline-block;
@@ -1086,7 +1122,7 @@
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
                 border-radius: 6px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                box-shadow: var(--shadow);
                 margin-top: 4px;
                 min-width: 150px;
                 max-height: 250px;
@@ -1194,14 +1230,14 @@
             }
             [data-theme='dark'] .focus-banner {
                 background: #1e3a5f;
-                border-color: #2563eb44;
+                border-color: var(--accent-soft);
             }
             [data-theme='dark'] .focus-banner-text {
                 color: #93c5fd;
             }
             [data-theme='dark'] .focus-banner-exit {
                 background: #1e293b;
-                border-color: #2563eb44;
+                border-color: var(--accent-soft);
                 color: #93c5fd;
             }
             [data-theme='dark'] .focus-banner-exit:hover {
@@ -1294,34 +1330,61 @@
             .node-connected text:not([fill]) {
                 fill: #000;
             }
-            .node-dimmed {
-                opacity: 0.35 !important;
+            /* Dimming via flat gray (not group opacity) so pan/zoom stays
+               cheap on big graphs — avoids per-group offscreen compositing. */
+            .node-dimmed polygon,
+            .node-dimmed ellipse,
+            .node-dimmed path,
+            .node-dimmed polyline {
+                fill: #efefef !important;
+                stroke: #d5d5d5 !important;
+            }
+            .node-dimmed text {
+                fill: #c4c4c4 !important;
             }
             .edge-highlighted path {
                 stroke-width: 2px !important;
             }
             .edge-highlighted polygon {
             }
-            .edge-dimmed {
-                opacity: 0.18 !important;
+            .edge-dimmed path {
+                stroke: #dcdcdc !important;
             }
-            .cluster-dimmed {
-                opacity: 0.25 !important;
+            .edge-dimmed polygon {
+                fill: #dcdcdc !important;
+                stroke: #dcdcdc !important;
+            }
+            .cluster-dimmed > polygon,
+            .cluster-dimmed > path {
+                fill: #f5f5f5 !important;
+                stroke: #e0e0e0 !important;
+            }
+            .cluster-dimmed text {
+                fill: #c4c4c4 !important;
             }
 
-            /* Dark mode adjustments */
-            [data-theme='dark'] .node-highlighted text:not([fill]),
-            [data-theme='dark'] .node-connected text:not([fill]) {
-                fill: #000 !important;
+            [data-theme='dark'] #graph .node-highlighted polygon,
+            [data-theme='dark'] #graph .node-highlighted ellipse,
+            [data-theme='dark'] #graph .node-highlighted path,
+            [data-theme='dark'] #graph .node-highlighted polyline,
+            [data-theme='dark'] #attribute-graph .node-highlighted polygon,
+            [data-theme='dark'] #attribute-graph .node-highlighted ellipse,
+            [data-theme='dark'] #attribute-graph .node-highlighted path,
+            [data-theme='dark'] #attribute-graph .node-highlighted polyline {
+                fill: #4a3413 !important;
+            }
+            [data-theme='dark'] #graph .node-highlighted text,
+            [data-theme='dark'] #attribute-graph .node-highlighted text {
+                fill: #ffe0b2 !important;
             }
             /* Dark mode graph text fix */
             [data-theme='dark'] #graph text,
             [data-theme='dark'] #attribute-graph text {
                 fill: #e0e0e0 !important;
             }
-            [data-theme='dark'] #graph .node text,
-            [data-theme='dark'] #attribute-graph .node text {
-                fill: #1a1a1a !important;
+            [data-theme='dark'] #graph .node text:not([fill]),
+            [data-theme='dark'] #attribute-graph .node text:not([fill]) {
+                fill: #e8e8e8 !important;
             }
             [data-theme='dark'] #graph .graph > polygon,
             [data-theme='dark'] #attribute-graph .graph > polygon {
@@ -1337,6 +1400,34 @@
             [data-theme='dark'] #graph .cluster text,
             [data-theme='dark'] #attribute-graph .cluster text {
                 fill: #e0e0e0 !important;
+            }
+            /* Dimming in dark mode */
+            [data-theme='dark'] .node-dimmed polygon,
+            [data-theme='dark'] .node-dimmed ellipse,
+            [data-theme='dark'] .node-dimmed path,
+            [data-theme='dark'] .node-dimmed polyline {
+                fill: #262626 !important;
+                stroke: #3a3a3a !important;
+            }
+            [data-theme='dark'] #graph .node-dimmed text,
+            [data-theme='dark'] #attribute-graph .node-dimmed text {
+                fill: #555 !important;
+            }
+            [data-theme='dark'] .edge-dimmed path {
+                stroke: #3a3a3a !important;
+            }
+            [data-theme='dark'] .edge-dimmed polygon {
+                fill: #3a3a3a !important;
+                stroke: #3a3a3a !important;
+            }
+            [data-theme='dark'] .cluster-dimmed > polygon,
+            [data-theme='dark'] .cluster-dimmed > path {
+                fill: #1f1f1f !important;
+                stroke: #3a3a3a !important;
+            }
+            [data-theme='dark'] #graph .cluster-dimmed text,
+            [data-theme='dark'] #attribute-graph .cluster-dimmed text {
+                fill: #555 !important;
             }
 
             /* Search box */
@@ -1358,12 +1449,12 @@
             }
             .search-input:focus {
                 outline: none;
-                border-color: #2563eb;
-                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px var(--accent-ring);
             }
             [data-theme='dark'] .search-input:focus {
-                border-color: #3b82f6;
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px var(--accent-ring);
             }
             .search-results-dropdown {
                 position: absolute;
@@ -1492,7 +1583,7 @@
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
                 border-radius: 8px;
-                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+                box-shadow: var(--shadow);
                 overflow: hidden;
             }
             .modal-header {
@@ -1716,7 +1807,7 @@
             .planner-btn-count {
                 display: inline-block;
                 font-size: 10px;
-                background: #2563eb;
+                background: var(--accent);
                 color: white;
                 padding: 1px 5px;
                 border-radius: 8px;
@@ -1942,6 +2033,20 @@
         <div class="app-layout">
             <!-- Main area -->
             <div class="main-area">
+                <!-- Hero title -->
+                <header class="app-hero">
+                    <div class="app-hero-title">
+                        <img
+                            src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png"
+                            alt=""
+                            class="app-hero-logo"
+                        />
+                        <h1 class="app-hero-wordmark">Pipeviz</h1>
+                    </div>
+                    <p class="app-hero-tagline">
+                        Easy, elegant lineage from a single <span class="app-ext">.json</span>
+                    </p>
+                </header>
                 <!-- JSON Panel (slide-over from left) -->
                 <div class="json-panel" id="json-panel">
                     <div class="json-panel-tabs">
@@ -1979,12 +2084,6 @@
                 </div>
                 <div class="top-bar">
                     <nav class="tab-strip">
-                        <span class="app-title" title="pipeviz"
-                            ><img
-                                src="https://raw.githubusercontent.com/mattlianje/d4/master/pix/pipeviz.png"
-                                alt="pipeviz"
-                                class="app-logo"
-                        /></span>
                         <button class="json-toggle-btn" onclick="toggleJsonPanel()" title="Toggle JSON editor (⌘J)">
                             <span class="json-toggle-icon">{ }</span> Editor
                         </button>

@@ -19,6 +19,20 @@ export function generateGraphvizDot() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
     const edgeColor = isDark ? '#b0b0b0' : '#555'
 
+    // Node fills/borders. Dark mode uses muted dark fills (with light labels via
+    // CSS) instead of the bright pastels, which read as glaring on a dark canvas.
+    const nodeColors = isDark
+        ? {
+              pipeline: { fill: '#1e3550', border: '#5b9bd5' },
+              datasource: { fill: '#33274a', border: '#a87fc7' },
+              group: { fill: '#3a2c1a', border: '#e0915a' }
+          }
+        : {
+              pipeline: { fill: '#e3f2fd', border: '#1976d2' },
+              datasource: { fill: '#f3e5f5', border: '#7b1fa2' },
+              group: { fill: '#fff3e0', border: '#ff6b35' }
+          }
+
     let pipelines = state.currentConfig.pipelines || []
     const datasources = state.currentConfig.datasources || []
     const explicitClusters = state.currentConfig.clusters || []
@@ -204,8 +218,8 @@ ${'    '.repeat(depth + 2)}fontname="Arial";
                     : scheduleDisplay
                       ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
                       : `"${pipeline.name}"`
-                const fillColor = isGroup ? '#fff3e0' : '#e3f2fd'
-                const borderColor = isGroup ? '#ff6b35' : '#1976d2'
+                const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
+                const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
                 const shape = isGroup ? 'box3d' : 'box'
                 const style = isGroup ? 'filled' : 'filled,rounded'
                 const penWidth = isGroup ? '2' : '1'
@@ -217,7 +231,7 @@ ${'    '.repeat(depth + 3)}label=${label}];
             } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
                 const ds = item.node
                 result += `${'    '.repeat(depth + 2)}"${ds.name}" [shape=ellipse, style=filled,
-${'    '.repeat(depth + 3)}fillcolor="#f3e5f5", color="#7b1fa2",
+${'    '.repeat(depth + 3)}fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
 ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
 `
             }
@@ -249,8 +263,8 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                 : scheduleDisplay
                   ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
                   : `"${pipeline.name}"`
-            const fillColor = isGroup ? '#fff3e0' : '#e3f2fd'
-            const borderColor = isGroup ? '#ff6b35' : '#1976d2'
+            const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
+            const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
             const shape = isGroup ? 'box3d' : 'box'
             const style = isGroup ? 'filled' : 'filled,rounded'
             const penWidth = isGroup ? '2' : '1'
@@ -262,7 +276,7 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
             const ds = item.node
             dot += `    "${ds.name}" [shape=ellipse, style=filled,
-        fillcolor="#f3e5f5", color="#7b1fa2",
+        fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
         fontname="Arial", fontsize=10];
 `
         }
@@ -272,9 +286,13 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         dot += '\n'
         pipelines.forEach((pipeline) => {
             pipeline.input_sources?.forEach((source) => {
+                // Only emit edges to declared nodes; otherwise Graphviz auto-creates
+                // the node, resurrecting off-path datasources when focused.
+                if (!allDataSources.has(source)) return
                 dot += `    "${source}" -> "${pipeline.name}" [color="${edgeColor}", arrowsize=0.8];\n`
             })
             pipeline.output_sources?.forEach((source) => {
+                if (!allDataSources.has(source)) return
                 dot += `    "${pipeline.name}" -> "${source}" [color="${edgeColor}", arrowsize=0.8];\n`
             })
         })
