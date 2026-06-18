@@ -6,7 +6,8 @@ import {
     loadExample,
     loadFromFile,
     applyConfig,
-    formatJson
+    formatJson,
+    generateShareableUrl
 } from './loaders.js'
 import { filterPipelines, filterDatasources } from './filters.js'
 import {
@@ -49,6 +50,7 @@ window.loadExample = loadExample
 window.loadFromFile = loadFromFile
 window.applyConfig = applyConfig
 window.formatJson = formatJson
+window.generateShareableUrl = generateShareableUrl
 window.filterPipelines = filterPipelines
 window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection

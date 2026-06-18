@@ -25,29 +25,58 @@ export function formatJson() {
     }
 }
 
-export function generateShareableUrl() {
+function bytesToBase64Url(bytes) {
+    let bin = ''
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64UrlToBytes(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/')
+    while (str.length % 4) str += '='
+    const bin = atob(str)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    return bytes
+}
+
+async function gzipString(str) {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))
+    return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
+async function gunzipToString(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+    return await new Response(stream).text()
+}
+
+export async function generateShareableUrl() {
     if (!state.currentConfig) {
         alert('No configuration loaded to share')
         return
     }
 
     const configJson = JSON.stringify(state.currentConfig)
-    const encodedConfig = btoa(configJson)
     const currentUrl = window.location.origin + window.location.pathname
-    const shareableUrl = `${currentUrl}?config=${encodedConfig}`
 
-    navigator.clipboard
-        .writeText(shareableUrl)
-        .then(() => {
-            const statusDiv = document.getElementById('json-status')
-            statusDiv.innerHTML = '<span class="success">Shareable URL copied to clipboard!</span>'
-            setTimeout(() => {
-                statusDiv.innerHTML = ''
-            }, 3000)
-        })
-        .catch(() => {
-            prompt('Copy this shareable URL:', shareableUrl)
-        })
+    let shareableUrl
+    try {
+        const compressed = await gzipString(configJson)
+        shareableUrl = `${currentUrl}?c=${bytesToBase64Url(compressed)}`
+    } catch (e) {
+        shareableUrl = `${currentUrl}?config=${btoa(unescape(encodeURIComponent(configJson)))}`
+    }
+
+    try {
+        await navigator.clipboard.writeText(shareableUrl)
+        const statusDiv = document.getElementById('json-status')
+        statusDiv.innerHTML = '<span class="success">Shareable URL copied to clipboard!</span>'
+        setTimeout(() => {
+            statusDiv.innerHTML = ''
+        }, 3000)
+    } catch (e) {
+        prompt('Copy this shareable URL:', shareableUrl)
+    }
 }
 
 async function tryLoadPipevizJson() {
@@ -71,6 +100,19 @@ async function tryLoadPipevizJson() {
 
 export async function loadFromUrl() {
     const urlParams = new URLSearchParams(window.location.search)
+
+    const compressedParam = urlParams.get('c')
+    if (compressedParam) {
+        try {
+            const decodedConfig = await gunzipToString(base64UrlToBytes(compressedParam))
+            const parsed = JSON.parse(decodedConfig)
+            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2)
+            loadJson()
+            return
+        } catch (error) {
+            console.error('Error decoding compressed config parameter:', error)
+        }
+    }
 
     const configParam = urlParams.get('config')
     const viewParam = urlParams.get('view')

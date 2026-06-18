@@ -849,7 +849,9 @@
                 border: 1px solid #bfdbfe;
                 border-radius: 6px;
                 text-decoration: none;
-                transition: background 0.15s, border-color 0.15s;
+                transition:
+                    background 0.15s,
+                    border-color 0.15s;
             }
             .detail-link-chip:hover {
                 background: #dbeafe;
@@ -2070,6 +2072,8 @@
                             <span class="json-action-sep">·</span>
                             <button class="json-action" onclick="formatJson()">Format</button>
                             <span class="json-action-sep">·</span>
+                            <button class="json-action" onclick="generateShareableUrl()">Share</button>
+                            <span class="json-action-sep">·</span>
                             <label class="json-action" style="cursor: pointer"
                                 >File<input
                                     type="file"
@@ -2332,7 +2336,7 @@
                     </div>
                 </div>
 
-<!-- docs pane removed -->
+                <!-- docs pane removed -->
             </div>
             <!-- end main-area -->
         </div>

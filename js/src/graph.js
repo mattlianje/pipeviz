@@ -517,10 +517,7 @@ function precomputeAdjacentStates() {
     const currentExpanded = new Set(state.expandedGroups)
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
-    const bulkStates = [
-        new Set(),
-        new Set(groupNames)
-    ]
+    const bulkStates = [new Set(), new Set(groupNames)]
     bulkStates.forEach((bulkExpanded) => {
         const bulkKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${Array.from(bulkExpanded).sort().join(',')}`
         if (!state.viewStateCache.has(bulkKey)) {
@@ -649,11 +646,8 @@ export function setupGraphInteractivity(forceRebuild = false) {
                 const connectors = entryHints || [comingFrom]
 
                 if (isUpstream) {
-                    const relevant = members.filter(
-                        (m) =>
-                            connectors.some(
-                                (cf) => m.outputs.includes(cf) || m.downstreamPipelines.includes(cf)
-                            )
+                    const relevant = members.filter((m) =>
+                        connectors.some((cf) => m.outputs.includes(cf) || m.downstreamPipelines.includes(cf))
                     )
                     if (relevant.length > 0) {
                         const allowed = new Set()
@@ -667,11 +661,8 @@ export function setupGraphInteractivity(forceRebuild = false) {
                         exitHints = [...allowed]
                     }
                 } else {
-                    const relevant = members.filter(
-                        (m) =>
-                            connectors.some(
-                                (cf) => m.inputs.includes(cf) || m.upstreams.includes(cf)
-                            )
+                    const relevant = members.filter((m) =>
+                        connectors.some((cf) => m.inputs.includes(cf) || m.upstreams.includes(cf))
                     )
                     if (relevant.length > 0) {
                         const allowed = new Set()
@@ -690,7 +681,7 @@ export function setupGraphInteractivity(forceRebuild = false) {
                 result.push({ name: n, depth: depth })
                 // If the next node is a group and we have exit hints, pass them
                 // so it knows which members are relevant
-                const hints = (exitHints && groupInfo[n]) ? exitHints : null
+                const hints = exitHints && groupInfo[n] ? exitHints : null
                 result.push(...getFullChain(n, map, visited, depth + 1, node, hints))
             })
             return result
@@ -1214,7 +1205,8 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         downstreamPipelines.length > 0 ||
         downstreamSources.length > 0
 
-    const totalLineage = upstreamPipelines.length + upstreamSources.length + downstreamPipelines.length + downstreamSources.length
+    const totalLineage =
+        upstreamPipelines.length + upstreamSources.length + downstreamPipelines.length + downstreamSources.length
 
     if (hasLineage) {
         html += `<div class="detail-section detail-drawer" data-open="false">`
