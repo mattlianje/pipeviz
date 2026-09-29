@@ -2,6 +2,7 @@ import { state } from './state.js'
 import { generateGraphvizDot } from './graph.js'
 import { generateBlastRadiusAnalysis, generateBlastRadiusDot } from './blastradius.js'
 import { updateHashWithPlannerState, getPlannerStateFromHash } from './tabs.js'
+import { escapeHtml, safeUrl, escapeDot } from './escape.js'
 
 const WAVE_COLORS = [
     { fill: '#e8f5e9', border: '#81c784', text: '#495057' },
@@ -646,13 +647,14 @@ function generatePlannerDot(analysis) {
         
 `
         pipelines.forEach((node) => {
-            dot += `        "${node.name}" [label="${node.name}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]\n`
+            const name = escapeDot(node.name)
+            dot += `        "${name}" [label="${name}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]\n`
         })
         dot += `    }\n\n`
     })
 
     analysis.edges.forEach((edge) => {
-        dot += `    "${edge.source}" -> "${edge.target}"\n`
+        dot += `    "${escapeDot(edge.source)}" -> "${escapeDot(edge.target)}"\n`
     })
 
     dot += `}\n`
@@ -810,18 +812,19 @@ function generateAirflowPlannerDot(analysis) {
         
 `
         wave.dags.forEach((d) => {
+            const dag = escapeDot(d.dag)
             if (d.missing) {
-                const label = `${d.dag}\\n?`
-                dot += `        "${d.dag}" [label="${label}" fillcolor="${missingColor.fill}" color="${missingColor.border}" fontcolor="${missingColor.text}" style="filled,rounded,dashed"]\n`
+                const label = `${dag}\\n?`
+                dot += `        "${dag}" [label="${label}" fillcolor="${missingColor.fill}" color="${missingColor.border}" fontcolor="${missingColor.text}" style="filled,rounded,dashed"]\n`
             } else {
-                dot += `        "${d.dag}" [label="${d.dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}" href="${d.airflow_url}" target="_blank" tooltip="Open in Airflow"]\n`
+                dot += `        "${dag}" [label="${dag}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}" href="${escapeDot(safeUrl(d.airflow_url))}" target="_blank" tooltip="Open in Airflow"]\n`
             }
         })
         dot += `    }\n\n`
     })
 
     analysis.edges.forEach((edge) => {
-        dot += `    "${edge.source_dag}" -> "${edge.target_dag}"\n`
+        dot += `    "${escapeDot(edge.source_dag)}" -> "${escapeDot(edge.target_dag)}"\n`
     })
 
     dot += `}\n`
@@ -859,7 +862,7 @@ export function updatePlannerPlan() {
         if (airflowAnalysis.error) {
             output.textContent = JSON.stringify(airflowAnalysis, null, 2)
             if (graphContainer) {
-                graphContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 12px; padding: 2rem; text-align: center;">${airflowAnalysis.message}</div>`
+                graphContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 12px; padding: 2rem; text-align: center;">${escapeHtml(airflowAnalysis.message)}</div>`
             }
             return
         }
@@ -1002,7 +1005,7 @@ export function restorePlannerStateFromHash() {
         const isBlastMode = currentPlannerView === 'blast'
 
         pipelines.forEach((pipelineName) => {
-            const input = list.querySelector(`input[value="${pipelineName}"]`)
+            const input = list.querySelector(`input[value="${CSS.escape(pipelineName)}"]`)
             if (input) {
                 input.checked = true
                 if (isBlastMode) {

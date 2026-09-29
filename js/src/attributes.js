@@ -1,4 +1,5 @@
 import { state } from './state.js'
+import { escapeHtml, jsArg, safeUrl, escapeDot } from './escape.js'
 export function generateAttributeDot() {
     if (!state.currentConfig) return ''
 
@@ -61,7 +62,7 @@ export function generateAttributeDot() {
                 const clusterId = `cluster_${attrId}`
                 const nestedBg = hasLineage ? '#dde5ed' : depth === 0 ? '#e8eef4' : '#dce4ec'
                 result += `        subgraph ${clusterId} {
-                    label="${attr.name}"
+                    label="${escapeDot(attr.name)}"
                     labelloc="t"
                     style=filled
                     fillcolor="${nestedBg}"
@@ -71,12 +72,12 @@ export function generateAttributeDot() {
                     fontsize="9"
                     margin="8"
 `
-                result += `            "${attrId}" [label="" shape=point width=0 height=0 fixedsize=true style=invis];\n` // anchor
+                result += `            "${escapeDot(attrId)}" [label="" shape=point width=0 height=0 fixedsize=true style=invis];\n` // anchor
                 result += renderAttributes(attr.attributes, dsName, dsId, attrPath, depth + 1)
                 result += `                        }\n`
             } else {
                 const fill = hasLineage ? '#e2e8f0' : attrFill
-                result += `            "${attrId}" [label="${attr.name}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`
+                result += `            "${escapeDot(attrId)}" [label="${escapeDot(attr.name)}" shape=box style="filled,rounded" fillcolor="${fill}" color="${attrBorder}" fontcolor="${textColor}" fontsize="9" height="0.3"];\n`
             }
         })
         return result
@@ -105,13 +106,15 @@ export function generateAttributeDot() {
                         let edgeAttrs = ['color="#7b1fa2"']
 
                         if (sourceIsStruct) {
-                            edgeAttrs.push(`ltail="cluster_${sourceId}"`)
+                            edgeAttrs.push(`ltail="cluster_${escapeDot(sourceId)}"`)
                         }
                         if (targetIsStruct) {
-                            edgeAttrs.push(`lhead="cluster_${targetId}"`)
+                            edgeAttrs.push(`lhead="cluster_${escapeDot(targetId)}"`)
                         }
 
-                        edges.push(`    "${sourceId}" -> "${targetId}" [${edgeAttrs.join(' ')}];\n`)
+                        edges.push(
+                            `    "${escapeDot(sourceId)}" -> "${escapeDot(targetId)}" [${edgeAttrs.join(' ')}];\n`
+                        )
                     }
                 })
             }
@@ -128,7 +131,7 @@ export function generateAttributeDot() {
 
         const dsId = ds.name.replace(/[^a-zA-Z0-9]/g, '_')
         dot += `    subgraph cluster_${dsId} {
-        label="${ds.name}"
+        label="${escapeDot(ds.name)}"
         style=filled
         fillcolor="${clusterBg}"
         fontcolor="${textColor}"
@@ -473,9 +476,9 @@ export function showAttributeDetails(attrId, upstream, downstream) {
         if (state.attributeGraphviz) state.attributeGraphviz.fit(true)
     }, 50)
 
-    let html = `<h5>${attr.name}</h5>`
+    let html = `<h5>${escapeHtml(attr.name)}</h5>`
     html += `<div class="detail-label">DATASOURCE</div>`
-    html += `<div class="detail-value">${attr.datasource}</div>`
+    html += `<div class="detail-value">${escapeHtml(attr.datasource)}</div>`
 
     const childPrefix = attrId + '__'
     const children = Object.keys(state.attributeLineageMap)
@@ -493,7 +496,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
         html += `<div class="detail-value">`
         children.forEach((child) => {
             const indent = child.depth * 12
-            html += `<div class="lineage-link" data-attr-id="${child.id}" style="padding-left: ${indent}px;">${child.relativePath.replace(/__/g, '.')}</div>`
+            html += `<div class="lineage-link" data-attr-id="${escapeHtml(child.id)}" style="padding-left: ${indent}px;">${escapeHtml(child.relativePath.replace(/__/g, '.'))}</div>`
         })
         html += `</div>`
     }
@@ -627,7 +630,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
                 const indent = (x.depth - 1) * 12
                 const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15)
                 const prefix = x.depth > 1 ? '└ ' : ''
-                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${upAttr.fullName}</div>`
+                html += `<div class="lineage-link" data-attr-id="${escapeHtml(x.id)}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${escapeHtml(upAttr.fullName)}</div>`
             }
         })
         html += `</div>`
@@ -642,7 +645,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
                 const indent = (x.depth - 1) * 12
                 const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.15)
                 const prefix = x.depth > 1 ? '└ ' : ''
-                html += `<div class="lineage-link" data-attr-id="${x.id}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${downAttr.fullName}</div>`
+                html += `<div class="lineage-link" data-attr-id="${escapeHtml(x.id)}" style="padding-left: ${indent}px; opacity: ${opacity};">${prefix}${escapeHtml(downAttr.fullName)}</div>`
             }
         })
         html += `</div>`
@@ -656,7 +659,7 @@ export function showAttributeDetails(attrId, upstream, downstream) {
 
     html += `<div class="lineage-json-view" style="display: none;">
         <div class="detail-label">LINEAGE JSON</div>
-        <pre class="lineage-json-pre">${JSON.stringify(lineageJson, null, 2)}</pre>
+        <pre class="lineage-json-pre">${escapeHtml(JSON.stringify(lineageJson, null, 2))}</pre>
     </div>`
 
     content.innerHTML = html
@@ -745,11 +748,11 @@ export function showDatasourceInAttributePanel(ds) {
         if (state.attributeGraphviz) state.attributeGraphviz.fit(true)
     }, 50)
 
-    let html = `<h5>${ds.name}</h5>`
+    let html = `<h5>${escapeHtml(ds.name)}</h5>`
 
     if (ds.type) {
         html += `<div class="detail-label">TYPE</div>`
-        html += `<div class="detail-value"><span class="badge badge-${ds.type}">${ds.type.toUpperCase()}</span></div>`
+        html += `<div class="detail-value"><span class="badge badge-${escapeHtml(ds.type)}">${escapeHtml(ds.type.toUpperCase())}</span></div>`
     }
 
     if (upstreamList.length > 0) {
@@ -766,14 +769,14 @@ export function showDatasourceInAttributePanel(ds) {
             const prefix = depth > 1 ? '└ ' : ''
             html +=
                 '<div class="lineage-link" data-ds-name="' +
-                name +
+                escapeHtml(name) +
                 '" style="padding-left: ' +
                 indent +
                 'px; opacity: ' +
                 opacity +
                 ';">' +
                 prefix +
-                name +
+                escapeHtml(name) +
                 '</div>'
         })
         html += '</div>'
@@ -793,14 +796,14 @@ export function showDatasourceInAttributePanel(ds) {
             const prefix = depth > 1 ? '└ ' : ''
             html +=
                 '<div class="lineage-link" data-ds-name="' +
-                name +
+                escapeHtml(name) +
                 '" style="padding-left: ' +
                 indent +
                 'px; opacity: ' +
                 opacity +
                 ';">' +
                 prefix +
-                name +
+                escapeHtml(name) +
                 '</div>'
         })
         html += '</div>'
@@ -808,23 +811,23 @@ export function showDatasourceInAttributePanel(ds) {
 
     if (ds.description) {
         html += `<div class="detail-label">Description</div>`
-        html += `<div class="detail-value">${ds.description}</div>`
+        html += `<div class="detail-value">${escapeHtml(ds.description)}</div>`
     }
 
     if (ds.owner) {
         html += `<div class="detail-label">Owner</div>`
-        html += `<div class="detail-value">${ds.owner}</div>`
+        html += `<div class="detail-value">${escapeHtml(ds.owner)}</div>`
     }
 
     if (ds.cluster) {
         html += `<div class="detail-label">Cluster</div>`
-        html += `<div class="detail-value"><span class="badge badge-cluster">${ds.cluster}</span></div>`
+        html += `<div class="detail-value"><span class="badge badge-cluster">${escapeHtml(ds.cluster)}</span></div>`
     }
 
     if (ds.tags && ds.tags.length > 0) {
         html += `<div class="detail-label">Tags</div>`
         html += `<div class="detail-value">${ds.tags
-            .map((t) => `<span class="badge badge-tag">${t}</span>`)
+            .map((t) => `<span class="badge badge-tag">${escapeHtml(t)}</span>`)
             .join('')}</div>`
     }
 
@@ -843,7 +846,7 @@ export function showDatasourceInAttributePanel(ds) {
         function listAttrs(attrs, indent = 0) {
             attrs.forEach((attr) => {
                 const hasChildren = attr.attributes && attr.attributes.length > 0
-                html += `<div class="small" style="padding-left: ${indent * 12}px;">${hasChildren ? '▸ ' : ''}${attr.name}</div>`
+                html += `<div class="small" style="padding-left: ${indent * 12}px;">${hasChildren ? '▸ ' : ''}${escapeHtml(attr.name)}</div>`
                 if (attr.attributes) listAttrs(attr.attributes, indent + 1)
             })
         }
@@ -855,7 +858,7 @@ export function showDatasourceInAttributePanel(ds) {
         html += `<div class="detail-label">Metadata</div>`
         html += `<div class="detail-value">`
         Object.entries(ds.metadata).forEach(([key, value]) => {
-            html += `<div class="small"><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</div>`
+            html += `<div class="small"><strong>${escapeHtml(key.replace(/_/g, ' '))}:</strong> ${escapeHtml(String(value))}</div>`
         })
         html += `</div>`
     }
@@ -864,7 +867,7 @@ export function showDatasourceInAttributePanel(ds) {
         html += `<div class="links-section">`
         html += `<div class="detail-label">Links</div>`
         Object.entries(ds.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" class="graph-ctrl-btn link-btn">${name}</a>`
+            html += `<a href="${escapeHtml(safeUrl(url))}" target="_blank" class="graph-ctrl-btn link-btn">${escapeHtml(name)}</a>`
         })
         html += `</div>`
     }
@@ -963,9 +966,9 @@ export function searchAttributes(event) {
 
     let html = ''
     matches.slice(0, 10).forEach((attr, i) => {
-        html += `<div class="search-result-item${i === 0 ? ' selected' : ''}" data-id="${attr.id}" onclick="selectAttributeFromSearch('${attr.id}')">
-            <span class="result-type datasource">${attr.datasource}</span>
-            <span class="result-name">${attr.name}</span>
+        html += `<div class="search-result-item${i === 0 ? ' selected' : ''}" data-id="${escapeHtml(attr.id)}" onclick="selectAttributeFromSearch(${jsArg(attr.id)})">
+            <span class="result-type datasource">${escapeHtml(attr.datasource)}</span>
+            <span class="result-name">${escapeHtml(attr.name)}</span>
         </div>`
     })
 

@@ -1,4 +1,5 @@
 import { state } from './state.js'
+import { escapeDot } from './escape.js'
 
 export function generateBlastRadiusAnalysis(nodeName) {
     if (!state.currentConfig || !nodeName) return null
@@ -136,9 +137,10 @@ export function generateBlastRadiusDot(analysis) {
     const sourceColor = depthColors[0]
     const isGroup = analysis.source_type === 'group'
     const sourceShape = analysis.source_type === 'datasource' ? 'ellipse' : 'box'
-    const sourceLabel = isGroup ? `${analysis.source}\\n(${analysis.group_size} pipelines)` : analysis.source
+    const source = escapeDot(analysis.source)
+    const sourceLabel = isGroup ? `${source}\\n(${analysis.group_size} pipelines)` : source
     const sourceBorderColor = isGroup ? '#00897b' : sourceColor.border
-    dot += `    "${analysis.source}" [label="${sourceLabel}" shape="${sourceShape}" fillcolor="${sourceColor.fill}" color="${sourceBorderColor}" fontcolor="${sourceColor.text}" penwidth="2"]\n\n`
+    dot += `    "${source}" [label="${sourceLabel}" shape="${sourceShape}" fillcolor="${sourceColor.fill}" color="${sourceBorderColor}" fontcolor="${sourceColor.text}" penwidth="2"]\n\n`
 
     Object.entries(analysis.by_depth).forEach(([depth, nodes]) => {
         const colorIdx = Math.min(parseInt(depth), depthColors.length - 1)
@@ -155,7 +157,8 @@ export function generateBlastRadiusDot(analysis) {
 `
         nodes.forEach((node) => {
             const shape = node.type === 'datasource' ? 'ellipse' : 'box'
-            dot += `        "${node.name}" [label="${node.name}" shape="${shape}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]\n`
+            const name = escapeDot(node.name)
+            dot += `        "${name}" [label="${name}" shape="${shape}" fillcolor="${colors.fill}" color="${colors.border}" fontcolor="${colors.text}"]\n`
         })
         dot += `    }\n\n`
     })
@@ -165,7 +168,7 @@ export function generateBlastRadiusDot(analysis) {
         const key = `${edge.source}|${edge.target}`
         if (!addedEdges.has(key)) {
             addedEdges.add(key)
-            dot += `    "${edge.source}" -> "${edge.target}"\n`
+            dot += `    "${escapeDot(edge.source)}" -> "${escapeDot(edge.target)}"\n`
         }
     })
 

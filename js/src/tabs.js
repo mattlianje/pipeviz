@@ -18,7 +18,7 @@ export function switchTab(paneId) {
     }
 
     // Activate corresponding sidebar item
-    const sidebarItem = document.querySelector(`.sidebar-item[data-tab="${paneId}"]`)
+    const sidebarItem = document.querySelector(`.sidebar-item[data-tab="${CSS.escape(paneId)}"]`)
     if (sidebarItem) {
         sidebarItem.classList.add('active')
     }

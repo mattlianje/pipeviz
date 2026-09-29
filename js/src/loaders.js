@@ -4,6 +4,7 @@ import { updateFilters } from './filters.js'
 import { renderGraph } from './graph.js'
 import { populatePlannerSelect } from './export.js'
 import { renderStats } from './stats.js'
+import { escapeHtml } from './escape.js'
 
 export function loadExample() {
     document.getElementById('json-input').value = JSON.stringify(exampleConfig, null, 2)
@@ -21,7 +22,7 @@ export function formatJson() {
         textarea.value = JSON.stringify(parsed, null, 2)
     } catch (e) {
         const statusDiv = document.getElementById('json-status')
-        statusDiv.innerHTML = '<span class="error">Invalid JSON: ' + e.message + '</span>'
+        statusDiv.innerHTML = '<span class="error">Invalid JSON: ' + escapeHtml(e.message) + '</span>'
     }
 }
 
@@ -109,11 +110,11 @@ async function loadFromConfigUrl(url) {
     } catch (error) {
         const statusDiv = document.getElementById('json-status')
         if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error">Error loading pipeline data: ${error.message}</span>`
+            statusDiv.innerHTML = `<span class="error">Error loading pipeline data: ${escapeHtml(error.message)}</span>`
         }
         const graph = document.getElementById('graph')
         if (graph && !state.currentConfig) {
-            graph.innerHTML = `<div style="padding:24px;color:var(--text-muted);font-size:13px">Could not load pipeline data.<br>${error.message}</div>`
+            graph.innerHTML = `<div style="padding:24px;color:var(--text-muted);font-size:13px">Could not load pipeline data.<br>${escapeHtml(error.message)}</div>`
         }
     }
 }
@@ -174,7 +175,7 @@ export async function loadFromUrl() {
         let fetchUrl = urlParam
         const fetchHeaders = {}
 
-        const isGitHubUrl = urlParam.includes('raw.githubusercontent.com') || urlParam.includes('github.com')
+        const isGitHubUrl = isGitHubHost(urlParam)
         if (tokenParam && isGitHubUrl) {
             fetchHeaders['Authorization'] = `token ${tokenParam}`
             const ghRawMatch = urlParam.match(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(.+)$/)
@@ -217,7 +218,7 @@ export async function loadFromUrl() {
                     banner.innerHTML = `<div class="auth-banner">GitHub token expired or invalid. <a onclick="promptGitHubToken(); return false">Update your token</a> to continue.<button class="auth-dismiss" onclick="this.parentElement.parentElement.innerHTML=''">&times;</button></div>`
                 } else {
                     const statusDiv = document.getElementById('json-status')
-                    statusDiv.innerHTML = `<span class="error">Error loading from URL: ${error.message}</span>`
+                    statusDiv.innerHTML = `<span class="error">Error loading from URL: ${escapeHtml(error.message)}</span>`
                 }
                 if (!state.currentConfig) {
                     loadExample()
@@ -229,6 +230,18 @@ export async function loadFromUrl() {
     const loaded = await tryLoadPipevizJson()
     if (!loaded && !state.currentConfig) {
         loadExample()
+    }
+}
+
+// The stored GitHub token is only ever sent to these exact hosts.
+const GITHUB_HOSTS = new Set(['github.com', 'raw.githubusercontent.com', 'api.github.com'])
+
+function isGitHubHost(url) {
+    try {
+        const { protocol, hostname } = new URL(url)
+        return protocol === 'https:' && GITHUB_HOSTS.has(hostname)
+    } catch {
+        return false
     }
 }
 
@@ -310,7 +323,7 @@ export function setupAutoProcess() {
                 statusDiv.innerHTML = '<span class="success">Valid JSON</span>'
                 loadJson()
             } catch (e) {
-                statusDiv.innerHTML = `<span class="error">Invalid JSON: ${e.message}</span>`
+                statusDiv.innerHTML = `<span class="error">Invalid JSON: ${escapeHtml(e.message)}</span>`
             }
         }, 500)
     })
@@ -339,6 +352,6 @@ export function loadJson() {
         populatePlannerSelect()
         renderStats()
     } catch (error) {
-        statusDiv.innerHTML = `<span class="error">JSON Parse Error: ${error.message}</span>`
+        statusDiv.innerHTML = `<span class="error">JSON Parse Error: ${escapeHtml(error.message)}</span>`
     }
 }

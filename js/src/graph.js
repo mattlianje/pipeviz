@@ -10,6 +10,7 @@ import {
     getBlastFromHash
 } from './tabs.js'
 import { formatSchedule } from './cron.js'
+import { escapeHtml, jsArg, safeUrl, escapeDot } from './escape.js'
 
 let blastRadiusGraphInstance = null
 
@@ -212,7 +213,7 @@ export function generateGraphvizDot() {
         colorIndex++
 
         let result = `${'    '.repeat(depth + 1)}subgraph cluster_${clusterName.replace(/[^a-zA-Z0-9]/g, '_')} {
-${'    '.repeat(depth + 2)}label="${clusterName}";
+${'    '.repeat(depth + 2)}label="${escapeDot(clusterName)}";
 ${'    '.repeat(depth + 2)}style="dotted";
 ${'    '.repeat(depth + 2)}color="#666666";
 ${'    '.repeat(depth + 2)}fontsize=11;
@@ -227,23 +228,23 @@ ${'    '.repeat(depth + 2)}fontname="Arial";
                 const memberCount = pipeline._members?.length || 0
                 const scheduleDisplay = formatSchedule(pipeline.schedule)
                 const label = isGroup
-                    ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
+                    ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
                     : scheduleDisplay
-                      ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
-                      : `"${pipeline.name}"`
+                      ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${escapeHtml(scheduleDisplay)}</I></FONT>>`
+                      : `"${escapeDot(pipeline.name)}"`
                 const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
                 const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
                 const shape = isGroup ? 'box3d' : 'box'
                 const style = isGroup ? 'filled' : 'filled,rounded'
                 const penWidth = isGroup ? '2' : '1'
-                result += `${'    '.repeat(depth + 2)}"${pipeline.name}" [shape=${shape}, style="${style}",
+                result += `${'    '.repeat(depth + 2)}"${escapeDot(pipeline.name)}" [shape=${shape}, style="${style}",
 ${'    '.repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
 ${'    '.repeat(depth + 3)}fontname="Arial",
 ${'    '.repeat(depth + 3)}label=${label}];
 `
             } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
                 const ds = item.node
-                result += `${'    '.repeat(depth + 2)}"${ds.name}" [shape=ellipse, style=filled,
+                result += `${'    '.repeat(depth + 2)}"${escapeDot(ds.name)}" [shape=ellipse, style=filled,
 ${'    '.repeat(depth + 3)}fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
 ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
 `
@@ -272,23 +273,23 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
             const memberCount = pipeline._members?.length || 0
             const scheduleDisplay = formatSchedule(pipeline.schedule)
             const label = isGroup
-                ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
+                ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
                 : scheduleDisplay
-                  ? `<${pipeline.name}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${scheduleDisplay}</I></FONT>>`
-                  : `"${pipeline.name}"`
+                  ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${escapeHtml(scheduleDisplay)}</I></FONT>>`
+                  : `"${escapeDot(pipeline.name)}"`
             const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
             const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
             const shape = isGroup ? 'box3d' : 'box'
             const style = isGroup ? 'filled' : 'filled,rounded'
             const penWidth = isGroup ? '2' : '1'
-            dot += `    "${pipeline.name}" [shape=${shape}, style="${style}",
+            dot += `    "${escapeDot(pipeline.name)}" [shape=${shape}, style="${style}",
         fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
         fontname="Arial",
         label=${label}];
 `
         } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
             const ds = item.node
-            dot += `    "${ds.name}" [shape=ellipse, style=filled,
+            dot += `    "${escapeDot(ds.name)}" [shape=ellipse, style=filled,
         fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
         fontname="Arial", fontsize=10];
 `
@@ -302,11 +303,11 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                 // Only emit edges to declared nodes; otherwise Graphviz auto-creates
                 // the node, resurrecting off-path datasources when focused.
                 if (!allDataSources.has(source)) return
-                dot += `    "${source}" -> "${pipeline.name}" [color="${edgeColor}", arrowsize=0.8];\n`
+                dot += `    "${escapeDot(source)}" -> "${escapeDot(pipeline.name)}" [color="${edgeColor}", arrowsize=0.8];\n`
             })
             pipeline.output_sources?.forEach((source) => {
                 if (!allDataSources.has(source)) return
-                dot += `    "${pipeline.name}" -> "${source}" [color="${edgeColor}", arrowsize=0.8];\n`
+                dot += `    "${escapeDot(pipeline.name)}" -> "${escapeDot(source)}" [color="${edgeColor}", arrowsize=0.8];\n`
             })
         })
     }
@@ -331,7 +332,7 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
                 const edgeKey = `${resolved}|${pipeline.name}`
                 if (!emittedEdges.has(edgeKey)) {
                     emittedEdges.add(edgeKey)
-                    dot += `    "${resolved}" -> "${pipeline.name}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`
+                    dot += `    "${escapeDot(resolved)}" -> "${escapeDot(pipeline.name)}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`
                 }
             }
         })
@@ -398,7 +399,7 @@ export function initializeGraph() {
             <div style="padding: 1rem; color: var(--text-muted);">
                 <strong>Graph rendering issue detected.</strong><br>
                 Please check the Raw DOT tab to see the generated code.<br>
-                <span style="font-size: 11px;">Error: ${error.message}</span>
+                <span style="font-size: 11px;">Error: ${escapeHtml(error.message)}</span>
             </div>
         `
     }
@@ -1154,39 +1155,40 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html += `<span class="badge ${nodeTypeBadge}">${nodeType}</span>`
     if (nodeType === 'Pipeline Group') {
         const isExpanded = state.expandedGroups.has(nodeName)
-        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeName}')">${isExpanded ? 'Collapse' : 'Expand'}</button>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup(${jsArg(nodeName)})">${isExpanded ? 'Collapse' : 'Expand'}</button>`
     }
     if (nodeType === 'Pipeline' && nodeData.group && state.expandedGroups.has(nodeData.group)) {
-        html += `<button class="graph-ctrl-btn" onclick="toggleGroup('${nodeData.group}')">Collapse group</button>`
+        html += `<button class="graph-ctrl-btn" onclick="toggleGroup(${jsArg(nodeData.group)})">Collapse group</button>`
     }
-    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius('${nodeName.replace(/'/g, "\\'")}')">Blast radius</button>`
+    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius(${jsArg(nodeName)})">Blast radius</button>`
     if (state.focusedNode === nodeName) {
         html += `<button class="graph-ctrl-btn active" onclick="unfocusNode()">Unfocus</button>`
     } else {
-        html += `<button class="graph-ctrl-btn" onclick="focusNode('${nodeName.replace(/'/g, "\\'")}')">Focus</button>`
+        html += `<button class="graph-ctrl-btn" onclick="focusNode(${jsArg(nodeName)})">Focus</button>`
     }
     html += `</div>`
 
     if (nodeData.description) {
         html += `<div class="detail-section"><div class="detail-label">Description</div>`
-        html += `<div class="detail-value">${nodeData.description}</div></div>`
+        html += `<div class="detail-value">${escapeHtml(nodeData.description)}</div></div>`
     }
 
     const props = []
-    if (nodeData.schedule) props.push(['Schedule', formatSchedule(nodeData.schedule)])
+    if (nodeData.schedule) props.push(['Schedule', escapeHtml(formatSchedule(nodeData.schedule))])
     if (nodeType === 'Pipeline' || nodeType === 'Pipeline Group') {
-        if (nodeData.duration !== undefined) props.push(['Duration', `${nodeData.duration}m`])
+        if (nodeData.duration !== undefined) props.push(['Duration', `${escapeHtml(nodeData.duration)}m`])
         if (nodeData.cost !== undefined) props.push(['Cost', `$${nodeData.cost.toFixed(2)}`])
     }
     if (nodeData.owners && nodeData.owners.length > 0) {
-        props.push(['Owners', nodeData.owners.join(', ')])
+        props.push(['Owners', escapeHtml(nodeData.owners.join(', '))])
     } else if (nodeData.owner) {
-        props.push(['Owner', nodeData.owner])
+        props.push(['Owner', escapeHtml(nodeData.owner)])
     }
     if (nodeData.users && nodeData.users.length > 0) {
-        props.push(['Users', nodeData.users.join(', ')])
+        props.push(['Users', escapeHtml(nodeData.users.join(', '))])
     }
-    if (nodeData.cluster) props.push(['Cluster', `<span class="badge badge-cluster">${nodeData.cluster}</span>`])
+    if (nodeData.cluster)
+        props.push(['Cluster', `<span class="badge badge-cluster">${escapeHtml(nodeData.cluster)}</span>`])
     if (nodeData.type) {
         const typeLower = (nodeData.type || '').toLowerCase()
         const typeBadge = ['snowflake', 'postgres', 'database'].includes(typeLower)
@@ -1196,7 +1198,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
               : ['kafka', 'api'].includes(typeLower)
                 ? `badge-${typeLower}`
                 : 'badge-type'
-        props.push(['Type', `<span class="badge ${typeBadge}">${nodeData.type}</span>`])
+        props.push(['Type', `<span class="badge ${typeBadge}">${escapeHtml(nodeData.type)}</span>`])
     }
     if (props.length) {
         html += `<div class="detail-section"><table class="detail-props">`
@@ -1207,13 +1209,13 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     }
 
     if (nodeData.tags?.length) {
-        html += `<div class="detail-section"><div class="detail-value">${nodeData.tags.map((t) => `<span class="badge badge-tag">${t}</span>`).join(' ')}</div></div>`
+        html += `<div class="detail-section"><div class="detail-value">${nodeData.tags.map((t) => `<span class="badge badge-tag">${escapeHtml(t)}</span>`).join(' ')}</div></div>`
     }
 
     if (nodeData.links && Object.keys(nodeData.links).length) {
         html += `<div class="detail-section"><div class="detail-links">`
         Object.entries(nodeData.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" class="detail-link-chip">${name}${LINK_ICON}</a>`
+            html += `<a href="${escapeHtml(safeUrl(url))}" target="_blank" class="detail-link-chip">${escapeHtml(name)}${LINK_ICON}</a>`
         })
         html += `</div></div>`
     }
@@ -1232,27 +1234,27 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
 
         if (nodeData._members?.length) {
             html += `<div class="detail-subsection"><div class="detail-label">Pipelines in this group <span class="detail-count">${nodeData._members.length}</span></div>`
-            html += `<div class="detail-value">${nodeData._members.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div></div>`
+            html += `<div class="detail-value">${nodeData._members.map((s) => `<span class="badge badge-pipeline">${escapeHtml(s)}</span>`).join(' ')}</div></div>`
         }
 
         if (nodeData.input_sources?.length) {
             html += `<div class="detail-subsection"><div class="detail-label">Reads from <span class="detail-count">${nodeData.input_sources.length}</span></div>`
-            html += `<div class="detail-value">${nodeData.input_sources.map((s) => `<span class="badge badge-input">${s}</span>`).join(' ')}</div></div>`
+            html += `<div class="detail-value">${nodeData.input_sources.map((s) => `<span class="badge badge-input">${escapeHtml(s)}</span>`).join(' ')}</div></div>`
         }
         if (nodeData.output_sources?.length) {
             html += `<div class="detail-subsection"><div class="detail-label">Writes to <span class="detail-count">${nodeData.output_sources.length}</span></div>`
-            html += `<div class="detail-value">${nodeData.output_sources.map((s) => `<span class="badge badge-output">${s}</span>`).join(' ')}</div></div>`
+            html += `<div class="detail-value">${nodeData.output_sources.map((s) => `<span class="badge badge-output">${escapeHtml(s)}</span>`).join(' ')}</div></div>`
         }
         if (nodeData.upstream_pipelines?.length) {
             html += `<div class="detail-subsection"><div class="detail-label">Depends on <span class="detail-count">${nodeData.upstream_pipelines.length}</span></div>`
-            html += `<div class="detail-value">${nodeData.upstream_pipelines.map((s) => `<span class="badge badge-pipeline">${s}</span>`).join(' ')}</div></div>`
+            html += `<div class="detail-value">${nodeData.upstream_pipelines.map((s) => `<span class="badge badge-pipeline">${escapeHtml(s)}</span>`).join(' ')}</div></div>`
         }
 
         if (nodeData.metadata && Object.keys(nodeData.metadata).length) {
             html += `<div class="detail-subsection"><div class="detail-label">Metadata</div>`
             html += `<table class="detail-props">`
             Object.entries(nodeData.metadata).forEach(([key, value]) => {
-                html += `<tr><td class="detail-prop-key">${key}</td><td class="detail-prop-val">${value}</td></tr>`
+                html += `<tr><td class="detail-prop-key">${escapeHtml(key)}</td><td class="detail-prop-val">${escapeHtml(value)}</td></tr>`
             })
             html += `</table></div>`
         }
@@ -1290,7 +1292,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         items.forEach((x) => {
             const indent = (x.depth - 1) * 14
             const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.12)
-            out += `<div class="lineage-link" data-node-name="${x.name}" style="padding-left: ${indent}px; opacity: ${opacity};">${x.name}</div>`
+            out += `<div class="lineage-link" data-node-name="${escapeHtml(x.name)}" style="padding-left: ${indent}px; opacity: ${opacity};">${escapeHtml(x.name)}</div>`
         })
         out += `</div>`
         return out
@@ -1400,7 +1402,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     html += `</div>`
 
     html += `<div class="lineage-json-view" style="display: none;">
-        <pre class="lineage-json-pre">${JSON.stringify(lineageJson, null, 2)}</pre>
+        <pre class="lineage-json-pre">${escapeHtml(JSON.stringify(lineageJson, null, 2))}</pre>
     </div>`
 
     if (hasLineage) {
@@ -1636,11 +1638,11 @@ export function highlightMatch(text, query) {
     const idx = lowerText.indexOf(lowerQuery)
     if (idx !== -1) {
         return (
-            text.substring(0, idx) +
+            escapeHtml(text.substring(0, idx)) +
             '<span class="result-match">' +
-            text.substring(idx, idx + query.length) +
+            escapeHtml(text.substring(idx, idx + query.length)) +
             '</span>' +
-            text.substring(idx + query.length)
+            escapeHtml(text.substring(idx + query.length))
         )
     }
 
@@ -1648,10 +1650,10 @@ export function highlightMatch(text, query) {
     let queryIdx = 0
     for (let i = 0; i < text.length; i++) {
         if (queryIdx < query.length && text[i].toLowerCase() === lowerQuery[queryIdx]) {
-            result += '<span class="result-match">' + text[i] + '</span>'
+            result += '<span class="result-match">' + escapeHtml(text[i]) + '</span>'
             queryIdx++
         } else {
-            result += text[i]
+            result += escapeHtml(text[i])
         }
     }
     return result
@@ -1758,7 +1760,7 @@ export function searchNodes(event) {
     dropdown.innerHTML = topResults
         .map(
             (r, i) => `
-        <div class="search-result-item${i === 0 ? ' selected' : ''}" data-name="${r.name}" onclick="selectSearchResult('${r.name}')">
+        <div class="search-result-item${i === 0 ? ' selected' : ''}" data-name="${escapeHtml(r.name)}" onclick="selectSearchResult(${jsArg(r.name)})">
             <span class="result-type ${r.type}">${r.type === 'pipeline' ? 'Pipeline' : 'Source'}</span>
             <span class="result-name">${highlightMatch(r.name, query)}</span>
         </div>
@@ -1995,7 +1997,7 @@ export function showBlastRadius(nodeName) {
             <div class="mb-3">
                 <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Group Members (${analysis.group_size})</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
-                    ${analysis.group_members.map((m) => `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid #ff6b35;">▢ ${m}</span>`).join('')}
+                    ${analysis.group_members.map((m) => `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid #ff6b35;">▢ ${escapeHtml(m)}</span>`).join('')}
                 </div>
             </div>
         `
@@ -2024,13 +2026,13 @@ export function showBlastRadius(nodeName) {
         summaryHtml += `
             <div class="mb-2">
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">
-                    Depth ${depth} <span style="color: ${color};">●</span>
+                    Depth ${escapeHtml(depth)} <span style="color: ${color};">●</span>
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
         `
         nodes.forEach((node) => {
             const icon = node.type === 'pipeline' ? '▢' : '○'
-            summaryHtml += `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid ${color};">${icon} ${node.name}</span>`
+            summaryHtml += `<span style="font-size: 0.75rem; padding: 0.15rem 0.4rem; background: var(--bg-secondary); border-radius: 3px; border-left: 2px solid ${color};">${icon} ${escapeHtml(node.name)}</span>`
         })
         summaryHtml += `</div></div>`
     })
@@ -2039,7 +2041,7 @@ export function showBlastRadius(nodeName) {
 
     summaryHtml += `
         <div id="blast-radius-json-view" style="display: none;">
-            <pre style="font-size: 0.7rem; max-height: 400px; overflow: auto; background: var(--bg-code); color: var(--text-primary); padding: 0.75rem; border-radius: 4px; margin: 0; border: 1px solid var(--border-color);">${JSON.stringify(analysis, null, 2)}</pre>
+            <pre style="font-size: 0.7rem; max-height: 400px; overflow: auto; background: var(--bg-code); color: var(--text-primary); padding: 0.75rem; border-radius: 4px; margin: 0; border: 1px solid var(--border-color);">${escapeHtml(JSON.stringify(analysis, null, 2))}</pre>
         </div>
     `
 

@@ -1,5 +1,6 @@
 import { state } from './state.js'
 import { formatSchedule } from './cron.js'
+import { escapeHtml, safeUrl } from './escape.js'
 
 export function renderPipelines() {
     if (!state.currentConfig || !state.currentConfig.pipelines) return
@@ -25,33 +26,36 @@ export function renderPipelines() {
 
     state.currentConfig.pipelines.forEach((pipeline) => {
         const inputSources =
-            pipeline.input_sources?.map((s) => `<span class="badge badge-input">${s}</span>`).join('') || ''
+            pipeline.input_sources?.map((s) => `<span class="badge badge-input">${escapeHtml(s)}</span>`).join('') || ''
 
         const outputSources =
-            pipeline.output_sources?.map((s) => `<span class="badge badge-output">${s}</span>`).join('') || ''
+            pipeline.output_sources?.map((s) => `<span class="badge badge-output">${escapeHtml(s)}</span>`).join('') ||
+            ''
 
-        const cluster = pipeline.cluster ? `<span class="badge badge-cluster">${pipeline.cluster}</span>` : ''
+        const cluster = pipeline.cluster
+            ? `<span class="badge badge-cluster">${escapeHtml(pipeline.cluster)}</span>`
+            : ''
 
-        const tags = pipeline.tags?.map((t) => `<span class="badge badge-tag">${t}</span>`).join('') || ''
+        const tags = pipeline.tags?.map((t) => `<span class="badge badge-tag">${escapeHtml(t)}</span>`).join('') || ''
 
         const links = pipeline.links
             ? `<div class="links-scroll">${Object.entries(pipeline.links)
                   .map(
                       ([name, url]) =>
-                          `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
+                          `<a href="${escapeHtml(safeUrl(url))}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${escapeHtml(name)}</a>`
                   )
                   .join('')}</div>`
             : ''
 
         html += `
             <tr class="pipeline-row"
-                data-name="${pipeline.name.toLowerCase()}"
-                data-description="${(pipeline.description || '').toLowerCase()}"
-                data-cluster="${(pipeline.cluster || '').toLowerCase()}"
-                data-tags="${(pipeline.tags || []).join(',').toLowerCase()}">
-                <td class="col-name"><div><strong>${pipeline.name}</strong></div></td>
-                <td class="col-desc"><div>${pipeline.description || ''}</div></td>
-                <td class="col-schedule"><div><code>${formatSchedule(pipeline.schedule) || ''}</code></div></td>
+                data-name="${escapeHtml(pipeline.name.toLowerCase())}"
+                data-description="${escapeHtml((pipeline.description || '').toLowerCase())}"
+                data-cluster="${escapeHtml((pipeline.cluster || '').toLowerCase())}"
+                data-tags="${escapeHtml((pipeline.tags || []).join(',').toLowerCase())}">
+                <td class="col-name"><div><strong>${escapeHtml(pipeline.name)}</strong></div></td>
+                <td class="col-desc"><div>${escapeHtml(pipeline.description || '')}</div></td>
+                <td class="col-schedule"><div><code>${escapeHtml(formatSchedule(pipeline.schedule) || '')}</code></div></td>
                 <td class="col-sources"><div>${inputSources}</div></td>
                 <td class="col-sources"><div>${outputSources}</div></td>
                 <td class="col-cluster"><div>${cluster}</div></td>
@@ -128,40 +132,40 @@ export function renderDatasources() {
     `
 
     allDataSources.forEach((ds) => {
-        const typeBadge = `<span class="badge badge-${ds.type || 'secondary'}">${(ds.type || 'unknown').toUpperCase()}</span>`
+        const typeBadge = `<span class="badge badge-${escapeHtml(ds.type || 'secondary')}">${escapeHtml((ds.type || 'unknown').toUpperCase())}</span>`
 
         const metadata = ds.metadata
             ? Object.entries(ds.metadata)
                   .map(
                       ([k, v]) =>
-                          `<div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;"><span style="font-weight: 500;">${k.replace(/_/g, ' ')}:</span> ${v}</div>`
+                          `<div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;"><span style="font-weight: 500;">${escapeHtml(k.replace(/_/g, ' '))}:</span> ${escapeHtml(v)}</div>`
                   )
                   .join('')
             : ''
 
-        const cluster = ds.cluster ? `<span class="badge badge-cluster">${ds.cluster}</span>` : ''
+        const cluster = ds.cluster ? `<span class="badge badge-cluster">${escapeHtml(ds.cluster)}</span>` : ''
 
-        const tags = ds.tags?.map((t) => `<span class="badge badge-tag">${t}</span>`).join('') || ''
+        const tags = ds.tags?.map((t) => `<span class="badge badge-tag">${escapeHtml(t)}</span>`).join('') || ''
 
         const links = ds.links
             ? `<div class="links-scroll">${Object.entries(ds.links)
                   .map(
                       ([name, url]) =>
-                          `<a href="${url}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${name}</a>`
+                          `<a href="${escapeHtml(safeUrl(url))}" target="_blank" class="graph-ctrl-btn" style="font-size: 0.7em; padding: 2px 6px;">${escapeHtml(name)}</a>`
                   )
                   .join('')}</div>`
             : ''
 
         html += `
             <tr class="datasource-row"
-                data-name="${ds.name.toLowerCase()}"
-                data-type="${(ds.type || '').toLowerCase()}"
-                data-cluster="${(ds.cluster || '').toLowerCase()}"
-                data-tags="${(ds.tags || []).join(',').toLowerCase()}"
-                data-search="${(ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase()}">
-                <td class="col-name"><div><strong>${ds.name}</strong><br>${typeBadge}</div></td>
-                <td class="col-desc"><div>${ds.isAutoCreated ? `<span style="color: var(--text-secondary); font-style: italic;">${ds.description}</span>` : ds.description || ''}</div></td>
-                <td class="col-owner"><div style="font-size: 11px; color: var(--text-muted);">${ds.owner || ''}</div></td>
+                data-name="${escapeHtml(ds.name.toLowerCase())}"
+                data-type="${escapeHtml((ds.type || '').toLowerCase())}"
+                data-cluster="${escapeHtml((ds.cluster || '').toLowerCase())}"
+                data-tags="${escapeHtml((ds.tags || []).join(',').toLowerCase())}"
+                data-search="${escapeHtml((ds.name + ' ' + (ds.description || '') + ' ' + (ds.owner || '')).toLowerCase())}">
+                <td class="col-name"><div><strong>${escapeHtml(ds.name)}</strong><br>${typeBadge}</div></td>
+                <td class="col-desc"><div>${ds.isAutoCreated ? `<span style="color: var(--text-secondary); font-style: italic;">${escapeHtml(ds.description)}</span>` : escapeHtml(ds.description || '')}</div></td>
+                <td class="col-owner"><div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(ds.owner || '')}</div></td>
                 <td class="col-metadata"><div>${metadata}</div></td>
                 <td class="col-cluster"><div>${cluster}</div></td>
                 <td class="col-tags"><div>${tags}</div></td>
