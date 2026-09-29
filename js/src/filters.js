@@ -1,4 +1,5 @@
 import { state } from './state.js'
+import { escapeHtml } from './escape.js'
 
 const activeFilters = {
     pipelineTags: new Set(),
@@ -23,7 +24,7 @@ function buildFilterGroup(label, type, values) {
     html += values
         .map(
             (v) =>
-                `<span class="filter-tag${activeFilters[type].has(v) ? ' active' : ''}" data-type="${type}" data-value="${v}">${v}</span>`
+                `<span class="filter-tag${activeFilters[type].has(v) ? ' active' : ''}" data-type="${type}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</span>`
         )
         .join('')
     html += `</div></div></span>`

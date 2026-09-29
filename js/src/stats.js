@@ -1,4 +1,5 @@
 import { state } from './state.js'
+import { escapeHtml } from './escape.js'
 
 let cachedCriticalPath = null
 let cachedCriticalPathHash = null
@@ -496,7 +497,7 @@ export function renderStats() {
                                 (h, i) => `
                             <div class="hub-row">
                                 <span class="hub-rank">${i + 1}</span>
-                                <span class="hub-name ${h.type}">${h.name}</span>
+                                <span class="hub-name ${h.type}">${escapeHtml(h.name)}</span>
                                 <span class="hub-stats">↑${h.upstream} ↓${h.downstream}</span>
                             </div>
                         `
@@ -516,7 +517,7 @@ function renderCoverageBar(label, data) {
     const pct = data.total > 0 ? Math.round((data.covered / data.total) * 100) : 100
     const color = pct >= 80 ? 'good' : pct >= 50 ? 'okay' : 'low'
     return `<div class="coverage-row">
-        <span class="coverage-label">${label}</span>
+        <span class="coverage-label">${escapeHtml(label)}</span>
         <div class="coverage-bar-wrap"><div class="coverage-bar ${color}" style="width: ${pct}%"></div></div>
         <span class="coverage-pct ${color}">${pct}%</span>
     </div>`
@@ -560,7 +561,7 @@ function renderPieLegend(data) {
             const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
             return `<div class="pie-legend-row">
             <span class="pie-legend-dot" style="background:${COLORS[i % COLORS.length]}"></span>
-            <span class="pie-legend-name">${d.label}</span>
+            <span class="pie-legend-name">${escapeHtml(d.label)}</span>
             <span class="pie-legend-val">${d.value} (${pct}%)</span>
         </div>`
         })
