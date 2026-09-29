@@ -12,17 +12,9 @@ const WAVE_COLORS = [
     { fill: '#fce4ec', border: '#f48fb1', text: '#495057' }
 ]
 
-const WAVE_COLORS_DARK = [
-    { fill: '#2a4a3a', border: '#81c784', text: '#e0e0e0' },
-    { fill: '#2a3a4a', border: '#64b5f6', text: '#e0e0e0' },
-    { fill: '#3a2a4a', border: '#ba68c8', text: '#e0e0e0' },
-    { fill: '#4a3a2a', border: '#ffb74d', text: '#e0e0e0' },
-    { fill: '#2a4a4a', border: '#4dd0e1', text: '#e0e0e0' },
-    { fill: '#4a2a3a', border: '#f48fb1', text: '#e0e0e0' }
-]
-
 const WAVE0_COLOR = { fill: '#fef3e2', border: '#d4915c', text: '#495057' }
-const WAVE0_COLOR_DARK = { fill: '#4a3a2a', border: '#d4915c', text: '#e0e0e0' }
+
+const waveColor = (wave) => (wave === 0 ? WAVE0_COLOR : WAVE_COLORS[(wave - 1) % WAVE_COLORS.length])
 
 let currentExportFormat = 'json'
 let currentPlannerView = 'pipeline'
@@ -628,12 +620,9 @@ function updatePickerCount() {
 function generatePlannerDot(analysis) {
     if (!analysis || !analysis.waves || analysis.waves.length === 0) return null
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-    const bgColor = isDark ? '#1a1a1a' : '#ffffff'
-    const textColor = isDark ? '#b0b0b0' : '#666666'
-    const edgeColor = isDark ? '#666666' : '#999999'
-    const waveColors = isDark ? WAVE_COLORS_DARK : WAVE_COLORS
-    const wave0Color = isDark ? WAVE0_COLOR_DARK : WAVE0_COLOR
+    const bgColor = '#ffffff'
+    const textColor = '#666666'
+    const edgeColor = '#999999'
 
     let dot = `digraph PlannerPlan {
     rankdir=LR
@@ -645,7 +634,7 @@ function generatePlannerDot(analysis) {
 `
 
     analysis.waves.forEach((wave) => {
-        const colors = wave.wave === 0 ? wave0Color : waveColors[(wave.wave - 1) % waveColors.length]
+        const colors = waveColor(wave.wave)
         const pipelines = wave.pipelines || wave.nodes || []
         dot += `    subgraph cluster_wave${wave.wave} {
         label="Wave ${wave.wave}"
@@ -795,15 +784,10 @@ function generateAirflowAnalysis(pipelineAnalysis) {
 function generateAirflowPlannerDot(analysis) {
     if (!analysis || !analysis.waves || analysis.waves.length === 0) return null
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-    const bgColor = isDark ? '#1a1a1a' : '#ffffff'
-    const textColor = isDark ? '#b0b0b0' : '#666666'
-    const edgeColor = isDark ? '#666666' : '#999999'
-    const missingColor = isDark
-        ? { fill: '#2a2a2a', border: '#555555', text: '#888888' }
-        : { fill: '#f5f5f5', border: '#cccccc', text: '#999999' }
-    const wave0Color = isDark ? WAVE0_COLOR_DARK : WAVE0_COLOR
-    const waveColors = isDark ? WAVE_COLORS_DARK : WAVE_COLORS
+    const bgColor = '#ffffff'
+    const textColor = '#666666'
+    const edgeColor = '#999999'
+    const missingColor = { fill: '#f5f5f5', border: '#cccccc', text: '#999999' }
 
     let dot = `digraph AirflowPlanner {
     rankdir=LR
@@ -815,7 +799,7 @@ function generateAirflowPlannerDot(analysis) {
 `
 
     analysis.waves.forEach((wave) => {
-        const colors = wave.wave === 0 ? wave0Color : waveColors[(wave.wave - 1) % waveColors.length]
+        const colors = waveColor(wave.wave)
         dot += `    subgraph cluster_wave${wave.wave} {
         label="Stage ${wave.wave}"
         fontname="Helvetica"

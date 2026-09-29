@@ -10,6 +10,13 @@ export const state = {
     selectedNode: null,
     focusedNode: null,
     focusedSet: null,
+    fullLineage: null,
+    fullUpstreamMap: null,
+    fullDownstreamMap: null,
+    focusReach: null, // lineage hops shown around focusedNode (1 = direct in/out)
+    clickMode: 'focus', // 'focus' | 'highlight'
+    pendingFocusReset: false,
+    pendingFocusSelect: null,
     cachedUpstreamMap: {},
     cachedDownstreamMap: {},
     cachedLineage: {},
@@ -17,6 +24,7 @@ export const state = {
     attributeGraphviz: null,
     attributeLastRenderedConfigHash: null,
     nestedClusterCount: 0,
+    lastGraphNodeCount: 0,
     attributeLineageMap: {},
     datasourceLineageMap: {},
     selectedAttribute: null
@@ -26,11 +34,11 @@ export function getConfigHash(config) {
     return JSON.stringify(config)
 }
 
-export function getViewStateKey() {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-    const expandedGroupsKey = Array.from(state.expandedGroups).sort().join(',')
-    const focusKey = state.focusedNode || ''
-    return `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${expandedGroupsKey}|${focusKey}`
+const currentFocusKey = () => (state.focusedNode ? `${state.focusedNode}:${state.focusReach}` : '')
+
+export function getViewStateKey(expandedGroups = state.expandedGroups, focusKey = currentFocusKey()) {
+    const expandedGroupsKey = Array.from(expandedGroups).sort().join(',')
+    return `${state.groupedView}|${state.pipelinesOnlyView}|${expandedGroupsKey}|${focusKey}`
 }
 
 export function clearViewStateCache() {
@@ -39,14 +47,16 @@ export function clearViewStateCache() {
     state.attributeLastRenderedConfigHash = null
 }
 
-const MAX_VIEW_CACHE_SIZE = 50
+const MAX_VIEW_CACHE_SIZE = 80
 
+// Evicts dot-only entries first; cached SVGs are expensive to rebuild.
 export function addToViewCache(key, value) {
-    if (state.viewStateCache.size >= MAX_VIEW_CACHE_SIZE) {
-        const firstKey = state.viewStateCache.keys().next().value
-        state.viewStateCache.delete(firstKey)
+    const cache = state.viewStateCache
+    if (!cache.has(key) && cache.size >= MAX_VIEW_CACHE_SIZE) {
+        const dotOnly = [...cache].find(([, v]) => !v.svg)
+        cache.delete(dotOnly ? dotOnly[0] : cache.keys().next().value)
     }
-    state.viewStateCache.set(key, value)
+    cache.set(key, value)
 }
 
 export const exampleConfig = {

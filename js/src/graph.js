@@ -13,25 +13,26 @@ import { formatSchedule } from './cron.js'
 
 let blastRadiusGraphInstance = null
 
+// Past this many nodes: polyline edges, capped layout, no morph transitions,
+// and the laid-out SVG is cached.
+const BIG_GRAPH_THRESHOLD = 250
+const ZOOM_EXTENT = [0.02, 2000]
+
+const LINK_ICON =
+    '<svg class="detail-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'
+
+const pipelineSources = (p) => [...(p.input_sources || []), ...(p.output_sources || [])]
+
 export function generateGraphvizDot() {
     if (!state.currentConfig) return ''
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-    const edgeColor = isDark ? '#b0b0b0' : '#555'
+    const edgeColor = '#555'
 
-    // Node fills/borders. Dark mode uses muted dark fills (with light labels via
-    // CSS) instead of the bright pastels, which read as glaring on a dark canvas.
-    const nodeColors = isDark
-        ? {
-              pipeline: { fill: '#1e3550', border: '#5b9bd5' },
-              datasource: { fill: '#33274a', border: '#a87fc7' },
-              group: { fill: '#3a2c1a', border: '#e0915a' }
-          }
-        : {
-              pipeline: { fill: '#e3f2fd', border: '#1976d2' },
-              datasource: { fill: '#f3e5f5', border: '#7b1fa2' },
-              group: { fill: '#fff3e0', border: '#ff6b35' }
-          }
+    const nodeColors = {
+        pipeline: { fill: '#e3f2fd', border: '#1976d2' },
+        datasource: { fill: '#f3e5f5', border: '#7b1fa2' },
+        group: { fill: '#fff3e0', border: '#ff6b35' }
+    }
 
     let pipelines = state.currentConfig.pipelines || []
     const datasources = state.currentConfig.datasources || []
@@ -75,31 +76,42 @@ export function generateGraphvizDot() {
         pipelines = [...ungroupedPipelines, ...groupedPipelines]
     }
 
-    if (state.focusedSet) {
-        pipelines = pipelines.filter((p) => state.focusedSet.has(p.name))
+    // focusedSet is captured against the grouped view; if a focused group has
+    // since been expanded, let its members and their sources through.
+    let focusFilter = state.focusedSet
+    if (focusFilter && state.groupedView) {
+        focusFilter = new Set(state.focusedSet)
+        for (const p of state.currentConfig.pipelines || []) {
+            if (p.group && state.expandedGroups.has(p.group) && state.focusedSet.has(p.group)) {
+                focusFilter.add(p.name)
+                pipelineSources(p).forEach((s) => focusFilter.add(s))
+            }
+        }
     }
+    const inFocus = (name) => !focusFilter || focusFilter.has(name)
+
+    pipelines = pipelines.filter((p) => inFocus(p.name))
 
     const allDataSources = new Map()
-    if (state.focusedSet) {
-        datasources.forEach((ds) => {
-            if (state.focusedSet.has(ds.name)) allDataSources.set(ds.name, ds)
-        })
-    } else {
-        datasources.forEach((ds) => allDataSources.set(ds.name, ds))
-    }
+    datasources.forEach((ds) => {
+        if (inFocus(ds.name)) allDataSources.set(ds.name, ds)
+    })
 
     pipelines.forEach((pipeline) => {
-        pipeline.input_sources?.forEach((sourceName) => {
-            if (!allDataSources.has(sourceName) && (!state.focusedSet || state.focusedSet.has(sourceName))) {
-                allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' })
-            }
-        })
-        pipeline.output_sources?.forEach((sourceName) => {
-            if (!allDataSources.has(sourceName) && (!state.focusedSet || state.focusedSet.has(sourceName))) {
+        pipelineSources(pipeline).forEach((sourceName) => {
+            if (!allDataSources.has(sourceName) && inFocus(sourceName)) {
                 allDataSources.set(sourceName, { name: sourceName, type: 'auto-created' })
             }
         })
     })
+
+    // Focused: drop datasources no remaining pipeline touches.
+    if (focusFilter) {
+        const referenced = new Set(pipelines.flatMap(pipelineSources))
+        for (const name of allDataSources.keys()) {
+            if (!referenced.has(name)) allDataSources.delete(name)
+        }
+    }
 
     const allClusterNames = new Set()
     pipelines.forEach((p) => {
@@ -172,9 +184,15 @@ export function generateGraphvizDot() {
         nodesByCluster.get(cluster).push({ type: 'datasource', node: ds })
     })
 
+    // Recurse into descendants: skipping a cluster whose nodes live only in
+    // grandchildren leaves edges to undeclared nodes (drawn as bare circles).
+    function clusterHasNodes(name) {
+        return nodesByCluster.get(name)?.length > 0 || (clusterChildren.get(name) || []).some(clusterHasNodes)
+    }
+
     const rootClusters = []
     clusterDefinitions.forEach((cluster, name) => {
-        if (!clusterHierarchy.has(name) && nodesByCluster.has(name)) {
+        if (!clusterHierarchy.has(name) && clusterHasNodes(name)) {
             rootClusters.push(name)
         }
     })
@@ -185,15 +203,10 @@ export function generateGraphvizDot() {
         const cluster = clusterDefinitions.get(clusterName)
         if (!cluster) return ''
 
+        if (!clusterHasNodes(clusterName)) return ''
+
         const nodesInCluster = nodesByCluster.get(clusterName) || []
         const children = clusterChildren.get(clusterName) || []
-
-        const hasNodes = nodesInCluster.length > 0
-        const hasChildrenWithNodes = children.some(
-            (child) => nodesByCluster.has(child) && nodesByCluster.get(child).length > 0
-        )
-
-        if (!hasNodes && !hasChildrenWithNodes) return ''
 
         const clusterColor = clusterColors[colorIndex % clusterColors.length]
         colorIndex++
@@ -324,7 +337,13 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         })
     })
 
-    dot += '\n    overlap=false; splines=true;\n}'
+    const nodeCount = pipelines.length + allDataSources.size
+    state.lastGraphNodeCount = nodeCount
+    const layoutAttrs =
+        nodeCount > BIG_GRAPH_THRESHOLD
+            ? 'splines=polyline; nslimit=2; mclimit=1; ranksep=0.5; nodesep=0.25;'
+            : 'splines=true;'
+    dot += `\n    overlap=false; ${layoutAttrs}\n}`
     return dot
 }
 
@@ -359,9 +378,7 @@ export function renderGraph() {
         if (!state.graphviz) {
             setTimeout(initializeGraph, 100)
         } else {
-            if (renderTimeout) clearTimeout(renderTimeout)
-            isRendering = false
-            pendingUpdate = false
+            resetRenderState()
             updateGraph()
         }
         state.lastRenderedConfigHash = currentHash
@@ -370,15 +387,10 @@ export function renderGraph() {
 
 export function initializeGraph() {
     try {
-        if (renderTimeout) clearTimeout(renderTimeout)
-        isRendering = false
-        pendingUpdate = false
-
+        resetRenderState()
         const el = document.getElementById('graph')
         el.innerHTML = ''
-        const w = el.clientWidth || el.parentElement.clientWidth || 800
-        const h = el.clientHeight || el.parentElement.clientHeight || 600
-        state.graphviz = d3.select('#graph').graphviz().width(w).height(h).fit(true).zoom(true)
+        createGraphviz(el)
         updateGraph()
     } catch (error) {
         console.error('Graphviz initialization error:', error)
@@ -394,66 +406,204 @@ export function initializeGraph() {
 
 let isRendering = false
 let pendingUpdate = false
+// Sticky across coalesced updates: downgrading a queued instant render to a
+// tween lets it be interrupted mid-morph, leaving unfilled paths behind.
+let pendingInstant = false
 let renderTimeout = null
+// Set once the cached-SVG path has replaced #graph's DOM behind d3-graphviz.
+let graphvizDirty = false
+
+function resetRenderState() {
+    if (renderTimeout) clearTimeout(renderTimeout)
+    isRendering = false
+    pendingUpdate = false
+    pendingInstant = false
+}
+
+function flushPendingUpdate() {
+    if (!pendingUpdate) return false
+    const instant = pendingInstant
+    pendingUpdate = false
+    pendingInstant = false
+    updateGraph(instant)
+    return true
+}
+
+function createGraphviz(el) {
+    const w = el.clientWidth || el.parentElement.clientWidth || 800
+    const h = el.clientHeight || el.parentElement.clientHeight || 600
+    state.graphviz = d3.select(el).graphviz().width(w).height(h).fit(true).zoom(true)
+    // The default [0.1, 10] can't zoom in far enough to read labels on huge graphs.
+    state.graphviz.zoomScaleExtent?.(ZOOM_EXTENT)
+}
+
+// d3-graphviz caches its renderer on the element (`__graphviz__`) with data
+// bindings and zoom tied to the old SVG; after a cached-SVG swap, start fresh.
+function recreateGraphviz() {
+    const el = document.getElementById('graph')
+    el.innerHTML = ''
+    delete el.__graphviz__
+    createGraphviz(el)
+}
+
+function setGraphSpinner(show) {
+    document.getElementById('graph-spinner')?.classList.toggle('show', show)
+}
+
+// Shared tail of the layout path and the cached-SVG restore path.
+function finishRender(restored) {
+    setupGraphInteractivity(!restored)
+    if (!restored) setupLevelOfDetail()
+
+    applyCriticalPathHighlighting()
+    if (state.showCostLabels) showCostLabels()
+
+    // Fit and re-select here rather than on a timer, otherwise d3-graphviz keeps
+    // the previous transform and focused subgraphs land off-center.
+    if (state.pendingFocusReset) {
+        const target = state.pendingFocusSelect
+        state.pendingFocusReset = false
+        state.pendingFocusSelect = null
+        if (!restored) state.graphviz?.resetZoom()
+        if (target) {
+            d3.select('#graph')
+                .selectAll('.node')
+                .each(function () {
+                    if (d3.select(this).select('title').text() === target) markFocusedNode(target, this)
+                })
+        }
+    }
+
+    if (!flushPendingUpdate()) setTimeout(precomputeAdjacentStates, 100)
+}
+
+// graphviz's zoom is bound to the SVG it rendered, so a restored SVG needs its
+// own. The cache is captured at fit, so identity == fitted.
+function attachRestoreZoom() {
+    const svg = d3.select('#graph').select('svg')
+    if (svg.empty()) return
+    const g = svg.select('g')
+    const base = g.attr('transform') || ''
+
+    const zoom = d3
+        .zoom()
+        .scaleExtent(ZOOM_EXTENT)
+        .on('zoom', ({ transform: t }) => {
+            g.attr('transform', `translate(${t.x},${t.y}) scale(${t.k}) ${base}`)
+            applyLodClass()
+        })
+
+    svg.call(zoom).on('dblclick.zoom', null).call(zoom.transform, d3.zoomIdentity)
+    applyLodClass()
+}
 
 export function updateGraph(instant = false) {
     if (!state.graphviz) return
 
     if (isRendering) {
         pendingUpdate = true
+        if (instant) pendingInstant = true
         return
     }
 
     const viewKey = getViewStateKey()
     let cached = state.viewStateCache.get(viewKey)
-
-    let dotSrc
-    if (cached?.dot) {
-        dotSrc = cached.dot
-    } else {
-        dotSrc = generateGraphvizDot()
-        if (!cached) {
-            cached = { dot: dotSrc }
-            addToViewCache(viewKey, cached)
+    if (!cached?.dot) {
+        const fresh = { dot: generateGraphvizDot(), nodeCount: state.lastGraphNodeCount || 0 }
+        if (cached) {
+            Object.assign(cached, fresh)
         } else {
-            cached.dot = dotSrc
+            cached = fresh
+            addToViewCache(viewKey, cached)
         }
     }
+    const nodeCount = cached.nodeCount || 0
+    const big = nodeCount > BIG_GRAPH_THRESHOLD
+
+    // Cached layout: swap the SVG in instead of re-running Graphviz. Deferred a
+    // frame so the spinner paints before the synchronous innerHTML swap.
+    if (cached.svg) {
+        isRendering = true
+        setGraphSpinner(true)
+        if (renderTimeout) clearTimeout(renderTimeout)
+        requestAnimationFrame(() => {
+            presetLodForPaint(nodeCount)
+            document.getElementById('graph').innerHTML = cached.svg
+            graphvizDirty = true
+            attachRestoreZoom()
+            setGraphSpinner(false)
+            isRendering = false
+            finishRender(true)
+        })
+        return
+    }
+
+    if (graphvizDirty) {
+        recreateGraphviz()
+        graphvizDirty = false
+    }
+
+    // Morph transitions are too slow on big graphs.
+    const instantRender = instant || big
 
     isRendering = true
     const container = d3.select('#graph')
-    if (!instant) container.style('opacity', 0.6)
+    if (!instantRender) container.style('opacity', 0.6)
+    if (big || state.pendingFocusReset) setGraphSpinner(true)
 
     if (renderTimeout) clearTimeout(renderTimeout)
     renderTimeout = setTimeout(() => {
-        if (isRendering) {
-            container.style('opacity', 1)
-            isRendering = false
-            if (pendingUpdate) {
-                pendingUpdate = false
-                updateGraph()
-            }
-        }
+        if (!isRendering) return
+        container.style('opacity', 1)
+        setGraphSpinner(false)
+        isRendering = false
+        flushPendingUpdate()
     }, 3000)
 
-    const gv = instant ? state.graphviz : state.graphviz.transition(() => d3.transition().duration(150))
-    gv.renderDot(dotSrc).on('end', () => {
+    presetLodForPaint(nodeCount)
+
+    const gv = instantRender ? state.graphviz : state.graphviz.transition(() => d3.transition().duration(150))
+    gv.renderDot(cached.dot).on('end', () => {
         if (renderTimeout) clearTimeout(renderTimeout)
         container.style('opacity', 1)
         isRendering = false
-
-        setupGraphInteractivity(true)
-
-        applyCriticalPathHighlighting()
-        if (state.showCostLabels) showCostLabels()
-
-        if (pendingUpdate) {
-            pendingUpdate = false
-            updateGraph()
-        } else {
-            setTimeout(() => precomputeAdjacentStates(), 100)
-        }
+        // Captured before selection/critical-path classes are applied.
+        if (big) cached.svg = document.getElementById('graph').innerHTML
+        setGraphSpinner(false)
+        finishRender(false)
     })
+}
+
+// Real on-screen scale (fit transform x zoom), so a huge graph fits label-free
+// while a small graph that fits large keeps its labels.
+function currentGraphScale() {
+    const ctm = document.querySelector('#graph svg g')?.getScreenCTM?.()
+    return ctm ? Math.abs(ctm.a) || 1 : 1
+}
+
+function applyLodClass() {
+    const graphEl = document.getElementById('graph')
+    if (!graphEl) return
+    const s = currentGraphScale()
+    graphEl.classList.toggle('lod-far', s < 0.32)
+    graphEl.classList.toggle('lod-veryfar', s < 0.18)
+}
+
+// Set before paint so big graphs never draw labels only to hide them;
+// applyLodClass refines once rendered.
+function presetLodForPaint(nodeCount) {
+    const graphEl = document.getElementById('graph')
+    if (!graphEl) return
+    const big = nodeCount > BIG_GRAPH_THRESHOLD
+    graphEl.classList.toggle('lod-far', big)
+    graphEl.classList.toggle('lod-veryfar', big)
+}
+
+function setupLevelOfDetail() {
+    const zoom = state.graphviz?.zoomBehavior?.()
+    if (!zoom || !state.graphviz.zoomSelection?.()) return
+    zoom.on('zoom.lod', applyLodClass)
+    applyLodClass()
 }
 
 function applyCriticalPathHighlighting() {
@@ -515,11 +665,10 @@ function precomputeAdjacentStates() {
     })
 
     const currentExpanded = new Set(state.expandedGroups)
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
 
     const bulkStates = [new Set(), new Set(groupNames)]
     bulkStates.forEach((bulkExpanded) => {
-        const bulkKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${Array.from(bulkExpanded).sort().join(',')}`
+        const bulkKey = getViewStateKey(bulkExpanded, '')
         if (!state.viewStateCache.has(bulkKey)) {
             const savedExpanded = state.expandedGroups
             state.expandedGroups = bulkExpanded
@@ -543,8 +692,7 @@ function precomputeAdjacentStates() {
             altExpanded.add(groupName)
         }
 
-        const altExpandedKey = Array.from(altExpanded).sort().join(',')
-        const altKey = `${state.groupedView}|${state.pipelinesOnlyView}|${isDark}|${altExpandedKey}`
+        const altKey = getViewStateKey(altExpanded, '')
 
         if (!state.viewStateCache.has(altKey)) {
             const savedExpanded = state.expandedGroups
@@ -726,16 +874,31 @@ export function setupGraphInteractivity(forceRebuild = false) {
     tooltip.style.display = 'none'
     document.body.appendChild(tooltip)
 
+    // Focus mode filters to the clicked node's lineage; once focused, further
+    // clicks just select in place. Group-node clicks are delayed so a
+    // double-click (expand) doesn't also fire a click.
+    let nodeClickTimer = null
     d3.select('#graph')
         .selectAll('.node')
         .style('cursor', 'pointer')
         .on('click', function (event, d) {
             event.stopPropagation()
             const nodeName = d3.select(this).select('title').text()
-            selectNode(nodeName, this)
+            const el = this
+            const isGroupNode = state.groupedView && state.currentConfig?.pipelines?.some((p) => p.group === nodeName)
+
+            const act = () => {
+                if (state.clickMode === 'highlight' || state.focusedNode) selectNode(nodeName, el)
+                else focusNode(nodeName)
+            }
+
+            if (!isGroupNode) return act()
+            clearTimeout(nodeClickTimer)
+            nodeClickTimer = setTimeout(act, 220)
         })
         .on('dblclick', function (event, d) {
             event.stopPropagation()
+            clearTimeout(nodeClickTimer)
             const nodeName = d3.select(this).select('title').text()
             if (state.groupedView && state.currentConfig?.pipelines) {
                 const isGroupNode = state.currentConfig.pipelines.some((p) => p.group === nodeName)
@@ -863,6 +1026,16 @@ export function hideNodeTooltip() {
     if (tooltip) {
         tooltip.style.display = 'none'
     }
+}
+
+// Like selectNode, but without dimming: in focus mode the whole subgraph is lineage.
+export function markFocusedNode(nodeName, nodeElement) {
+    state.selectedNode = nodeName
+    clearHighlights()
+    d3.select(nodeElement).classed('node-highlighted', true)
+    updateHashWithNode(nodeName)
+    const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
+    showNodeDetails(nodeName, lineage.upstream, lineage.downstream)
 }
 
 export function selectNode(nodeName, nodeElement) {
@@ -1040,7 +1213,7 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     if (nodeData.links && Object.keys(nodeData.links).length) {
         html += `<div class="detail-section"><div class="detail-links">`
         Object.entries(nodeData.links).forEach(([name, url]) => {
-            html += `<a href="${url}" target="_blank" class="detail-link-chip">${name}<span class="detail-link-arrow">\u2197</span></a>`
+            html += `<a href="${url}" target="_blank" class="detail-link-chip">${name}${LINK_ICON}</a>`
         })
         html += `</div></div>`
     }
@@ -1286,56 +1459,126 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
     })
 }
 
-export function focusNode(nodeName) {
-    const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
+// Hop distance from `start` to every node reachable through the adjacency `map`.
+function bfsHopDistances(map, start) {
+    const dist = new Map()
+    const visited = new Set([start])
+    let frontier = [start]
+    let hop = 0
+    while (frontier.length) {
+        hop++
+        const next = []
+        for (const node of frontier) {
+            for (const neighbor of map[node] || []) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor)
+                    dist.set(neighbor, hop)
+                    next.push(neighbor)
+                }
+            }
+        }
+        frontier = next
+    }
+    return dist
+}
+
+function updateFocusBanner(nodeName, reach, maxReach) {
+    const banner = document.getElementById('focus-banner')
+    if (!banner) return
+    banner.style.display = ''
+    const label = banner.querySelector('.focus-banner-text')
+    if (label) label.textContent = `Focused: ${nodeName}`
+
+    const reachWrap = document.getElementById('focus-reach')
+    if (!reachWrap) return
+    reachWrap.innerHTML = ''
+    // Direct and Full are the same view when the lineage is a single hop.
+    reachWrap.style.display = maxReach <= 1 ? 'none' : ''
+    if (maxReach <= 1) return
+
+    const segments = [
+        { text: 'Direct', title: 'Direct inputs and outputs', target: 1, active: reach <= 1 },
+        { text: 'Full', title: 'Full lineage', target: maxReach, active: reach > 1 }
+    ]
+    segments.forEach((seg) => {
+        const btn = document.createElement('button')
+        btn.className = 'focus-reach-seg' + (seg.active ? ' active' : '')
+        btn.textContent = seg.text
+        btn.title = seg.title
+        btn.addEventListener('click', () => setFocusReach(seg.target))
+        reachWrap.appendChild(btn)
+    })
+}
+
+// Filter the graph to `nodeName` plus lineage within `reach` hops (default: all).
+export function focusNode(nodeName, reach) {
+    // Keep the full-graph adjacency from before the first focus; the cached maps
+    // get rebuilt from the focused subgraph.
+    if (!state.focusedNode) {
+        state.fullLineage = state.cachedLineage
+        state.fullUpstreamMap = state.cachedUpstreamMap
+        state.fullDownstreamMap = state.cachedDownstreamMap
+    }
+    const upDist = bfsHopDistances(state.fullUpstreamMap || state.cachedUpstreamMap, nodeName)
+    const downDist = bfsHopDistances(state.fullDownstreamMap || state.cachedDownstreamMap, nodeName)
+    const hops = [...upDist, ...downDist]
+
+    let maxReach = 1
+    for (const [, d] of hops) if (d > maxReach) maxReach = d
+    const r = Math.max(1, Math.min(reach ?? maxReach, maxReach))
+
     const focusSet = new Set([nodeName])
-    lineage.upstream.forEach((x) => focusSet.add(x.name))
-    lineage.downstream.forEach((x) => focusSet.add(x.name))
+    for (const [n, d] of hops) if (d <= r) focusSet.add(n)
 
     state.focusedNode = nodeName
     state.focusedSet = focusSet
+    state.focusReach = r
 
-    const banner = document.getElementById('focus-banner')
-    if (banner) banner.style.display = ''
+    updateFocusBanner(nodeName, r, maxReach)
 
+    state.pendingFocusReset = true
+    state.pendingFocusSelect = nodeName
     updateGraph(true)
+}
 
-    setTimeout(() => {
-        if (state.graphviz) state.graphviz.resetZoom()
-        d3.select('#graph')
-            .selectAll('.node')
-            .each(function () {
-                const title = d3.select(this).select('title').text()
-                if (title === nodeName) {
-                    selectNode(nodeName, this)
-                }
-            })
-    }, 50)
+export function setFocusReach(reach) {
+    if (!state.focusedNode || reach === state.focusReach) return
+    focusNode(state.focusedNode, reach)
 }
 
 export function unfocusNode() {
-    const prev = state.focusedNode
+    clearFocusState()
+    // Highlighting on the full graph is slow, and "Show all" shouldn't leave
+    // the last node lit up.
+    clearSelection()
+    state.pendingFocusReset = true
+    state.pendingFocusSelect = null
+    updateGraph(true)
+}
+
+// Highlight mode works on the full graph, so entering it unfocuses.
+export function toggleClickMode() {
+    state.clickMode = state.clickMode === 'focus' ? 'highlight' : 'focus'
+    const highlight = state.clickMode === 'highlight'
+    const btn = document.getElementById('click-mode-btn')
+    if (btn) {
+        btn.textContent = highlight ? 'Click: Highlight' : 'Click: Focus'
+        btn.classList.toggle('active', highlight)
+    }
+    if (!highlight) clearSelection()
+    else if (state.focusedNode) unfocusNode()
+}
+
+// Reset focus without re-rendering, for callers that re-render anyway.
+function clearFocusState() {
     state.focusedNode = null
     state.focusedSet = null
-
+    state.fullLineage = null
+    state.fullUpstreamMap = null
+    state.fullDownstreamMap = null
+    state.focusReach = null
     const banner = document.getElementById('focus-banner')
     if (banner) banner.style.display = 'none'
-
-    updateGraph(true)
-
-    setTimeout(() => {
-        if (state.graphviz) state.graphviz.resetZoom()
-        if (prev) {
-            d3.select('#graph')
-                .selectAll('.node')
-                .each(function () {
-                    const title = d3.select(this).select('title').text()
-                    if (title === prev) {
-                        selectNode(prev, this)
-                    }
-                })
-        }
-    }, 50)
 }
 
 export function clearSelection() {
@@ -1531,19 +1774,16 @@ export function selectSearchResult(nodeName) {
     dropdown.classList.remove('show')
     searchInput.value = ''
 
-    let found = false
-    d3.select('#graph')
-        .selectAll('.node')
-        .each(function () {
-            const node = d3.select(this)
-            const nodeTitle = node.select('title').text()
-            if (nodeTitle === nodeName) {
-                found = true
-                selectNode(nodeName, this)
-            }
-        })
+    // A pipeline inside a collapsed group is focused via its group node.
+    let target = nodeName
+    if (state.groupedView) {
+        const p = state.currentConfig?.pipelines?.find((pl) => pl.name === nodeName)
+        if (p?.group && !state.expandedGroups.has(p.group)) target = p.group
+    }
 
-    if (!found) {
+    if ((state.fullLineage || state.cachedLineage)?.[target]) {
+        focusNode(target)
+    } else {
         showNodeDetails(nodeName)
     }
 }
@@ -1556,6 +1796,30 @@ document.addEventListener('click', function (e) {
     }
 })
 
+// Clicking empty canvas (not a pan) exits focus. Both listeners use the capture
+// phase because graphviz's zoom stops mousedown propagation.
+let bgClickDownX = 0
+let bgClickDownY = 0
+document.addEventListener(
+    'mousedown',
+    function (e) {
+        bgClickDownX = e.clientX
+        bgClickDownY = e.clientY
+    },
+    true
+)
+document.addEventListener(
+    'click',
+    function (e) {
+        if (!state.focusedNode) return
+        if (!e.target.closest?.('#graph')) return
+        if (Math.abs(e.clientX - bgClickDownX) > 4 || Math.abs(e.clientY - bgClickDownY) > 4) return
+        if (e.target.closest('.node, .edge')) return
+        unfocusNode()
+    },
+    true
+)
+
 export function fitGraph() {
     if (state.graphviz) state.graphviz.fit(true)
 }
@@ -1565,11 +1829,13 @@ export function resetGraph() {
 }
 
 export function collapseAllGroups() {
+    clearFocusState()
     state.expandedGroups.clear()
     updateGraph(true)
 }
 
 export function toggleCollapseAll() {
+    clearFocusState()
     const allGroups = getAllGroupNames()
     const btn = document.getElementById('collapse-all-btn')
 

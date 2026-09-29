@@ -98,8 +98,35 @@ async function tryLoadPipevizJson() {
     return false
 }
 
+// No example fallback here: embedded mode has no editor to recover from.
+async function loadFromConfigUrl(url) {
+    try {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        const config = await response.json()
+        document.getElementById('json-input').value = JSON.stringify(config, null, 2)
+        loadJson()
+    } catch (error) {
+        const statusDiv = document.getElementById('json-status')
+        if (statusDiv) {
+            statusDiv.innerHTML = `<span class="error">Error loading pipeline data: ${error.message}</span>`
+        }
+        const graph = document.getElementById('graph')
+        if (graph && !state.currentConfig) {
+            graph.innerHTML = `<div style="padding:24px;color:var(--text-muted);font-size:13px">Could not load pipeline data.<br>${error.message}</div>`
+        }
+    }
+}
+
 export async function loadFromUrl() {
     const urlParams = new URLSearchParams(window.location.search)
+
+    // ?src= (or a host-injected PIPEVIZ_CONFIG_URL) takes precedence over share links.
+    const configSrc = urlParams.get('src') || window.PIPEVIZ_CONFIG_URL
+    if (configSrc) {
+        await loadFromConfigUrl(configSrc)
+        return
+    }
 
     const compressedParam = urlParams.get('c')
     if (compressedParam) {
@@ -300,6 +327,8 @@ export function loadJson() {
 
     try {
         state.currentConfig = JSON.parse(jsonText)
+        // Groups start expanded.
+        state.expandedGroups = new Set((state.currentConfig.pipelines || []).filter((p) => p.group).map((p) => p.group))
         clearViewStateCache()
         statusDiv.innerHTML = ''
 

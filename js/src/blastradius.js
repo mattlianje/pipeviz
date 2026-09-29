@@ -112,28 +112,17 @@ export function generateBlastRadiusAnalysis(nodeName) {
 export function generateBlastRadiusDot(analysis) {
     if (!analysis || analysis.downstream.length === 0) return null
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-    const bgColor = isDark ? '#1a1a1a' : '#ffffff'
-    const textColor = isDark ? '#b0b0b0' : '#666666'
-    const edgeColor = isDark ? '#666666' : '#999999'
-
-    const depthColors = isDark
-        ? [
-              { fill: '#4a2a2a', border: '#c98b8b', text: '#e0e0e0' },
-              { fill: '#4a3a2a', border: '#d4a574', text: '#e0e0e0' },
-              { fill: '#4a4a2a', border: '#c4c474', text: '#e0e0e0' },
-              { fill: '#2a4a3a', border: '#7cb47c', text: '#e0e0e0' },
-              { fill: '#2a3a4a', border: '#6b9dc4', text: '#e0e0e0' },
-              { fill: '#3a2a4a', border: '#a88bc4', text: '#e0e0e0' }
-          ]
-        : [
-              { fill: '#fce4ec', border: '#c98b8b', text: '#495057' },
-              { fill: '#fff3e0', border: '#d4a574', text: '#495057' },
-              { fill: '#fffde7', border: '#c4c474', text: '#495057' },
-              { fill: '#e8f5e9', border: '#7cb47c', text: '#495057' },
-              { fill: '#e3f2fd', border: '#6b9dc4', text: '#495057' },
-              { fill: '#f3e5f5', border: '#a88bc4', text: '#495057' }
-          ]
+    const bgColor = '#ffffff'
+    const textColor = '#666666'
+    const edgeColor = '#999999'
+    const depthColors = [
+        { fill: '#fce4ec', border: '#c98b8b', text: '#495057' },
+        { fill: '#fff3e0', border: '#d4a574', text: '#495057' },
+        { fill: '#fffde7', border: '#c4c474', text: '#495057' },
+        { fill: '#e8f5e9', border: '#7cb47c', text: '#495057' },
+        { fill: '#e3f2fd', border: '#6b9dc4', text: '#495057' },
+        { fill: '#f3e5f5', border: '#a88bc4', text: '#495057' }
+    ]
 
     let dot = `digraph BlastRadius {
     rankdir=LR

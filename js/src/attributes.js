@@ -3,7 +3,6 @@ export function generateAttributeDot() {
     if (!state.currentConfig) return ''
 
     const datasources = state.currentConfig.datasources || []
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
     const textColor = '#334155'
     const clusterBg = '#f1f5f9'
     const attrFill = '#ffffff'
