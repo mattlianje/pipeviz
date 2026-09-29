@@ -13,23 +13,16 @@
                 --text-secondary: #6c757d;
                 --text-muted: #828282;
                 --border-color: #dee2e6;
-                --accent: #ec4899;
-                --accent-ring: rgba(236, 72, 153, 0.18);
-                --accent-soft: rgba(236, 72, 153, 0.3);
-                --radius: 4px;
+                --accent: #2563eb;
+                --accent-hover: #1d4ed8;
+                --accent-ring: rgba(37, 99, 235, 0.18);
+                --accent-soft: rgba(37, 99, 235, 0.3);
+                --accent-tint: rgba(37, 99, 235, 0.1);
+                --accent-border: rgba(37, 99, 235, 0.35);
+                --radius-sm: 4px;
+                --radius: 6px;
+                --radius-lg: 10px;
                 --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            }
-            [data-theme='dark'] {
-                --bg-primary: #1a1a1a;
-                --bg-secondary: #252525;
-                --text-primary: #e0e0e0;
-                --text-secondary: #aaa;
-                --text-muted: #888;
-                --border-color: #444;
-                --accent: #f472b6;
-                --accent-ring: rgba(244, 114, 182, 0.22);
-                --accent-soft: rgba(244, 114, 182, 0.34);
-                --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             }
 
             * {
@@ -111,12 +104,6 @@
             .json-panel.hidden {
                 transform: translateX(-110%);
                 opacity: 0;
-                box-shadow: none;
-            }
-            [data-theme='dark'] .json-panel {
-                box-shadow: var(--shadow);
-            }
-            [data-theme='dark'] .json-panel.hidden {
                 box-shadow: none;
             }
             /* Panel tabs (JSON / Mermaid / DOT) */
@@ -308,8 +295,14 @@
             .app-ext {
                 color: #ec4899;
             }
-            [data-theme='dark'] .app-ext {
-                color: #f472b6;
+            /* ?embed=1 */
+            body.embedded .app-hero,
+            body.embedded .toolbar,
+            body.embedded .json-toggle-btn,
+            body.embedded .json-toggle-btn + .tab-strip-sep,
+            body.embedded #json-panel,
+            body.embedded #auth-banner {
+                display: none !important;
             }
             .tab-strip {
                 display: flex;
@@ -338,9 +331,6 @@
             }
             .tab-strip-btn.active {
                 color: var(--text-primary);
-                border-bottom-color: var(--accent);
-            }
-            [data-theme='dark'] .tab-strip-btn.active {
                 border-bottom-color: var(--accent);
             }
             .toolbar {
@@ -413,11 +403,6 @@
                 font-size: 12px;
                 color: #92400e;
                 flex-shrink: 0;
-            }
-            [data-theme='dark'] .auth-banner {
-                background: #451a03;
-                border-bottom-color: #b45309;
-                color: #fbbf24;
             }
             .auth-banner a {
                 color: inherit;
@@ -494,8 +479,8 @@
                 color: var(--text-primary);
             }
             .graph-subtab.active {
-                background: var(--text-primary);
-                color: var(--bg-primary);
+                background: var(--accent);
+                color: #fff;
             }
 
             /* JSON editor */
@@ -515,10 +500,6 @@
             }
             .json-editor:focus {
                 outline: none;
-                border-color: var(--accent);
-                box-shadow: 0 0 0 3px var(--accent-ring);
-            }
-            [data-theme='dark'] .json-editor:focus {
                 border-color: var(--accent);
                 box-shadow: 0 0 0 3px var(--accent-ring);
             }
@@ -548,7 +529,7 @@
                 color: #fff;
             }
             .btn-dark:hover {
-                background: #1d4ed8;
+                background: var(--accent-hover);
             }
             .btn-outline {
                 background: var(--bg-secondary);
@@ -557,12 +538,6 @@
             }
             .btn-outline:hover {
                 background: var(--border-color);
-            }
-            [data-theme='dark'] .btn-dark {
-                background: var(--accent);
-            }
-            [data-theme='dark'] .btn-dark:hover {
-                background: var(--accent);
             }
 
             @media (max-width: 768px) {
@@ -607,9 +582,6 @@
             .details-col.visible {
                 transform: translateX(0);
             }
-            [data-theme='dark'] .details-col {
-                box-shadow: var(--shadow);
-            }
 
             .graph-container {
                 background: var(--bg-primary);
@@ -618,6 +590,41 @@
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
+            }
+            .graph-spinner {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                display: none;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 16px;
+                border-radius: var(--radius);
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                box-shadow: var(--shadow);
+                color: var(--text-primary);
+                font-size: 13px;
+                font-weight: 500;
+                z-index: 20;
+                pointer-events: none;
+            }
+            .graph-spinner.show {
+                display: flex;
+            }
+            .graph-spinner-dot {
+                width: 16px;
+                height: 16px;
+                border: 2px solid var(--border-color);
+                border-top-color: var(--accent);
+                border-radius: 50%;
+                animation: graph-spin 0.7s linear infinite;
+            }
+            @keyframes graph-spin {
+                to {
+                    transform: rotate(360deg);
+                }
             }
             .graph-toolbar {
                 display: flex;
@@ -647,9 +654,9 @@
                 background: var(--border-color);
             }
             .graph-ctrl-btn.active {
-                background: var(--text-primary);
-                color: var(--bg-primary);
-                border-color: var(--text-primary);
+                background: var(--accent);
+                color: #fff;
+                border-color: var(--accent);
             }
             #graph,
             #attribute-graph {
@@ -844,35 +851,30 @@
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: 500;
-                color: var(--accent);
-                background: #eff6ff;
-                border: 1px solid #bfdbfe;
-                border-radius: 6px;
+                color: var(--accent-hover);
+                background: var(--accent-tint);
+                border: 1px solid var(--accent-border);
+                border-radius: var(--radius);
                 text-decoration: none;
-                transition: background 0.15s, border-color 0.15s;
+                transition:
+                    background 0.15s,
+                    border-color 0.15s;
             }
             .detail-link-chip:hover {
-                background: #dbeafe;
-                border-color: #93c5fd;
-            }
-            .detail-link-arrow {
-                font-size: 10px;
-                opacity: 0.6;
-            }
-            [data-theme='dark'] .detail-link-chip {
-                color: #93c5fd;
-                background: #1e3a5f;
-                border-color: var(--accent-soft);
-            }
-            [data-theme='dark'] .detail-link-chip:hover {
-                background: #1e4a7f;
+                background: var(--accent-ring);
                 border-color: var(--accent);
+            }
+            .detail-link-icon {
+                width: 10px;
+                height: 10px;
+                opacity: 0.6;
+                flex-shrink: 0;
             }
             .badge {
                 display: inline-block;
                 padding: 2px 8px;
                 font-size: 10px;
-                border-radius: 3px;
+                border-radius: var(--radius-sm);
                 margin-right: 3px;
                 margin-bottom: 3px;
             }
@@ -928,39 +930,6 @@
             .badge-unknown {
                 background: var(--bg-secondary);
                 color: var(--text-muted);
-            }
-            [data-theme='dark'] .badge-pipeline,
-            [data-theme='dark'] .badge-output,
-            [data-theme='dark'] .badge-snowflake,
-            [data-theme='dark'] .badge-postgres,
-            [data-theme='dark'] .badge-database {
-                background: #1e3a5f;
-                color: #90caf9;
-            }
-            [data-theme='dark'] .badge-source,
-            [data-theme='dark'] .badge-input {
-                background: #3a1f4a;
-                color: #ce93d8;
-            }
-            [data-theme='dark'] .badge-type,
-            [data-theme='dark'] .badge-cluster {
-                background: #1b3a1b;
-                color: #a5d6a7;
-            }
-            [data-theme='dark'] .badge-tag {
-                background: #3a3520;
-                color: #ffe082;
-            }
-            [data-theme='dark'] .badge-s3,
-            [data-theme='dark'] .badge-delta,
-            [data-theme='dark'] .badge-parquet {
-                background: #3a2a1a;
-                color: #ffcc80;
-            }
-            [data-theme='dark'] .badge-kafka,
-            [data-theme='dark'] .badge-api {
-                background: #3a1a2a;
-                color: #ef9a9a;
             }
             .group-toggle-section {
                 margin: 0.5rem 0;
@@ -1091,9 +1060,9 @@
                 color: var(--text-primary);
             }
             .filter-group-header.has-active {
-                background: var(--text-primary);
-                color: var(--bg-primary);
-                border-color: var(--text-primary);
+                background: var(--accent);
+                color: #fff;
+                border-color: var(--accent);
             }
             .filter-group-label {
                 text-transform: uppercase;
@@ -1141,7 +1110,7 @@
                 display: block;
                 padding: 4px 8px;
                 font-size: 11px;
-                border-radius: 3px;
+                border-radius: var(--radius-sm);
                 cursor: pointer;
                 color: var(--text-primary);
                 transition: background 0.15s;
@@ -1150,8 +1119,8 @@
                 background: var(--bg-secondary);
             }
             .filter-tag.active {
-                background: var(--text-primary);
-                color: var(--bg-primary);
+                background: var(--accent);
+                color: #fff;
             }
             .lineage-item,
             .lineage-link {
@@ -1161,17 +1130,13 @@
                 margin: 1px 0;
                 font-size: 12px;
                 cursor: pointer;
-                color: #0366d6;
-                border-radius: 4px;
+                color: var(--accent);
+                border-radius: var(--radius-sm);
                 transition: background 0.1s;
             }
             .lineage-item:hover,
             .lineage-link:hover {
                 background: var(--bg-secondary);
-            }
-            [data-theme='dark'] .lineage-item,
-            [data-theme='dark'] .lineage-link {
-                color: #58a6ff;
             }
             .lineage-item .lineage-name:hover,
             .lineage-link .lineage-name:hover {
@@ -1203,45 +1168,70 @@
                 align-items: center;
                 gap: 8px;
                 padding: 4px 6px 4px 12px;
-                background: #eff6ff;
-                border: 1px solid #bfdbfe;
-                border-radius: 8px;
+                background: var(--accent-tint);
+                border: 1px solid var(--accent-border);
+                border-radius: var(--radius);
                 font-size: 12px;
                 margin-left: auto;
+                max-width: min(440px, 42vw);
             }
             .focus-banner-text {
-                color: #1d4ed8;
+                color: var(--accent-hover);
                 font-weight: 500;
+                min-width: 0;
+                line-height: 1.35;
+                overflow-wrap: anywhere;
+            }
+            .focus-reach,
+            .focus-banner-exit {
+                flex-shrink: 0;
             }
             .focus-banner-exit {
                 padding: 3px 10px;
                 font-size: 11px;
                 font-weight: 500;
                 font-family: inherit;
-                border: 1px solid #93c5fd;
-                border-radius: 5px;
+                border: 1px solid var(--accent-border);
+                border-radius: var(--radius-sm);
                 cursor: pointer;
-                background: white;
-                color: #1d4ed8;
+                background: var(--bg-primary);
+                color: var(--accent-hover);
                 transition: background 0.15s;
             }
             .focus-banner-exit:hover {
-                background: #dbeafe;
+                background: var(--accent-tint);
             }
-            [data-theme='dark'] .focus-banner {
-                background: #1e3a5f;
-                border-color: var(--accent-soft);
+            .focus-reach {
+                display: inline-flex;
+                align-items: stretch;
+                border: 1px solid var(--accent-border);
+                border-radius: var(--radius-sm);
+                overflow: hidden;
             }
-            [data-theme='dark'] .focus-banner-text {
-                color: #93c5fd;
+            .focus-reach-seg {
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: 500;
+                line-height: 1.2;
+                font-family: inherit;
+                border: none;
+                cursor: pointer;
+                background: var(--bg-primary);
+                color: var(--accent-hover);
+                transition:
+                    background 0.15s,
+                    color 0.15s;
             }
-            [data-theme='dark'] .focus-banner-exit {
-                background: #1e293b;
-                border-color: var(--accent-soft);
-                color: #93c5fd;
+            .focus-reach-seg + .focus-reach-seg {
+                border-left: 1px solid var(--accent-border);
             }
-            [data-theme='dark'] .focus-banner-exit:hover {
-                background: #1e4a7f;
+            .focus-reach-seg:hover:not(.active) {
+                background: var(--accent-tint);
+            }
+            .focus-reach-seg.active {
+                background: var(--accent-hover);
+                color: var(--bg-primary);
+                cursor: default;
             }
             .lineage-section-label {
                 font-size: 11px;
@@ -1302,18 +1292,32 @@
                 max-height: 300px;
             }
 
+            /* Zoomed-out level of detail: hide labels, then arrowheads. */
+            #graph.lod-far .node text:not([fill]),
+            #graph.lod-far .edge text {
+                display: none;
+            }
+            #graph.lod-far .node-highlighted text,
+            #graph.lod-far .node-connected text {
+                display: inline;
+            }
+            #graph.lod-veryfar .edge polygon {
+                display: none;
+            }
+
             /* Node highlighting */
             .node-highlighted {
                 stroke: #e65100 !important;
-                stroke-width: 3px !important;
+                stroke-width: 4px !important;
+                filter: drop-shadow(0 0 7px rgba(230, 81, 0, 0.7));
             }
             .node-highlighted polygon,
             .node-highlighted ellipse,
             .node-highlighted path {
-                fill: #fff3e0 !important;
+                fill: #ffe0b2 !important;
             }
             .node-highlighted text {
-                font-weight: normal !important;
+                font-weight: bold !important;
                 stroke: none !important;
             }
             .node-highlighted text:not([fill]) {
@@ -1330,8 +1334,8 @@
             .node-connected text:not([fill]) {
                 fill: #000;
             }
-            /* Dimming via flat gray (not group opacity) so pan/zoom stays
-               cheap on big graphs — avoids per-group offscreen compositing. */
+            /* Flat gray dim instead of group opacity: avoids per-group
+               offscreen compositing, keeps pan/zoom cheap on big graphs. */
             .node-dimmed polygon,
             .node-dimmed ellipse,
             .node-dimmed path,
@@ -1363,73 +1367,6 @@
                 fill: #c4c4c4 !important;
             }
 
-            [data-theme='dark'] #graph .node-highlighted polygon,
-            [data-theme='dark'] #graph .node-highlighted ellipse,
-            [data-theme='dark'] #graph .node-highlighted path,
-            [data-theme='dark'] #graph .node-highlighted polyline,
-            [data-theme='dark'] #attribute-graph .node-highlighted polygon,
-            [data-theme='dark'] #attribute-graph .node-highlighted ellipse,
-            [data-theme='dark'] #attribute-graph .node-highlighted path,
-            [data-theme='dark'] #attribute-graph .node-highlighted polyline {
-                fill: #4a3413 !important;
-            }
-            [data-theme='dark'] #graph .node-highlighted text,
-            [data-theme='dark'] #attribute-graph .node-highlighted text {
-                fill: #ffe0b2 !important;
-            }
-            /* Dark mode graph text fix */
-            [data-theme='dark'] #graph text,
-            [data-theme='dark'] #attribute-graph text {
-                fill: #e0e0e0 !important;
-            }
-            [data-theme='dark'] #graph .node text:not([fill]),
-            [data-theme='dark'] #attribute-graph .node text:not([fill]) {
-                fill: #e8e8e8 !important;
-            }
-            [data-theme='dark'] #graph .graph > polygon,
-            [data-theme='dark'] #attribute-graph .graph > polygon {
-                fill: transparent !important;
-            }
-            [data-theme='dark'] #graph .cluster > polygon,
-            [data-theme='dark'] #graph .cluster > path,
-            [data-theme='dark'] #attribute-graph .cluster > polygon,
-            [data-theme='dark'] #attribute-graph .cluster > path {
-                fill: #2a2a2a !important;
-                stroke: #555 !important;
-            }
-            [data-theme='dark'] #graph .cluster text,
-            [data-theme='dark'] #attribute-graph .cluster text {
-                fill: #e0e0e0 !important;
-            }
-            /* Dimming in dark mode */
-            [data-theme='dark'] .node-dimmed polygon,
-            [data-theme='dark'] .node-dimmed ellipse,
-            [data-theme='dark'] .node-dimmed path,
-            [data-theme='dark'] .node-dimmed polyline {
-                fill: #262626 !important;
-                stroke: #3a3a3a !important;
-            }
-            [data-theme='dark'] #graph .node-dimmed text,
-            [data-theme='dark'] #attribute-graph .node-dimmed text {
-                fill: #555 !important;
-            }
-            [data-theme='dark'] .edge-dimmed path {
-                stroke: #3a3a3a !important;
-            }
-            [data-theme='dark'] .edge-dimmed polygon {
-                fill: #3a3a3a !important;
-                stroke: #3a3a3a !important;
-            }
-            [data-theme='dark'] .cluster-dimmed > polygon,
-            [data-theme='dark'] .cluster-dimmed > path {
-                fill: #1f1f1f !important;
-                stroke: #3a3a3a !important;
-            }
-            [data-theme='dark'] #graph .cluster-dimmed text,
-            [data-theme='dark'] #attribute-graph .cluster-dimmed text {
-                fill: #555 !important;
-            }
-
             /* Search box */
             .search-wrapper {
                 position: relative;
@@ -1449,10 +1386,6 @@
             }
             .search-input:focus {
                 outline: none;
-                border-color: var(--accent);
-                box-shadow: 0 0 0 3px var(--accent-ring);
-            }
-            [data-theme='dark'] .search-input:focus {
                 border-color: var(--accent);
                 box-shadow: 0 0 0 3px var(--accent-ring);
             }
@@ -1510,7 +1443,7 @@
                 font-weight: 400;
             }
             .search-result-item .result-match {
-                color: #d84315;
+                color: var(--accent);
                 font-weight: 600;
             }
             .search-result-item.no-match {
@@ -1536,14 +1469,6 @@
             }
             .graph-ctrl-btn.danger:hover {
                 background: #fecaca;
-            }
-            [data-theme='dark'] .graph-ctrl-btn.danger {
-                background: #2a1a1a;
-                color: #f87171;
-                border-color: #7f1d1d;
-            }
-            [data-theme='dark'] .graph-ctrl-btn.danger:hover {
-                background: #3a1a1a;
             }
 
             /* Modal styles */
@@ -1582,7 +1507,7 @@
             .modal-content {
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
-                border-radius: 8px;
+                border-radius: var(--radius-lg);
                 box-shadow: var(--shadow);
                 overflow: hidden;
             }
@@ -1728,10 +1653,6 @@
                 color: #1976d2;
                 border-radius: 2px;
                 margin-left: auto;
-            }
-            [data-theme='dark'] .planner-picker-item .ds-tag {
-                background: #1e3a5f;
-                color: #90caf9;
             }
             .planner-sidebar-footer {
                 padding: 0.4rem 0.6rem;
@@ -1993,9 +1914,6 @@
             .cycles-warning .section-title {
                 color: #e65100;
             }
-            [data-theme='dark'] .cycles-warning .section-title {
-                color: #ffb74d;
-            }
             .cycle-count {
                 background: #ffb74d;
                 color: #fff;
@@ -2044,7 +1962,8 @@
                         <h1 class="app-hero-wordmark">Pipeviz</h1>
                     </div>
                     <p class="app-hero-tagline">
-                        Easy, elegant lineage from a single <span class="app-ext">.json</span>
+                        Easy, elegant lineage from a single
+                        <span class="app-ext">.json</span>
                     </p>
                 </header>
                 <!-- JSON Panel (slide-over from left) -->
@@ -2069,6 +1988,8 @@
                             <button class="json-action" onclick="loadExample()">Example</button>
                             <span class="json-action-sep">·</span>
                             <button class="json-action" onclick="formatJson()">Format</button>
+                            <span class="json-action-sep">·</span>
+                            <button class="json-action" onclick="generateShareableUrl()">Share</button>
                             <span class="json-action-sep">·</span>
                             <label class="json-action" style="cursor: pointer"
                                 >File<input
@@ -2096,9 +2017,6 @@
                     </nav>
                     <div class="toolbar">
                         <button class="toolbar-btn" onclick="toggleSpecModal()" title="Spec">?</button>
-                        <button class="toolbar-btn" onclick="toggleTheme()" id="theme-toggle" title="Theme">
-                            &#x263C;
-                        </button>
                         <a
                             class="toolbar-btn"
                             href="https://github.com/mattlianje/pipeviz"
@@ -2139,14 +2057,23 @@
                                 <div id="graph-search-results" class="search-results-dropdown"></div>
                             </div>
                             <button class="graph-ctrl-btn" id="collapse-all-btn" onclick="toggleCollapseAll()">
-                                Expand All
+                                Collapse All
                             </button>
                             <button class="graph-ctrl-btn" id="pipelines-only-btn" onclick="togglePipelinesOnly()">
                                 Hide Datasources
                             </button>
+                            <button
+                                class="graph-ctrl-btn"
+                                id="click-mode-btn"
+                                onclick="toggleClickMode()"
+                                title="What clicking a node does. Focus filters to that node's lineage; Highlight dims everything else."
+                            >
+                                Click: Focus
+                            </button>
                             <span id="group-toggles"></span>
                             <div id="focus-banner" class="focus-banner" style="display: none">
                                 <span class="focus-banner-text">Focused view</span>
+                                <span id="focus-reach" class="focus-reach"></span>
                                 <button class="focus-banner-exit" onclick="unfocusNode()">Show all</button>
                             </div>
                         </div>
@@ -2170,6 +2097,10 @@
                             <div class="graph-col" id="graph-col">
                                 <div class="graph-container">
                                     <div id="graph"></div>
+                                    <div class="graph-spinner" id="graph-spinner">
+                                        <div class="graph-spinner-dot"></div>
+                                        <span>Rendering…</span>
+                                    </div>
                                     <div class="legend">
                                         <div
                                             class="legend-toggle"
@@ -2332,7 +2263,7 @@
                     </div>
                 </div>
 
-<!-- docs pane removed -->
+                <!-- docs pane removed -->
             </div>
             <!-- end main-area -->
         </div>

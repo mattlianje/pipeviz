@@ -1,4 +1,3 @@
-import { initTheme, toggleTheme } from './theme.js'
 import {
     setupDragDrop,
     setupAutoProcess,
@@ -6,7 +5,8 @@ import {
     loadExample,
     loadFromFile,
     applyConfig,
-    formatJson
+    formatJson,
+    generateShareableUrl
 } from './loaders.js'
 import { filterPipelines, filterDatasources } from './filters.js'
 import {
@@ -23,7 +23,9 @@ import {
     hideBlastRadiusModal,
     generateGraphvizDot,
     focusNode,
-    unfocusNode
+    unfocusNode,
+    setFocusReach,
+    toggleClickMode
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -44,11 +46,11 @@ import {
 } from './export.js'
 import { renderStats } from './stats.js'
 
-window.toggleTheme = toggleTheme
 window.loadExample = loadExample
 window.loadFromFile = loadFromFile
 window.applyConfig = applyConfig
 window.formatJson = formatJson
+window.generateShareableUrl = generateShareableUrl
 window.filterPipelines = filterPipelines
 window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection
@@ -64,6 +66,8 @@ window.selectNodeFromHash = selectNodeFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 window.focusNode = focusNode
 window.unfocusNode = unfocusNode
+window.setFocusReach = setFocusReach
+window.toggleClickMode = toggleClickMode
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
@@ -222,11 +226,11 @@ window.clearGitHubToken = function () {
     if (statusDiv) statusDiv.innerHTML = '<span class="success">GitHub token cleared</span>'
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initTheme()
-})
-
 window.addEventListener('load', () => {
+    // ?embed=1 hides branding and the editor; pair with ?src=<url>.
+    if (new URLSearchParams(window.location.search).get('embed') === '1') {
+        document.body.classList.add('embedded')
+    }
     setupDragDrop()
     setupAutoProcess()
     loadFromUrl()
