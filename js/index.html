@@ -628,15 +628,105 @@
             }
             .graph-toolbar {
                 display: flex;
+                flex-wrap: wrap;
                 align-items: center;
-                gap: 8px;
+                gap: 8px 14px;
                 padding: 0.5rem 0.75rem;
                 flex-shrink: 0;
             }
             .graph-toolbar .search-wrapper {
                 flex: 1;
+                min-width: 180px;
                 max-width: 400px;
                 margin-bottom: 0;
+            }
+
+            /* Labelled segmented controls: both options visible, current one filled. */
+            .seg-field {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .seg-label {
+                font-size: 11px;
+                color: var(--text-muted);
+                white-space: nowrap;
+            }
+            .seg-ctl {
+                display: inline-flex;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                overflow: hidden;
+                background: var(--bg-secondary);
+            }
+            .seg-btn {
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                line-height: 1.2;
+                border: none;
+                cursor: pointer;
+                background: transparent;
+                color: var(--text-muted);
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+            }
+            .seg-btn + .seg-btn {
+                border-left: 1px solid var(--border-color);
+            }
+            .seg-btn:hover:not(.active) {
+                background: var(--border-color);
+                color: var(--text-primary);
+            }
+            .seg-btn.active {
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                box-shadow: inset 0 -2px 0 var(--accent);
+                cursor: default;
+            }
+
+            .graph-toolbar-right {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin-left: auto;
+            }
+            .graph-nav {
+                display: inline-flex;
+                gap: 4px;
+            }
+            .graph-nav-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                cursor: pointer;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                transition: background 0.15s;
+            }
+            .graph-nav-btn svg {
+                width: 13px;
+                height: 13px;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 1.5;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .graph-nav-btn:hover:not(:disabled) {
+                background: var(--border-color);
+            }
+            .graph-nav-btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
             }
             .graph-ctrl-btn {
                 padding: 5px 12px;
@@ -1172,23 +1262,25 @@
                 border: 1px solid var(--accent-border);
                 border-radius: var(--radius);
                 font-size: 12px;
-                margin-left: auto;
-                max-width: min(440px, 42vw);
+                max-width: min(360px, 28vw);
             }
             .focus-banner-text {
                 color: var(--accent-hover);
                 font-weight: 500;
                 min-width: 0;
                 line-height: 1.35;
-                overflow-wrap: anywhere;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             .focus-reach,
             .focus-banner-exit {
                 flex-shrink: 0;
             }
             .focus-banner-exit {
-                padding: 3px 10px;
-                font-size: 11px;
+                padding: 1px 7px;
+                font-size: 14px;
+                line-height: 1.2;
                 font-weight: 500;
                 font-family: inherit;
                 border: 1px solid var(--accent-border);
@@ -2054,25 +2146,109 @@
                                 />
                                 <div id="graph-search-results" class="search-results-dropdown"></div>
                             </div>
-                            <button class="graph-ctrl-btn" id="collapse-all-btn" onclick="toggleCollapseAll()">
-                                Collapse All
-                            </button>
-                            <button class="graph-ctrl-btn" id="pipelines-only-btn" onclick="togglePipelinesOnly()">
-                                Hide Datasources
-                            </button>
-                            <button
-                                class="graph-ctrl-btn"
-                                id="click-mode-btn"
-                                onclick="toggleClickMode()"
-                                title="What clicking a node does. Focus filters to that node's lineage; Highlight dims everything else."
-                            >
-                                Click: Focus
-                            </button>
-                            <span id="group-toggles"></span>
-                            <div id="focus-banner" class="focus-banner" style="display: none">
-                                <span class="focus-banner-text">Focused view</span>
-                                <span id="focus-reach" class="focus-reach"></span>
-                                <button class="focus-banner-exit" onclick="unfocusNode()">Show all</button>
+                            <div class="seg-field" id="groups-ctl">
+                                <span class="seg-label">Groups</span>
+                                <div class="seg-ctl" role="group" aria-label="Groups">
+                                    <button
+                                        class="seg-btn"
+                                        data-value="expanded"
+                                        onclick="setGroupsExpanded(true)"
+                                        title="Show every pipeline inside its group"
+                                    >
+                                        Expanded
+                                    </button>
+                                    <button
+                                        class="seg-btn"
+                                        data-value="collapsed"
+                                        onclick="setGroupsExpanded(false)"
+                                        title="Fold each group into a single node (double-click a group to open it)"
+                                    >
+                                        Collapsed
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="seg-field" id="datasources-ctl">
+                                <span class="seg-label">Datasources</span>
+                                <div class="seg-ctl" role="group" aria-label="Datasources">
+                                    <button
+                                        class="seg-btn"
+                                        data-value="show"
+                                        onclick="setDatasourcesVisible(true)"
+                                        title="Show tables and other datasources between pipelines"
+                                    >
+                                        Show
+                                    </button>
+                                    <button
+                                        class="seg-btn"
+                                        data-value="hide"
+                                        onclick="setDatasourcesVisible(false)"
+                                        title="Show pipelines only, linked directly to each other"
+                                    >
+                                        Hide
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="seg-field" id="click-mode-ctl">
+                                <span class="seg-label">On click</span>
+                                <div class="seg-ctl" role="group" aria-label="What clicking a node does">
+                                    <button
+                                        class="seg-btn"
+                                        data-value="focus"
+                                        onclick="setClickMode('focus')"
+                                        title="Clicking a node filters the graph down to its lineage"
+                                    >
+                                        Focus
+                                    </button>
+                                    <button
+                                        class="seg-btn"
+                                        data-value="highlight"
+                                        onclick="setClickMode('highlight')"
+                                        title="Clicking a node lights up its lineage and keeps the rest visible"
+                                    >
+                                        Highlight
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="graph-toolbar-right">
+                                <div id="focus-banner" class="focus-banner" style="display: none">
+                                    <span class="focus-banner-text">Focused view</span>
+                                    <span id="focus-reach" class="focus-reach"></span>
+                                    <button
+                                        class="focus-banner-exit"
+                                        onclick="unfocusNode()"
+                                        title="Exit focus"
+                                        aria-label="Exit focus"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                                <div class="graph-nav">
+                                    <button
+                                        class="graph-nav-btn"
+                                        id="recenter-btn"
+                                        onclick="recenterSelection()"
+                                        title="Center and fit the graph (keeps focus and selection)"
+                                    >
+                                        <svg viewBox="0 0 16 16" aria-hidden="true">
+                                            <circle cx="8" cy="8" r="4.5" />
+                                            <circle cx="8" cy="8" r="1" fill="currentColor" />
+                                            <path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" />
+                                        </svg>
+                                        Recenter
+                                    </button>
+                                    <button
+                                        class="graph-nav-btn"
+                                        onclick="showAll()"
+                                        title="Back to the full graph: exit focus, clear selection, fit to screen (Esc)"
+                                    >
+                                        <svg viewBox="0 0 16 16" aria-hidden="true">
+                                            <path
+                                                d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4M1.5 1.5l4 4M14.5 1.5l-4 4M14.5 14.5l-4-4M1.5 14.5l4-4"
+                                            />
+                                        </svg>
+                                        Show all
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div id="attribute-toolbar-items" style="display: none">

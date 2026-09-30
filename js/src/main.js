@@ -12,9 +12,11 @@ import { filterPipelines, filterDatasources } from './filters.js'
 import {
     clearSelection,
     resetGraph,
-    toggleCollapseAll,
+    recenterSelection,
+    showAll,
+    setGroupsExpanded,
     toggleGroup,
-    togglePipelinesOnly,
+    setDatasourcesVisible,
     searchNodes,
     selectSearchResult,
     showBlastRadius,
@@ -25,7 +27,7 @@ import {
     focusNode,
     unfocusNode,
     setFocusReach,
-    toggleClickMode
+    setClickMode
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -55,9 +57,11 @@ window.filterPipelines = filterPipelines
 window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection
 window.resetGraph = resetGraph
-window.toggleCollapseAll = toggleCollapseAll
+window.recenterSelection = recenterSelection
+window.showAll = showAll
+window.setGroupsExpanded = setGroupsExpanded
 window.toggleGroup = toggleGroup
-window.togglePipelinesOnly = togglePipelinesOnly
+window.setDatasourcesVisible = setDatasourcesVisible
 window.searchNodes = searchNodes
 window.selectSearchResult = selectSearchResult
 window.showBlastRadius = showBlastRadius
@@ -67,7 +71,7 @@ window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 window.focusNode = focusNode
 window.unfocusNode = unfocusNode
 window.setFocusReach = setFocusReach
-window.toggleClickMode = toggleClickMode
+window.setClickMode = setClickMode
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
@@ -157,14 +161,12 @@ document.addEventListener('keydown', (e) => {
             jsonPanel.classList.add('hidden')
             return
         }
-        const specModal = document.getElementById('spec-modal')
-        if (specModal?.classList.contains('show')) {
-            specModal.classList.remove('show')
-        }
-        const blastModal = document.getElementById('blast-radius-modal')
-        if (blastModal?.classList.contains('show')) {
-            blastModal.classList.remove('show')
-        }
+        const openModals = document.querySelectorAll('#spec-modal.show, #blast-radius-modal.show')
+        openModals.forEach((m) => m.classList.remove('show'))
+        if (openModals.length) return
+        // Otherwise Esc on the pipeline graph means "back to everything".
+        if (e.target.closest?.('input, textarea, select')) return
+        if (document.getElementById('pipelines-subview')?.offsetParent) showAll()
     }
 })
 

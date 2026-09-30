@@ -458,6 +458,7 @@ function finishRender(restored) {
 
     applyCriticalPathHighlighting()
     if (state.showCostLabels) showCostLabels()
+    syncGraphToolbar()
 
     // Fit and re-select here rather than on a timer, otherwise d3-graphviz keeps
     // the previous transform and focused subgraphs land off-center.
@@ -480,19 +481,20 @@ function finishRender(restored) {
 
 // graphviz's zoom is bound to the SVG it rendered, so a restored SVG needs its
 // own. The cache is captured at fit, so identity == fitted.
+let restoreZoom = null
 function attachRestoreZoom() {
     const svg = d3.select('#graph').select('svg')
     if (svg.empty()) return
     const g = svg.select('g')
     const base = g.attr('transform') || ''
 
-    const zoom = d3
+    const zoom = (restoreZoom = d3
         .zoom()
         .scaleExtent(ZOOM_EXTENT)
         .on('zoom', ({ transform: t }) => {
             g.attr('transform', `translate(${t.x},${t.y}) scale(${t.k}) ${base}`)
             applyLodClass()
-        })
+        }))
 
     svg.call(zoom).on('dblclick.zoom', null).call(zoom.transform, d3.zoomIdentity)
     applyLodClass()
@@ -564,7 +566,10 @@ export function updateGraph(instant = false) {
     presetLodForPaint(nodeCount)
 
     const gv = instantRender ? state.graphviz : state.graphviz.transition(() => d3.transition().duration(150))
-    gv.renderDot(cached.dot).on('end', () => {
+    // Bind 'end' before rendering: once wasm is warm an instant render can finish
+    // synchronously, which would fire the previous render's handler and cache
+    // this SVG under the previous view's key.
+    gv.on('end', () => {
         if (renderTimeout) clearTimeout(renderTimeout)
         container.style('opacity', 1)
         isRendering = false
@@ -572,7 +577,7 @@ export function updateGraph(instant = false) {
         if (big) cached.svg = document.getElementById('graph').innerHTML
         setGraphSpinner(false)
         finishRender(false)
-    })
+    }).renderDot(cached.dot)
 }
 
 // Real on-screen scale (fit transform x zoom), so a huge graph fits label-free
@@ -1035,6 +1040,7 @@ export function markFocusedNode(nodeName, nodeElement) {
     clearHighlights()
     d3.select(nodeElement).classed('node-highlighted', true)
     updateHashWithNode(nodeName)
+    syncGraphToolbar()
     const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
     showNodeDetails(nodeName, lineage.upstream, lineage.downstream)
 }
@@ -1045,6 +1051,7 @@ export function selectNode(nodeName, nodeElement) {
     d3.select(nodeElement).classed('node-highlighted', true)
 
     updateHashWithNode(nodeName)
+    syncGraphToolbar()
 
     const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
     const upstream = lineage.upstream
@@ -1489,7 +1496,10 @@ function updateFocusBanner(nodeName, reach, maxReach) {
     if (!banner) return
     banner.style.display = ''
     const label = banner.querySelector('.focus-banner-text')
-    if (label) label.textContent = `Focused: ${nodeName}`
+    if (label) {
+        label.textContent = `Focused: ${nodeName}`
+        label.title = nodeName
+    }
 
     const reachWrap = document.getElementById('focus-reach')
     if (!reachWrap) return
@@ -1559,15 +1569,11 @@ export function unfocusNode() {
 }
 
 // Highlight mode works on the full graph, so entering it unfocuses.
-export function toggleClickMode() {
-    state.clickMode = state.clickMode === 'focus' ? 'highlight' : 'focus'
-    const highlight = state.clickMode === 'highlight'
-    const btn = document.getElementById('click-mode-btn')
-    if (btn) {
-        btn.textContent = highlight ? 'Click: Highlight' : 'Click: Focus'
-        btn.classList.toggle('active', highlight)
-    }
-    if (!highlight) clearSelection()
+export function setClickMode(mode) {
+    if (mode === state.clickMode) return
+    state.clickMode = mode
+    syncGraphToolbar()
+    if (mode === 'focus') clearSelection()
     else if (state.focusedNode) unfocusNode()
 }
 
@@ -1588,6 +1594,7 @@ export function clearSelection() {
     clearHighlights()
     applyCriticalPathHighlighting()
     updateHashWithNode(null)
+    syncGraphToolbar()
     const col = document.getElementById('details-col')
     if (col) {
         col.classList.remove('visible')
@@ -1822,12 +1829,80 @@ document.addEventListener(
     true
 )
 
-export function fitGraph() {
-    if (state.graphviz) state.graphviz.fit(true)
+const NAV_DURATION = 400
+// On-screen scale below which Recenter also zooms in, so the node is legible.
+const RECENTER_MIN_SCALE = 0.6
+
+// The live zoom: graphviz's own, or the one attached to a restored cached SVG.
+function activeZoom() {
+    const svg = d3.select('#graph').select('svg')
+    const behavior = graphvizDirty ? restoreZoom : state.graphviz?.zoomBehavior?.()
+    return svg.empty() || !behavior ? null : { svg, behavior }
 }
 
+function findNodeElement(nodeName) {
+    let found = null
+    d3.select('#graph')
+        .selectAll('.node')
+        .each(function () {
+            if (!found && d3.select(this).select('title').text() === nodeName) found = this
+        })
+    return found
+}
+
+// Animate back to the fitted view without touching focus or selection.
 export function resetGraph() {
-    if (state.graphviz) state.graphviz.resetZoom()
+    const z = activeZoom()
+    if (!z) return
+    const t = d3.transition().duration(NAV_DURATION)
+    if (graphvizDirty) z.svg.transition(t).call(z.behavior.transform, d3.zoomIdentity)
+    else state.graphviz.resetZoom(t)
+}
+
+// Pan the selected node to the middle of the canvas, zooming in if it's too small
+// to read. With nothing selected, re-fit the whole graph.
+export function recenterSelection() {
+    const z = activeZoom()
+    const el = state.selectedNode && findNodeElement(state.selectedNode)
+    if (!z || !el) return resetGraph()
+
+    // Zoom transforms live in the SVG's user space; convert screen px through its CTM.
+    const svgNode = z.svg.node()
+    const ctm = svgNode.getScreenCTM()
+    if (!ctm) return
+    const view = svgNode.getBoundingClientRect()
+    const box = el.getBoundingClientRect()
+    // The details drawer overlays the canvas; centre within what's left visible.
+    const drawer = document.getElementById('details-col')
+    const right = drawer?.classList.contains('visible')
+        ? Math.min(view.right, drawer.getBoundingClientRect().left)
+        : view.right
+    const cx = (view.left + right) / 2
+    const cy = view.top + view.height / 2
+    const t = d3.zoomTransform(svgNode)
+
+    let x = t.x + (cx - (box.left + box.width / 2)) / ctm.a
+    let y = t.y + (cy - (box.top + box.height / 2)) / ctm.d
+    let k = t.k
+    const scale = currentGraphScale()
+    if (scale < RECENTER_MIN_SCALE) {
+        const f = Math.min(1 / scale, ZOOM_EXTENT[1] / k)
+        // Scale about the canvas centre, where the node now sits.
+        const ux = (cx - ctm.e) / ctm.a
+        const uy = (cy - ctm.f) / ctm.d
+        x = ux - f * (ux - x)
+        y = uy - f * (uy - y)
+        k *= f
+    }
+
+    z.svg.transition().duration(NAV_DURATION).call(z.behavior.transform, d3.zoomIdentity.translate(x, y).scale(k))
+}
+
+// Back to the whole graph: no focus, no selection, fitted.
+export function showAll() {
+    if (state.focusedNode) return unfocusNode()
+    clearSelection()
+    resetGraph()
 }
 
 export function collapseAllGroups() {
@@ -1836,27 +1911,37 @@ export function collapseAllGroups() {
     updateGraph(true)
 }
 
-export function toggleCollapseAll() {
+export function setGroupsExpanded(expand) {
     clearFocusState()
-    const allGroups = getAllGroupNames()
-    const btn = document.getElementById('collapse-all-btn')
-
-    // If all groups are collapsed (expandedGroups is empty or smaller than total), expand all
-    // If all/most are expanded, collapse all
-    const allCollapsed = state.expandedGroups.size === 0
-
-    if (allCollapsed) {
-        // Expand all
-        allGroups.forEach((g) => state.expandedGroups.add(g))
-        btn.classList.remove('active')
-        btn.textContent = 'Collapse All'
-    } else {
-        // Collapse all
-        state.expandedGroups.clear()
-        btn.classList.add('active')
-        btn.textContent = 'Expand All'
-    }
+    state.expandedGroups = new Set(expand ? getAllGroupNames() : [])
     updateGraph(true)
+}
+
+// Reflect current state in the graph toolbar's segmented controls and nav buttons.
+export function syncGraphToolbar() {
+    const setSeg = (id, value) => {
+        document.querySelectorAll(`#${id} .seg-btn`).forEach((b) => {
+            const on = b.dataset.value === value
+            b.classList.toggle('active', on)
+            b.setAttribute('aria-pressed', on)
+        })
+    }
+
+    const groups = getAllGroupNames()
+    const groupsCtl = document.getElementById('groups-ctl')
+    if (groupsCtl) groupsCtl.style.display = groups.length ? '' : 'none'
+    const expanded = groups.filter((g) => state.expandedGroups.has(g)).length
+    // Partly expanded (groups toggled one by one) lights neither segment.
+    setSeg('groups-ctl', expanded === groups.length ? 'expanded' : expanded === 0 ? 'collapsed' : null)
+    setSeg('datasources-ctl', state.pipelinesOnlyView ? 'hide' : 'show')
+    setSeg('click-mode-ctl', state.clickMode)
+
+    const recenter = document.getElementById('recenter-btn')
+    if (recenter) {
+        recenter.title = state.selectedNode
+            ? `Center the view on ${state.selectedNode}`
+            : 'Center and fit the graph (keeps focus and selection)'
+    }
 }
 
 function getAllGroupNames() {
@@ -1868,11 +1953,10 @@ function getAllGroupNames() {
     return Array.from(groups)
 }
 
-export function togglePipelinesOnly() {
-    state.pipelinesOnlyView = !state.pipelinesOnlyView
-    const btn = document.getElementById('pipelines-only-btn')
-    btn.classList.toggle('active', state.pipelinesOnlyView)
-    btn.textContent = state.pipelinesOnlyView ? 'Show Datasources' : 'Hide Datasources'
+export function setDatasourcesVisible(show) {
+    if (state.pipelinesOnlyView === !show) return
+    state.pipelinesOnlyView = !show
+    syncGraphToolbar()
     updateGraph(true)
 }
 
