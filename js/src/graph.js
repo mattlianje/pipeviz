@@ -11,6 +11,8 @@ import {
 } from './tabs.js'
 import { formatSchedule } from './cron.js'
 import { escapeHtml, jsArg, safeUrl, escapeDot } from './escape.js'
+import { getLineageModel, litLineage } from './lineage.js'
+import { updateLineageControl } from './lineagectl.js'
 
 let blastRadiusGraphInstance = null
 
@@ -28,6 +30,8 @@ export function generateGraphvizDot() {
     if (!state.currentConfig) return ''
 
     const edgeColor = '#555'
+    // upstream_pipelines links with no datasource behind them ("run after").
+    const explicitEdgeColor = '#9e9e9e'
 
     const nodeColors = {
         pipeline: { fill: '#e3f2fd', border: '#1976d2' },
@@ -177,6 +181,9 @@ export function generateGraphvizDot() {
         nodesByCluster.get(cluster).push({ type: 'pipeline', node: pipeline })
     })
 
+    // The Pipelines view draws no datasources; don't let them hold clusters open.
+    if (state.pipelinesOnlyView) allDataSources.clear()
+
     allDataSources.forEach((ds) => {
         const cluster = ds.cluster || '_unclustered'
         if (!nodesByCluster.has(cluster)) {
@@ -296,46 +303,18 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
         }
     })
 
-    if (!state.pipelinesOnlyView) {
-        dot += '\n'
-        pipelines.forEach((pipeline) => {
-            pipeline.input_sources?.forEach((source) => {
-                // Only emit edges to declared nodes; otherwise Graphviz auto-creates
-                // the node, resurrecting off-path datasources when focused.
-                if (!allDataSources.has(source)) return
-                dot += `    "${escapeDot(source)}" -> "${escapeDot(pipeline.name)}" [color="${edgeColor}", arrowsize=0.8];\n`
-            })
-            pipeline.output_sources?.forEach((source) => {
-                if (!allDataSources.has(source)) return
-                dot += `    "${escapeDot(pipeline.name)}" -> "${escapeDot(source)}" [color="${edgeColor}", arrowsize=0.8];\n`
-            })
-        })
-    }
-
-    const validNodeNames = new Set(pipelines.map((p) => p.name))
-
-    const memberToGroup = new Map()
-    if (state.groupedView) {
-        pipelines.forEach((p) => {
-            if (p._isGroup && p._members) {
-                p._members.forEach((m) => memberToGroup.set(m, p.name))
-            }
-        })
-    }
-
-    const emittedEdges = new Set()
+    // Edges come from the same model lineage walks, so what's lit always matches
+    // what's drawn. Only emit edges between drawn nodes; otherwise Graphviz
+    // auto-creates the node, resurrecting off-path datasources when focused.
+    const drawn = new Set([...pipelines.map((p) => p.name), ...allDataSources.keys()])
     dot += '\n'
-    pipelines.forEach((pipeline) => {
-        pipeline.upstream_pipelines?.forEach((upstream) => {
-            const resolved = validNodeNames.has(upstream) ? upstream : memberToGroup.get(upstream)
-            if (resolved && resolved !== pipeline.name) {
-                const edgeKey = `${resolved}|${pipeline.name}`
-                if (!emittedEdges.has(edgeKey)) {
-                    emittedEdges.add(edgeKey)
-                    dot += `    "${escapeDot(resolved)}" -> "${escapeDot(pipeline.name)}" [color="#ff6b35", style="solid", arrowsize=0.8];\n`
-                }
-            }
-        })
+    getLineageModel().edges.forEach(({ from, to, kind }) => {
+        if (!drawn.has(from) || !drawn.has(to)) return
+        const style =
+            kind === 'explicit'
+                ? `color="${explicitEdgeColor}", style="dashed", arrowsize=0.7`
+                : `color="${edgeColor}", arrowsize=0.8`
+        dot += `    "${escapeDot(from)}" -> "${escapeDot(to)}" [${style}];\n`
     })
 
     const nodeCount = pipelines.length + allDataSources.size
@@ -433,7 +412,10 @@ function flushPendingUpdate() {
 function createGraphviz(el) {
     const w = el.clientWidth || el.parentElement.clientWidth || 800
     const h = el.clientHeight || el.parentElement.clientHeight || 600
-    state.graphviz = d3.select(el).graphviz().width(w).height(h).fit(true).zoom(true)
+    // Morphing samples every edge path once per pixel by default, which takes
+    // tens of seconds on a few hundred long edges; a fixed 20 points per path
+    // looks the same at 150ms.
+    state.graphviz = d3.select(el).graphviz().width(w).height(h).fit(true).zoom(true).tweenPrecision('5%')
     // The default [0.1, 10] can't zoom in far enough to read labels on huge graphs.
     state.graphviz.zoomScaleExtent?.(ZOOM_EXTENT)
 }
@@ -453,27 +435,26 @@ function setGraphSpinner(show) {
 
 // Shared tail of the layout path and the cached-SVG restore path.
 function finishRender(restored) {
-    setupGraphInteractivity(!restored)
+    setupGraphInteractivity()
     if (!restored) setupLevelOfDetail()
 
     applyCriticalPathHighlighting()
     if (state.showCostLabels) showCostLabels()
     syncGraphToolbar()
 
-    // Fit and re-select here rather than on a timer, otherwise d3-graphviz keeps
-    // the previous transform and focused subgraphs land off-center.
+    // Fit here rather than on a timer, otherwise d3-graphviz keeps the previous
+    // transform and focused subgraphs land off-center.
     if (state.pendingFocusReset) {
-        const target = state.pendingFocusSelect
         state.pendingFocusReset = false
-        state.pendingFocusSelect = null
         if (!restored) state.graphviz?.resetZoom()
-        if (target) {
-            d3.select('#graph')
-                .selectAll('.node')
-                .each(function () {
-                    if (d3.select(this).select('title').text() === target) markFocusedNode(target, this)
-                })
-        }
+    }
+    // The SVG is new, so the selection's classes need re-applying.
+    if (state.selectedNode) {
+        refreshSelection()
+        renderDetailsLineage()
+        revealLineage()
+    } else {
+        selectNodeFromHash()
     }
 
     if (!flushPendingUpdate()) setTimeout(precomputeAdjacentStates, 100)
@@ -546,8 +527,9 @@ export function updateGraph(instant = false) {
         graphvizDirty = false
     }
 
-    // Morph transitions are too slow on big graphs.
-    const instantRender = instant || big
+    // Morph transitions are too slow on big graphs, and the first render has
+    // nothing to morph from.
+    const instantRender = instant || big || !document.querySelector('#graph svg')
 
     isRendering = true
     const container = d3.select('#graph')
@@ -716,248 +698,92 @@ function precomputeAdjacentStates() {
     processNext()
 }
 
-export function setupGraphInteractivity(forceRebuild = false) {
-    const viewKey = getViewStateKey()
-    let cached = state.viewStateCache.get(viewKey)
+// On-screen node name -> its <g>, and each drawn edge with its endpoints.
+// Rebuilt after every render.
+let nodeEls = new Map()
+let edgeEls = []
 
-    if (!forceRebuild && cached?.lineage && Object.keys(cached.lineage.nodeLineage).length > 0) {
-        state.cachedUpstreamMap = cached.lineage.upstreamMap
-        state.cachedDownstreamMap = cached.lineage.downstreamMap
-        state.cachedLineage = cached.lineage.nodeLineage
-    } else {
-        state.cachedUpstreamMap = {}
-        state.cachedDownstreamMap = {}
-        state.cachedLineage = {}
+function indexRenderedGraph() {
+    nodeEls = new Map()
+    edgeEls = []
+    d3.select('#graph')
+        .selectAll('.node')
+        .each(function () {
+            nodeEls.set(d3.select(this).select('title').text(), this)
+        })
+    d3.select('#graph')
+        .selectAll('.edge')
+        .each(function () {
+            const match = d3
+                .select(this)
+                .select('title')
+                .text()
+                .match(/^(.+?)(?:->|--)\s*(.+?)$/)
+            if (match) edgeEls.push({ el: this, from: match[1], to: match[2] })
+        })
+}
 
-        d3.select('#graph')
-            .selectAll('.edge')
-            .each(function () {
-                const edge = d3.select(this)
-                const title = edge.select('title').text()
-                const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/)
-                if (match) {
-                    const source = match[1]
-                    const target = match[2]
-                    if (!state.cachedDownstreamMap[source]) state.cachedDownstreamMap[source] = []
-                    if (!state.cachedUpstreamMap[target]) state.cachedUpstreamMap[target] = []
-                    state.cachedDownstreamMap[source].push(target)
-                    state.cachedUpstreamMap[target].push(source)
-                }
-            })
+const isGroupNode = (name) => getLineageModel().members.has(name)
 
-        const groupInfo = {}
-        const memberToGroup = {}
-        if (state.groupedView && state.currentConfig?.pipelines) {
-            state.currentConfig.pipelines.forEach((p) => {
-                if (p.group && !state.expandedGroups.has(p.group)) {
-                    if (!groupInfo[p.group]) groupInfo[p.group] = []
-                    memberToGroup[p.name] = p.group
-                    groupInfo[p.group].push({
-                        name: p.name,
-                        inputs: p.input_sources || [],
-                        outputs: p.output_sources || [],
-                        upstreams: (p.upstream_pipelines || []).map((u) => memberToGroup[u] || u),
-                        downstreamPipelines: []
-                    })
-                }
-            })
-            // Second pass to resolve upstreams that were added before their group was seen
-            Object.values(groupInfo).forEach((members) => {
-                members.forEach((m) => {
-                    m.upstreams = m.upstreams.map((u) => memberToGroup[u] || u)
-                })
-            })
-            // Build reverse mapping: which external pipelines are downstream of each member
-            if (state.currentConfig.pipelines) {
-                state.currentConfig.pipelines.forEach((p) => {
-                    ;(p.upstream_pipelines || []).forEach((u) => {
-                        const groupName = memberToGroup[u]
-                        if (groupName && !memberToGroup[p.name]) {
-                            const member = groupInfo[groupName]?.find((m) => m.name === u)
-                            if (member) member.downstreamPipelines.push(p.name)
-                        }
-                    })
-                })
-            }
+export function setupGraphInteractivity() {
+    indexRenderedGraph()
+
+    const incident = new Map()
+    edgeEls.forEach((e) => {
+        for (const n of [e.from, e.to]) {
+            if (!incident.has(n)) incident.set(n, [])
+            incident.get(n).push(e.el)
         }
-
-        // When traversing through a group node, figure out which members
-        // are relevant based on what connected us to this group, then only
-        // continue along those members' connections.
-        // `comingFrom` is the previous node name; `entryHints` is an optional
-        // set of source/pipeline names that narrow which members matter
-        // (used when the previous node was also a group).
-        function getFullChain(node, map, visited = new Set(), depth = 1, comingFrom = null, entryHints = null) {
-            if (visited.has(node)) return []
-            visited.add(node)
-            let neighbors = map[node] || []
-            let exitHints = null
-
-            const members = groupInfo[node]
-            if (members && comingFrom) {
-                const isUpstream = map === state.cachedUpstreamMap
-                // Build the set of names to match against this group's members
-                const connectors = entryHints || [comingFrom]
-
-                if (isUpstream) {
-                    const relevant = members.filter((m) =>
-                        connectors.some((cf) => m.outputs.includes(cf) || m.downstreamPipelines.includes(cf))
-                    )
-                    if (relevant.length > 0) {
-                        const allowed = new Set()
-                        relevant.forEach((m) => {
-                            m.inputs.forEach((i) => allowed.add(i))
-                            m.upstreams.forEach((u) => allowed.add(u))
-                        })
-                        neighbors = neighbors.filter((n) => allowed.has(n))
-                        // Prepare hints for the next group upstream: the relevant
-                        // members' inputs and upstream pipeline refs
-                        exitHints = [...allowed]
-                    }
-                } else {
-                    const relevant = members.filter((m) =>
-                        connectors.some((cf) => m.inputs.includes(cf) || m.upstreams.includes(cf))
-                    )
-                    if (relevant.length > 0) {
-                        const allowed = new Set()
-                        relevant.forEach((m) => {
-                            m.outputs.forEach((o) => allowed.add(o))
-                            m.downstreamPipelines.forEach((d) => allowed.add(d))
-                        })
-                        neighbors = neighbors.filter((n) => allowed.has(n))
-                        exitHints = [...allowed]
-                    }
-                }
-            }
-
-            let result = []
-            neighbors.forEach((n) => {
-                result.push({ name: n, depth: depth })
-                // If the next node is a group and we have exit hints, pass them
-                // so it knows which members are relevant
-                const hints = exitHints && groupInfo[n] ? exitHints : null
-                result.push(...getFullChain(n, map, visited, depth + 1, node, hints))
-            })
-            return result
-        }
-
-        d3.select('#graph')
-            .selectAll('.node')
-            .each(function () {
-                const nodeName = d3.select(this).select('title').text()
-                state.cachedLineage[nodeName] = {
-                    upstream: getFullChain(nodeName, state.cachedUpstreamMap, new Set()),
-                    downstream: getFullChain(nodeName, state.cachedDownstreamMap, new Set())
-                }
-            })
-
-        if (Object.keys(state.cachedLineage).length > 0) {
-            if (!cached) {
-                cached = {
-                    lineage: {
-                        upstreamMap: state.cachedUpstreamMap,
-                        downstreamMap: state.cachedDownstreamMap,
-                        nodeLineage: state.cachedLineage
-                    }
-                }
-                addToViewCache(viewKey, cached)
-            } else {
-                cached.lineage = {
-                    upstreamMap: state.cachedUpstreamMap,
-                    downstreamMap: state.cachedDownstreamMap,
-                    nodeLineage: state.cachedLineage
-                }
-            }
-        }
+    })
+    const setHover = (el, on) => {
+        const nodeName = d3.select(el).select('title').text()
+        el.classList.toggle('node-hover', on)
+        ;(incident.get(nodeName) || []).forEach((e) => e.classList.toggle('edge-hover', on))
     }
 
-    if (document.getElementById('node-tooltip')) {
-        document.getElementById('node-tooltip').remove()
-    }
-    const tooltip = document.createElement('div')
-    tooltip.id = 'node-tooltip'
-    tooltip.className = 'node-tooltip'
-    tooltip.style.display = 'none'
-    document.body.appendChild(tooltip)
-
-    // Focus mode filters to the clicked node's lineage; once focused, further
-    // clicks just select in place. Group-node clicks are delayed so a
-    // double-click (expand) doesn't also fire a click.
+    // Click selects in place; double-click focuses, or opens a group. Group-node
+    // clicks are delayed so a double-click doesn't also select.
     let nodeClickTimer = null
     d3.select('#graph')
         .selectAll('.node')
         .style('cursor', 'pointer')
-        .on('click', function (event, d) {
+        .on('click', function (event) {
             event.stopPropagation()
             const nodeName = d3.select(this).select('title').text()
-            const el = this
-            const isGroupNode = state.groupedView && state.currentConfig?.pipelines?.some((p) => p.group === nodeName)
-
-            const act = () => {
-                if (state.clickMode === 'highlight' || state.focusedNode) selectNode(nodeName, el)
-                else focusNode(nodeName)
-            }
-
-            if (!isGroupNode) return act()
+            if (!isGroupNode(nodeName)) return selectNode(nodeName)
             clearTimeout(nodeClickTimer)
-            nodeClickTimer = setTimeout(act, 220)
+            nodeClickTimer = setTimeout(() => selectNode(nodeName), 220)
         })
-        .on('dblclick', function (event, d) {
+        .on('dblclick', function (event) {
             event.stopPropagation()
             clearTimeout(nodeClickTimer)
             const nodeName = d3.select(this).select('title').text()
-            if (state.groupedView && state.currentConfig?.pipelines) {
-                const isGroupNode = state.currentConfig.pipelines.some((p) => p.group === nodeName)
-                if (isGroupNode) {
-                    toggleGroup(nodeName)
-                }
-            }
+            if (isGroupNode(nodeName)) toggleGroup(nodeName)
+            else toggleFocus(nodeName)
         })
-        .on('mouseover', function (event, d) {
-            const nodeName = d3.select(this).select('title').text()
-            showNodeTooltip(event, nodeName)
+        // Hover just previews the node's own edges; details live in the panel.
+        .on('mouseenter', function () {
+            setHover(this, true)
         })
-        .on('mousemove', function (event, d) {
-            tooltip.style.left = event.pageX + 10 + 'px'
-            tooltip.style.top = event.pageY - 10 + 'px'
-        })
-        .on('mouseout', function (event, d) {
-            hideNodeTooltip()
+        .on('mouseleave', function () {
+            setHover(this, false)
         })
 
+    // Clicking empty canvas (not the end of a pan) clears the selection.
     d3.select('#graph').on('click', function (event) {
-        if (
-            event.target.tagName === 'svg' ||
-            event.target === event.currentTarget ||
-            event.target.classList.contains('graph-container') ||
-            !event.target.closest('.node')
-        ) {
-            clearSelection()
-        }
+        if (event.target.closest('.node')) return
+        if (Math.abs(event.clientX - bgClickDownX) > 4 || Math.abs(event.clientY - bgClickDownY) > 4) return
+        clearSelection()
     })
 
-    selectNodeFromHash()
     restoreBlastRadiusFromHash()
 }
 
 export function selectNodeFromHash() {
     const nodeName = getNodeFromHash()
-    if (!nodeName) return
-
-    let found = false
-    d3.select('#graph')
-        .selectAll('.node')
-        .each(function () {
-            const nodeTitle = d3.select(this).select('title').text()
-            if (nodeTitle === nodeName) {
-                found = true
-                selectNode(nodeName, this)
-            }
-        })
-
-    if (!found && state.currentConfig) {
-        showNodeDetails(nodeName)
-    }
+    if (!nodeName || nodeName === state.selectedNode) return
+    if (nodeEls.has(nodeName)) selectNode(nodeName)
+    else if (state.currentConfig) showNodeDetails(nodeName)
 }
 
 export function restoreBlastRadiusFromHash() {
@@ -967,132 +793,139 @@ export function restoreBlastRadiusFromHash() {
     }
 }
 
-export function showNodeTooltip(event, nodeName) {
-    const tooltip = document.getElementById('node-tooltip')
-    if (!tooltip || !state.currentConfig) return
-
-    let content = ''
-
-    if (state.groupedView) {
-        const groupMembers = state.currentConfig.pipelines?.filter((p) => p.group === nodeName)
-        if (groupMembers?.length > 0) {
-            content = `${nodeName} (${groupMembers.length} pipelines)`
-            content += `\nClick for details`
-            content += `\nMembers: ${groupMembers.map((p) => p.name).join(', ')}`
-            tooltip.textContent = content
-            tooltip.style.display = 'block'
-            tooltip.style.left = event.pageX + 10 + 'px'
-            tooltip.style.top = event.pageY - 10 + 'px'
-            return
-        }
-    }
-
-    const pipeline = state.currentConfig.pipelines?.find((p) => p.name === nodeName)
-    if (pipeline) {
-        content = `${pipeline.name}`
-        if (pipeline.description) content += `\nDescription: ${pipeline.description}`
-        if (pipeline.schedule) content += `\nSchedule: ${formatSchedule(pipeline.schedule)}`
-        if (pipeline.cluster) content += `\nCluster: ${pipeline.cluster}`
-        if (pipeline.tags && pipeline.tags.length > 0) content += `\nTags: ${pipeline.tags.join(', ')}`
-        if (pipeline.input_sources && pipeline.input_sources.length > 0)
-            content += `\nInputs: ${pipeline.input_sources.join(', ')}`
-        if (pipeline.output_sources && pipeline.output_sources.length > 0)
-            content += `\nOutputs: ${pipeline.output_sources.join(', ')}`
-    }
-
-    const datasource = state.currentConfig.datasources?.find((ds) => ds.name === nodeName)
-    if (datasource) {
-        content = `${datasource.name}`
-        if (datasource.type) content += `\nType: ${datasource.type.toUpperCase()}`
-        if (datasource.description) content += `\nDescription: ${datasource.description}`
-        if (datasource.owner) content += `\nOwner: ${datasource.owner}`
-        if (datasource.cluster) content += `\nCluster: ${datasource.cluster}`
-        if (datasource.tags && datasource.tags.length > 0) content += `\nTags: ${datasource.tags.join(', ')}`
-
-        if (datasource.metadata) {
-            const keyFields = ['size', 'record_count', 'refresh_frequency', 'environment']
-            keyFields.forEach((field) => {
-                if (datasource.metadata[field]) {
-                    content += `\n${field.replace(/_/g, ' ')}: ${datasource.metadata[field]}`
-                }
-            })
-        }
-    }
-
-    if (content) {
-        tooltip.textContent = content
-        tooltip.style.display = 'block'
-        tooltip.style.left = event.pageX + 10 + 'px'
-        tooltip.style.top = event.pageY - 10 + 'px'
-    }
-}
-
-export function hideNodeTooltip() {
-    const tooltip = document.getElementById('node-tooltip')
-    if (tooltip) {
-        tooltip.style.display = 'none'
-    }
-}
-
-// Like selectNode, but without dimming: in focus mode the whole subgraph is lineage.
-export function markFocusedNode(nodeName, nodeElement) {
+export function selectNode(nodeName) {
     state.selectedNode = nodeName
-    clearHighlights()
-    d3.select(nodeElement).classed('node-highlighted', true)
     updateHashWithNode(nodeName)
+    refreshSelection()
+    showNodeDetails(nodeName)
     syncGraphToolbar()
-    const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
-    showNodeDetails(nodeName, lineage.upstream, lineage.downstream)
+    revealLineage()
 }
 
-export function selectNode(nodeName, nodeElement) {
-    state.selectedNode = nodeName
+const hopClass = (h) => `hop-${Math.min(h, 3)}`
+
+// Off-lineage nodes are dimmed, or hidden in place. Big graphs default to
+// hiding, since a sea of grey doesn't help there; an explicit choice sticks.
+const hidingOthers = () => state.hideUnrelated ?? nodeEls.size > BIG_GRAPH_THRESHOLD
+
+// Light the selection's lineage within the current reach, upstream and
+// downstream told apart, fading with distance; dim or hide everything else.
+function refreshSelection() {
     clearHighlights()
-    d3.select(nodeElement).classed('node-highlighted', true)
-
-    updateHashWithNode(nodeName)
-    syncGraphToolbar()
-
-    const lineage = state.cachedLineage[nodeName] || { upstream: [], downstream: [] }
-    const upstream = lineage.upstream
-    const downstream = lineage.downstream
-    const allConnected = new Set([...upstream.map((x) => x.name), ...downstream.map((x) => x.name)])
-
-    d3.select('#graph')
-        .selectAll('.node')
-        .each(function () {
-            const node = d3.select(this)
-            const nodeTitle = node.select('title').text()
-            if (allConnected.has(nodeTitle)) {
-                node.classed('node-connected', true)
-            } else if (nodeTitle !== nodeName) {
-                node.classed('node-dimmed', true)
+    const name = state.selectedNode
+    if (name && nodeEls.has(name)) {
+        const { up, down } = litLineage(name)
+        const hide = hidingOthers()
+        const offNode = hide ? 'node-hidden' : 'node-dimmed'
+        const offEdge = hide ? 'edge-hidden' : 'edge-dimmed'
+        for (const [n, el] of nodeEls) {
+            if (n === name) el.classList.add('node-highlighted')
+            else if (up.has(n)) el.classList.add('node-connected', 'lin-up', hopClass(up.get(n)))
+            else if (down.has(n)) el.classList.add('node-connected', 'lin-down', hopClass(down.get(n)))
+            else el.classList.add(offNode)
+        }
+        for (const { el, from, to } of edgeEls) {
+            if (up.has(from) && (to === name || up.has(to))) {
+                el.classList.add('edge-highlighted', 'lin-up', hopClass(up.get(from)))
+            } else if (down.has(to) && (from === name || down.has(from))) {
+                el.classList.add('edge-highlighted', 'lin-down', hopClass(down.get(to)))
+            } else {
+                el.classList.add(offEdge)
             }
-        })
-
-    d3.select('#graph')
-        .selectAll('.edge')
-        .each(function () {
-            const edge = d3.select(this)
-            const title = edge.select('title').text()
-            const match = title.match(/^(.+?)(?:->|--)\s*(.+?)$/)
-            if (match) {
-                const source = match[1]
-                const target = match[2]
-                const sourceInChain = source === nodeName || allConnected.has(source)
-                const targetInChain = target === nodeName || allConnected.has(target)
-                if (sourceInChain && targetInChain) {
-                    edge.classed('edge-highlighted', true)
-                } else {
-                    edge.classed('edge-dimmed', true)
-                }
-            }
-        })
-
-    showNodeDetails(nodeName, upstream, downstream)
+        }
+        if (hide) hideEmptyClusters()
+    }
+    syncLineageControl()
 }
 
-export function showNodeDetails(nodeName, upstream = [], downstream = []) {
+// Cluster boxes don't contain their nodes in the SVG, so match by position.
+function hideEmptyClusters() {
+    const centers = []
+    for (const el of nodeEls.values()) {
+        if (el.classList.contains('node-hidden')) continue
+        const b = el.getBBox()
+        centers.push([b.x + b.width / 2, b.y + b.height / 2])
+    }
+    d3.select('#graph')
+        .selectAll('.cluster')
+        .each(function () {
+            const b = this.getBBox()
+            const used = centers.some(([x, y]) => x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height)
+            if (!used) this.classList.add('cluster-hidden')
+        })
+}
+
+// When hiding, the remaining lineage can be scattered across a huge canvas:
+// bring it into view if part of it is off screen or too small to read.
+function revealLineage() {
+    if (!state.selectedNode || !hidingOthers()) return
+    const rects = [...document.querySelectorAll('#graph .node-highlighted, #graph .node-connected')].map((el) =>
+        el.getBoundingClientRect()
+    )
+    if (!rects.length) return
+    const box = {
+        left: Math.min(...rects.map((r) => r.left)),
+        top: Math.min(...rects.map((r) => r.top)),
+        right: Math.max(...rects.map((r) => r.right)),
+        bottom: Math.max(...rects.map((r) => r.bottom))
+    }
+    moveView(box, { onlyIfHidden: true, fit: true })
+}
+
+export function toggleHideUnrelated() {
+    if (state.selectedNode) setHideUnrelated(!hidingOthers())
+}
+
+export function setHideUnrelated(hide) {
+    state.hideUnrelated = hide
+    refreshSelection()
+    revealLineage()
+}
+
+// The floating up/down reach slider; shown while a drawn node is selected.
+function syncLineageControl() {
+    const name = state.selectedNode
+    if (!name || !nodeEls.has(name)) return updateLineageControl(null)
+    const { up, down, maxUp, maxDown } = litLineage(name)
+    updateLineageControl({
+        name,
+        maxUp,
+        maxDown,
+        reachUp: state.reachUp,
+        reachDown: state.reachDown,
+        upCount: up.size,
+        downCount: down.size,
+        focused: state.focusedNode === name,
+        hiding: hidingOthers(),
+        onReach: setLineageReach,
+        onFocus: () => toggleFocus(name),
+        onHide: setHideUnrelated
+    })
+}
+
+let refocusTimer = null
+let revealTimer = null
+export function setLineageReach(dir, value) {
+    if (dir === 'up') state.reachUp = value
+    else state.reachDown = value
+    refreshSelection()
+    renderDetailsLineage()
+    // A focused view shows exactly the slider's range; re-cut it once dragging settles.
+    if (state.focusedNode && state.focusedNode === state.selectedNode) {
+        clearTimeout(refocusTimer)
+        refocusTimer = setTimeout(() => state.focusedNode && focusNode(state.focusedNode), 350)
+    } else {
+        clearTimeout(revealTimer)
+        revealTimer = setTimeout(revealLineage, 350)
+    }
+}
+
+// The node the details panel is showing; not always the selection (e.g. a
+// group that was just expanded, or a search hit that isn't drawn).
+let detailsNode = null
+
+export function showNodeDetails(nodeName) {
+    detailsNode = nodeName
     const col = document.getElementById('details-col')
     const content = document.getElementById('details-content')
 
@@ -1168,17 +1001,14 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         html += `<button class="graph-ctrl-btn" onclick="toggleGroup(${jsArg(nodeData.group)})">Collapse group</button>`
     }
     html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius(${jsArg(nodeName)})">Blast radius</button>`
-    if (state.focusedNode === nodeName) {
-        html += `<button class="graph-ctrl-btn active" onclick="unfocusNode()">Unfocus</button>`
-    } else {
-        html += `<button class="graph-ctrl-btn" onclick="focusNode(${jsArg(nodeName)})">Focus</button>`
-    }
     html += `</div>`
 
     if (nodeData.description) {
-        html += `<div class="detail-section"><div class="detail-label">Description</div>`
-        html += `<div class="detail-value">${escapeHtml(nodeData.description)}</div></div>`
+        html += `<div class="detail-description">${escapeHtml(nodeData.description)}</div>`
     }
+
+    // Filled by renderDetailsLineage, which re-runs as the reach slider moves.
+    html += `<div class="detail-section" id="details-lineage"></div>`
 
     const props = []
     if (nodeData.schedule) props.push(['Schedule', escapeHtml(formatSchedule(nodeData.schedule))])
@@ -1269,229 +1099,160 @@ export function showNodeDetails(nodeName, upstream = [], downstream = []) {
         html += `</div></div>`
     }
 
-    const pipelineNames = new Set((state.currentConfig.pipelines || []).map((p) => p.name))
-    if (state.groupedView) {
-        ;(state.currentConfig.pipelines || []).forEach((p) => {
-            if (p.group) pipelineNames.add(p.group)
-        })
-    }
-
-    function dedupeAndSort(items, filterFn) {
-        const seen = new Map()
-        items
-            .filter((x) => filterFn(x.name))
-            .forEach((x) => {
-                if (!seen.has(x.name) || seen.get(x.name).depth > x.depth) {
-                    seen.set(x.name, x)
-                }
-            })
-        return [...seen.values()].sort((a, b) => a.depth - b.depth)
-    }
-
-    const upstreamPipelines = dedupeAndSort(upstream, (n) => pipelineNames.has(n))
-    const upstreamSources = dedupeAndSort(upstream, (n) => !pipelineNames.has(n))
-    const downstreamPipelines = dedupeAndSort(downstream, (n) => pipelineNames.has(n))
-    const downstreamSources = dedupeAndSort(downstream, (n) => !pipelineNames.has(n))
-
-    function renderLineageList(items, label) {
-        if (items.length === 0) return ''
-        let out = `<div class="lineage-section-label">${label} <span class="detail-count">${items.length}</span></div><div class="detail-value">`
-        items.forEach((x) => {
-            const indent = (x.depth - 1) * 14
-            const opacity = Math.max(0.5, 1 - (x.depth - 1) * 0.12)
-            out += `<div class="lineage-link" data-node-name="${escapeHtml(x.name)}" style="padding-left: ${indent}px; opacity: ${opacity};">${escapeHtml(x.name)}</div>`
-        })
-        out += `</div>`
-        return out
-    }
-
-    function getNodeMetadata(name) {
-        const pipeline = state.currentConfig.pipelines?.find((p) => p.name === name)
-        if (pipeline) {
-            const meta = { name, type: 'pipeline', depth: undefined }
-            if (pipeline.description) meta.description = pipeline.description
-            if (pipeline.schedule) meta.schedule = pipeline.schedule
-            if (pipeline.cluster) meta.cluster = pipeline.cluster
-            if (pipeline.group) meta.group = pipeline.group
-            if (pipeline.owner) meta.owner = pipeline.owner
-            if (pipeline.tags?.length) meta.tags = pipeline.tags
-            if (pipeline.input_sources?.length) meta.input_sources = pipeline.input_sources
-            if (pipeline.output_sources?.length) meta.output_sources = pipeline.output_sources
-            if (pipeline.upstream_pipelines?.length) meta.upstream_pipelines = pipeline.upstream_pipelines
-            if (pipeline.links && Object.keys(pipeline.links).length) meta.links = pipeline.links
-            if (pipeline.metadata && Object.keys(pipeline.metadata).length) meta.metadata = pipeline.metadata
-            return meta
-        }
-        const datasource = state.currentConfig.datasources?.find((ds) => ds.name === name)
-        if (datasource) {
-            const meta = { name, type: 'datasource', depth: undefined }
-            if (datasource.description) meta.description = datasource.description
-            if (datasource.type) meta.source_type = datasource.type
-            if (datasource.cluster) meta.cluster = datasource.cluster
-            if (datasource.owner) meta.owner = datasource.owner
-            if (datasource.tags?.length) meta.tags = datasource.tags
-            if (datasource.links && Object.keys(datasource.links).length) meta.links = datasource.links
-            if (datasource.metadata && Object.keys(datasource.metadata).length) meta.metadata = datasource.metadata
-            return meta
-        }
-        return { name, type: 'datasource' }
-    }
-
-    const allUpstreamNodes = new Set([...upstreamPipelines, ...upstreamSources].map((x) => x.name))
-    const allDownstreamNodes = new Set([...downstreamPipelines, ...downstreamSources].map((x) => x.name))
-
-    const upstreamEdges = []
-    allUpstreamNodes.forEach((node) => {
-        const downstreamNeighbors = state.cachedDownstreamMap[node] || []
-        downstreamNeighbors.forEach((neighbor) => {
-            if (allUpstreamNodes.has(neighbor) || neighbor === nodeName) {
-                upstreamEdges.push({ from: node, to: neighbor })
-            }
-        })
-    })
-
-    const downstreamEdges = []
-    downstreamEdges.push(
-        ...(state.cachedDownstreamMap[nodeName] || [])
-            .filter((n) => allDownstreamNodes.has(n))
-            .map((n) => ({ from: nodeName, to: n }))
-    )
-    allDownstreamNodes.forEach((node) => {
-        const downstreamNeighbors = state.cachedDownstreamMap[node] || []
-        downstreamNeighbors.forEach((neighbor) => {
-            if (allDownstreamNodes.has(neighbor)) {
-                downstreamEdges.push({ from: node, to: neighbor })
-            }
-        })
-    })
-
-    const lineageJson = {
-        node: nodeName,
-        type: nodeType,
-        ...getNodeMetadata(nodeName),
-        upstream: {
-            pipelines: upstreamPipelines.map((x) => ({ ...getNodeMetadata(x.name), depth: x.depth })),
-            sources: upstreamSources.map((x) => ({ ...getNodeMetadata(x.name), depth: x.depth })),
-            edges: upstreamEdges
-        },
-        downstream: {
-            pipelines: downstreamPipelines.map((x) => ({ ...getNodeMetadata(x.name), depth: x.depth })),
-            sources: downstreamSources.map((x) => ({ ...getNodeMetadata(x.name), depth: x.depth })),
-            edges: downstreamEdges
-        }
-    }
-
-    const hasLineage =
-        upstreamPipelines.length > 0 ||
-        upstreamSources.length > 0 ||
-        downstreamPipelines.length > 0 ||
-        downstreamSources.length > 0
-
-    const totalLineage =
-        upstreamPipelines.length + upstreamSources.length + downstreamPipelines.length + downstreamSources.length
-
-    if (hasLineage) {
-        html += `<div class="detail-section detail-drawer" data-open="false">`
-        html += `<div class="detail-drawer-toggle"><span class="detail-drawer-arrow">&#9656;</span> Lineage <span class="detail-count">${totalLineage}</span>`
-        html += `<div class="lineage-view-toggle" style="margin-left: auto;">
-            <span class="lineage-toggle-label active" data-view="tree">Tree</span>
-            <div class="lineage-toggle-slider"></div>
-            <span class="lineage-toggle-label" data-view="json">JSON</span>
-        </div></div>`
-        html += `<div class="detail-drawer-body">`
-    }
-
-    html += `<div class="lineage-tree-view">`
-    html += renderLineageList(upstreamPipelines, 'Upstream pipelines')
-    html += renderLineageList(upstreamSources, 'Upstream sources')
-    html += renderLineageList(downstreamPipelines, 'Downstream pipelines')
-    html += renderLineageList(downstreamSources, 'Downstream sources')
-    html += `</div>`
-
-    html += `<div class="lineage-json-view" style="display: none;">
-        <pre class="lineage-json-pre">${escapeHtml(JSON.stringify(lineageJson, null, 2))}</pre>
-    </div>`
-
-    if (hasLineage) {
-        html += `</div></div>`
-    }
-
     col.classList.add('visible')
     content.innerHTML = html
+    renderDetailsLineage()
 
     content.querySelectorAll('.detail-drawer-toggle').forEach((toggle) => {
-        toggle.addEventListener('click', function (e) {
-            if (e.target.closest('.lineage-view-toggle')) return
+        toggle.addEventListener('click', function () {
             const drawer = this.closest('.detail-drawer')
             const isOpen = drawer.getAttribute('data-open') === 'true'
             drawer.setAttribute('data-open', isOpen ? 'false' : 'true')
         })
     })
+}
 
-    const slider = content.querySelector('.lineage-toggle-slider')
-    if (slider) {
-        slider.addEventListener('click', function () {
-            const isJson = this.classList.toggle('json-active')
-            const treeView = content.querySelector('.lineage-tree-view')
-            const jsonView = content.querySelector('.lineage-json-view')
-            const treeLabel = content.querySelector('.lineage-toggle-label[data-view="tree"]')
-            const jsonLabel = content.querySelector('.lineage-toggle-label[data-view="json"]')
+function getNodeMetadata(name) {
+    const pipeline = state.currentConfig.pipelines?.find((p) => p.name === name)
+    if (pipeline) {
+        const meta = { name, type: 'pipeline', depth: undefined }
+        if (pipeline.description) meta.description = pipeline.description
+        if (pipeline.schedule) meta.schedule = pipeline.schedule
+        if (pipeline.cluster) meta.cluster = pipeline.cluster
+        if (pipeline.group) meta.group = pipeline.group
+        if (pipeline.owner) meta.owner = pipeline.owner
+        if (pipeline.tags?.length) meta.tags = pipeline.tags
+        if (pipeline.input_sources?.length) meta.input_sources = pipeline.input_sources
+        if (pipeline.output_sources?.length) meta.output_sources = pipeline.output_sources
+        if (pipeline.upstream_pipelines?.length) meta.upstream_pipelines = pipeline.upstream_pipelines
+        if (pipeline.links && Object.keys(pipeline.links).length) meta.links = pipeline.links
+        if (pipeline.metadata && Object.keys(pipeline.metadata).length) meta.metadata = pipeline.metadata
+        return meta
+    }
+    const datasource = state.currentConfig.datasources?.find((ds) => ds.name === name)
+    if (datasource) {
+        const meta = { name, type: 'datasource', depth: undefined }
+        if (datasource.description) meta.description = datasource.description
+        if (datasource.type) meta.source_type = datasource.type
+        if (datasource.cluster) meta.cluster = datasource.cluster
+        if (datasource.owner) meta.owner = datasource.owner
+        if (datasource.tags?.length) meta.tags = datasource.tags
+        if (datasource.links && Object.keys(datasource.links).length) meta.links = datasource.links
+        if (datasource.metadata && Object.keys(datasource.metadata).length) meta.metadata = datasource.metadata
+        return meta
+    }
+    return { name, type: getLineageModel().isPipeline(name) ? 'group' : 'datasource' }
+}
 
-            if (isJson) {
-                treeView.style.display = 'none'
-                jsonView.style.display = 'block'
-                treeLabel.classList.remove('active')
-                jsonLabel.classList.add('active')
-            } else {
-                treeView.style.display = 'block'
-                jsonView.style.display = 'none'
-                treeLabel.classList.add('active')
-                jsonLabel.classList.remove('active')
-            }
-        })
+let lineageJsonView = false
+
+// The panel's lineage list: what the slider lights, grouped by hop.
+function renderDetailsLineage() {
+    const box = document.getElementById('details-lineage')
+    const nodeName = detailsNode
+    if (!box || !nodeName || !state.currentConfig) return
+
+    const model = getLineageModel()
+    if (!model.nodes.has(nodeName)) {
+        box.innerHTML = ''
+        return
+    }
+    const { up, down, all } = litLineage(nodeName)
+
+    const byHop = (m) => {
+        const hops = new Map()
+        ;[...m]
+            .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+            .forEach(([n, h]) => {
+                if (!hops.has(h)) hops.set(h, [])
+                hops.get(h).push(n)
+            })
+        return hops
     }
 
-    content.querySelectorAll('.lineage-link').forEach((el) => {
-        el.addEventListener('click', function () {
-            const targetName = this.getAttribute('data-node-name')
-            if (targetName) {
-                d3.select('#graph')
-                    .selectAll('.node')
-                    .each(function () {
-                        const nodeTitle = d3.select(this).select('title').text()
-                        if (nodeTitle === targetName) {
-                            selectNode(targetName, this)
-                        }
-                    })
-            }
-        })
+    const renderDir = (label, lit, full, dir) => {
+        if (full.size === 0) return ''
+        let out = `<div class="lineage-dir lineage-dir-${dir}"><div class="lineage-dir-label">${label} <span class="detail-count">${lit.size}</span></div>`
+        for (const [h, names] of byHop(lit)) {
+            out += `<div class="lineage-hop"><span class="lineage-hop-n" title="${h} hop${h > 1 ? 's' : ''} away">${h}</span><div class="lineage-hop-items">`
+            names.forEach((n) => {
+                const kind = model.isPipeline(n) ? 'badge-pipeline' : 'badge-source'
+                const off = nodeEls.has(n) ? '' : ' lineage-chip-offscreen'
+                out += `<button class="lineage-chip badge ${kind}${off}" data-node-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`
+            })
+            out += `</div></div>`
+        }
+        const hidden = full.size - lit.size
+        if (hidden > 0) {
+            out += `<button class="lineage-more" data-dir="${dir}">+${hidden} further ${dir === 'up' ? 'upstream' : 'downstream'}</button>`
+        }
+        return out + `</div>`
+    }
+
+    if (all.up.size === 0 && all.down.size === 0) {
+        box.innerHTML = `<div class="detail-label">Lineage</div><div class="lineage-empty">Nothing upstream or downstream.</div>`
+        return
+    }
+
+    const edgesWithin = (keep) => model.edges.filter((e) => keep(e.from, e.to)).map((e) => ({ from: e.from, to: e.to }))
+    const split = (m) => {
+        const items = [...m].map(([n, depth]) => ({ ...getNodeMetadata(n), depth }))
+        return {
+            pipelines: items.filter((x) => model.isPipeline(x.name)),
+            sources: items.filter((x) => !model.isPipeline(x.name))
+        }
+    }
+    const lineageJson = {
+        node: nodeName,
+        ...getNodeMetadata(nodeName),
+        upstream: { ...split(up), edges: edgesWithin((a, b) => up.has(a) && (b === nodeName || up.has(b))) },
+        downstream: { ...split(down), edges: edgesWithin((a, b) => down.has(b) && (a === nodeName || down.has(a))) }
+    }
+
+    box.innerHTML = `
+        <div class="lineage-head">
+            <span class="detail-label">Lineage</span>
+            <div class="lineage-view-toggle">
+                <span class="lineage-toggle-label${lineageJsonView ? '' : ' active'}" data-view="tree">List</span>
+                <div class="lineage-toggle-slider${lineageJsonView ? ' json-active' : ''}"></div>
+                <span class="lineage-toggle-label${lineageJsonView ? ' active' : ''}" data-view="json">JSON</span>
+            </div>
+        </div>
+        <div class="lineage-tree-view"${lineageJsonView ? ' style="display: none;"' : ''}>
+            ${renderDir('Upstream', up, all.up, 'up')}
+            ${renderDir('Downstream', down, all.down, 'down')}
+        </div>
+        <div class="lineage-json-view"${lineageJsonView ? '' : ' style="display: none;"'}>
+            <pre class="lineage-json-pre">${escapeHtml(JSON.stringify(lineageJson, null, 2))}</pre>
+        </div>`
+
+    box.querySelector('.lineage-view-toggle').addEventListener('click', () => {
+        lineageJsonView = !lineageJsonView
+        renderDetailsLineage()
+    })
+    box.querySelectorAll('.lineage-chip').forEach((el) => {
+        el.addEventListener('click', () => goToNode(el.dataset.nodeName))
+    })
+    box.querySelectorAll('.lineage-more').forEach((el) => {
+        el.addEventListener('click', () => setLineageReach(el.dataset.dir, Infinity))
     })
 }
 
-// Hop distance from `start` to every node reachable through the adjacency `map`.
-function bfsHopDistances(map, start) {
-    const dist = new Map()
-    const visited = new Set([start])
-    let frontier = [start]
-    let hop = 0
-    while (frontier.length) {
-        hop++
-        const next = []
-        for (const node of frontier) {
-            for (const neighbor of map[node] || []) {
-                if (!visited.has(neighbor)) {
-                    visited.add(neighbor)
-                    dist.set(neighbor, hop)
-                    next.push(neighbor)
-                }
-            }
-        }
-        frontier = next
+// Select a node from the panel or search: in place if it's drawn, refocusing
+// if it's outside the focused subgraph.
+function goToNode(name, { zoomIn = false } = {}) {
+    const el = nodeEls.get(name)
+    if (el) {
+        selectNode(name)
+        if (!hidingOthers()) panToNode(el, { onlyIfHidden: !zoomIn, zoomIn })
+    } else if (state.focusedNode && getLineageModel().nodes.has(name)) {
+        focusNode(name)
+    } else {
+        showNodeDetails(name)
     }
-    return dist
 }
 
-function updateFocusBanner(nodeName, reach, maxReach) {
+function updateFocusBanner(nodeName) {
     const banner = document.getElementById('focus-banner')
     if (!banner) return
     banner.style.display = ''
@@ -1500,90 +1261,47 @@ function updateFocusBanner(nodeName, reach, maxReach) {
         label.textContent = `Focused: ${nodeName}`
         label.title = nodeName
     }
-
-    const reachWrap = document.getElementById('focus-reach')
-    if (!reachWrap) return
-    reachWrap.innerHTML = ''
-    // Direct and Full are the same view when the lineage is a single hop.
-    reachWrap.style.display = maxReach <= 1 ? 'none' : ''
-    if (maxReach <= 1) return
-
-    const segments = [
-        { text: 'Direct', title: 'Direct inputs and outputs', target: 1, active: reach <= 1 },
-        { text: 'Full', title: 'Full lineage', target: maxReach, active: reach > 1 }
-    ]
-    segments.forEach((seg) => {
-        const btn = document.createElement('button')
-        btn.className = 'focus-reach-seg' + (seg.active ? ' active' : '')
-        btn.textContent = seg.text
-        btn.title = seg.title
-        btn.addEventListener('click', () => setFocusReach(seg.target))
-        reachWrap.appendChild(btn)
-    })
 }
 
-// Filter the graph to `nodeName` plus lineage within `reach` hops (default: all).
-export function focusNode(nodeName, reach) {
-    // Keep the full-graph adjacency from before the first focus; the cached maps
-    // get rebuilt from the focused subgraph.
-    if (!state.focusedNode) {
-        state.fullLineage = state.cachedLineage
-        state.fullUpstreamMap = state.cachedUpstreamMap
-        state.fullDownstreamMap = state.cachedDownstreamMap
-    }
-    const upDist = bfsHopDistances(state.fullUpstreamMap || state.cachedUpstreamMap, nodeName)
-    const downDist = bfsHopDistances(state.fullDownstreamMap || state.cachedDownstreamMap, nodeName)
-    const hops = [...upDist, ...downDist]
-
-    let maxReach = 1
-    for (const [, d] of hops) if (d > maxReach) maxReach = d
-    const r = Math.max(1, Math.min(reach ?? maxReach, maxReach))
-
-    const focusSet = new Set([nodeName])
-    for (const [n, d] of hops) if (d <= r) focusSet.add(n)
-
+// Filter the graph to `nodeName` plus whatever the reach slider currently lights.
+export function focusNode(nodeName) {
+    const { up, down, maxUp, maxDown } = litLineage(nodeName)
     state.focusedNode = nodeName
-    state.focusedSet = focusSet
-    state.focusReach = r
-
-    updateFocusBanner(nodeName, r, maxReach)
+    state.focusedSet = new Set([nodeName, ...up.keys(), ...down.keys()])
+    state.focusReach = `${Math.min(state.reachUp, maxUp)}:${Math.min(state.reachDown, maxDown)}`
+    state.selectedNode = nodeName
+    updateHashWithNode(nodeName)
+    updateFocusBanner(nodeName)
+    showNodeDetails(nodeName)
 
     state.pendingFocusReset = true
-    state.pendingFocusSelect = nodeName
     updateGraph(true)
 }
 
-export function setFocusReach(reach) {
-    if (!state.focusedNode || reach === state.focusReach) return
-    focusNode(state.focusedNode, reach)
+export function toggleFocus(nodeName = state.selectedNode) {
+    if (!nodeName) return
+    if (state.focusedNode === nodeName) unfocusNode()
+    else focusNode(nodeName)
 }
 
+// Back to the full graph, keeping the selection lit.
 export function unfocusNode() {
+    clearTimeout(refocusTimer)
     clearFocusState()
-    // Highlighting on the full graph is slow, and "Show all" shouldn't leave
-    // the last node lit up.
-    clearSelection()
     state.pendingFocusReset = true
-    state.pendingFocusSelect = null
     updateGraph(true)
 }
 
-// Highlight mode works on the full graph, so entering it unfocuses.
-export function setClickMode(mode) {
-    if (mode === state.clickMode) return
-    state.clickMode = mode
-    syncGraphToolbar()
-    if (mode === 'focus') clearSelection()
-    else if (state.focusedNode) unfocusNode()
+// Esc: leave focus first, then drop the selection.
+export function stepBack() {
+    if (state.focusedNode) unfocusNode()
+    else if (state.selectedNode) clearSelection()
 }
 
 // Reset focus without re-rendering, for callers that re-render anyway.
 function clearFocusState() {
     state.focusedNode = null
     state.focusedSet = null
-    state.fullLineage = null
-    state.fullUpstreamMap = null
-    state.fullDownstreamMap = null
     state.focusReach = null
     const banner = document.getElementById('focus-banner')
     if (banner) banner.style.display = 'none'
@@ -1595,6 +1313,7 @@ export function clearSelection() {
     applyCriticalPathHighlighting()
     updateHashWithNode(null)
     syncGraphToolbar()
+    updateLineageControl(null)
     const col = document.getElementById('details-col')
     if (col) {
         col.classList.remove('visible')
@@ -1604,10 +1323,17 @@ export function clearSelection() {
 export function clearHighlights() {
     d3.select('#graph')
         .selectAll('.node')
-        .classed('node-highlighted node-connected node-dimmed node-critical-path node-costliest-path', false)
+        .classed(
+            'node-highlighted node-connected node-dimmed node-hidden node-critical-path node-costliest-path lin-up lin-down hop-1 hop-2 hop-3',
+            false
+        )
     d3.select('#graph')
         .selectAll('.edge')
-        .classed('edge-highlighted edge-dimmed edge-critical-path edge-costliest-path', false)
+        .classed(
+            'edge-highlighted edge-dimmed edge-hidden edge-critical-path edge-costliest-path lin-up lin-down hop-1 hop-2 hop-3',
+            false
+        )
+    d3.select('#graph').selectAll('.cluster').classed('cluster-hidden', false)
 }
 
 export function fuzzyMatch(text, query) {
@@ -1790,11 +1516,7 @@ export function selectSearchResult(nodeName) {
         if (p?.group && !state.expandedGroups.has(p.group)) target = p.group
     }
 
-    if ((state.fullLineage || state.cachedLineage)?.[target]) {
-        focusNode(target)
-    } else {
-        showNodeDetails(nodeName)
-    }
+    goToNode(nodeEls.has(target) || state.focusedNode ? target : nodeName, { zoomIn: true })
 }
 
 document.addEventListener('click', function (e) {
@@ -1805,8 +1527,8 @@ document.addEventListener('click', function (e) {
     }
 })
 
-// Clicking empty canvas (not a pan) exits focus. Both listeners use the capture
-// phase because graphviz's zoom stops mousedown propagation.
+// Where the last press landed, to tell a background click from the end of a
+// pan. Capture phase because graphviz's zoom stops mousedown propagation.
 let bgClickDownX = 0
 let bgClickDownY = 0
 document.addEventListener(
@@ -1814,17 +1536,6 @@ document.addEventListener(
     function (e) {
         bgClickDownX = e.clientX
         bgClickDownY = e.clientY
-    },
-    true
-)
-document.addEventListener(
-    'click',
-    function (e) {
-        if (!state.focusedNode) return
-        if (!e.target.closest?.('#graph')) return
-        if (Math.abs(e.clientX - bgClickDownX) > 4 || Math.abs(e.clientY - bgClickDownY) > 4) return
-        if (e.target.closest('.node, .edge')) return
-        unfocusNode()
     },
     true
 )
@@ -1840,16 +1551,6 @@ function activeZoom() {
     return svg.empty() || !behavior ? null : { svg, behavior }
 }
 
-function findNodeElement(nodeName) {
-    let found = null
-    d3.select('#graph')
-        .selectAll('.node')
-        .each(function () {
-            if (!found && d3.select(this).select('title').text() === nodeName) found = this
-        })
-    return found
-}
-
 // Animate back to the fitted view without touching focus or selection.
 export function resetGraph() {
     const z = activeZoom()
@@ -1862,32 +1563,61 @@ export function resetGraph() {
 // Pan the selected node to the middle of the canvas, zooming in if it's too small
 // to read. With nothing selected, re-fit the whole graph.
 export function recenterSelection() {
+    const el = state.selectedNode && nodeEls.get(state.selectedNode)
+    if (!el) return resetGraph()
+    panToNode(el, { zoomIn: true })
+}
+
+// Centre `el` in the visible canvas. `onlyIfHidden` leaves the view alone when
+// the node is already on screen; `zoomIn` also zooms if it's too small to read.
+function panToNode(el, { onlyIfHidden = false, zoomIn = false } = {}) {
+    moveView(el.getBoundingClientRect(), { onlyIfHidden, zoomIn })
+}
+
+// Bring a screen-space box to the middle of the visible canvas. `zoomIn` zooms
+// up to legible if it's too small; `fit` scales so the whole box fits (never
+// past 1:1). `onlyIfHidden` skips boxes already on screen and legible.
+function moveView(box, { onlyIfHidden = false, zoomIn = false, fit = false } = {}) {
     const z = activeZoom()
-    const el = state.selectedNode && findNodeElement(state.selectedNode)
-    if (!z || !el) return resetGraph()
+    if (!z) return
 
     // Zoom transforms live in the SVG's user space; convert screen px through its CTM.
     const svgNode = z.svg.node()
     const ctm = svgNode.getScreenCTM()
     if (!ctm) return
     const view = svgNode.getBoundingClientRect()
-    const box = el.getBoundingClientRect()
-    // The details drawer overlays the canvas; centre within what's left visible.
+    // The details drawer and the reach slider overlay the canvas; aim for
+    // what's left. Measured from layout, not the drawer's (maybe sliding) box.
     const drawer = document.getElementById('details-col')
     const right = drawer?.classList.contains('visible')
-        ? Math.min(view.right, drawer.getBoundingClientRect().left)
+        ? Math.min(view.right, drawer.offsetParent.getBoundingClientRect().right - drawer.offsetWidth)
         : view.right
+    const ctl = document.getElementById('lineage-ctl')
+    const bottom = ctl && !ctl.hidden ? view.bottom - (ctl.offsetHeight + 24) : view.bottom
+    const scale = currentGraphScale()
+    const tooSmall = (zoomIn || fit) && scale < RECENTER_MIN_SCALE
+    const onScreen = box.left >= view.left && box.right <= right && box.top >= view.top && box.bottom <= bottom
+    if (onlyIfHidden && onScreen && !tooSmall) return
+
     const cx = (view.left + right) / 2
-    const cy = view.top + view.height / 2
+    const cy = (view.top + bottom) / 2
     const t = d3.zoomTransform(svgNode)
 
-    let x = t.x + (cx - (box.left + box.width / 2)) / ctm.a
-    let y = t.y + (cy - (box.top + box.height / 2)) / ctm.d
+    let x = t.x + (cx - (box.left + box.right) / 2) / ctm.a
+    let y = t.y + (cy - (box.top + box.bottom) / 2) / ctm.d
     let k = t.k
-    const scale = currentGraphScale()
-    if (scale < RECENTER_MIN_SCALE) {
-        const f = Math.min(1 / scale, ZOOM_EXTENT[1] / k)
-        // Scale about the canvas centre, where the node now sits.
+    let f = 1
+    if (fit) {
+        const pad = 40
+        const w = Math.max(1, box.right - box.left)
+        const h = Math.max(1, box.bottom - box.top)
+        f = Math.min((right - view.left - 2 * pad) / w, (bottom - view.top - 2 * pad) / h, Math.max(1, 1 / scale))
+    } else if (tooSmall) {
+        f = 1 / scale
+    }
+    f = Math.min(f, ZOOM_EXTENT[1] / k)
+    if (f !== 1) {
+        // Scale about the canvas centre, where the box now sits.
         const ux = (cx - ctm.e) / ctm.a
         const uy = (cy - ctm.f) / ctm.d
         x = ux - f * (ux - x)
@@ -1900,8 +1630,8 @@ export function recenterSelection() {
 
 // Back to the whole graph: no focus, no selection, fitted.
 export function showAll() {
-    if (state.focusedNode) return unfocusNode()
     clearSelection()
+    if (state.focusedNode) return unfocusNode()
     resetGraph()
 }
 
@@ -1933,8 +1663,6 @@ export function syncGraphToolbar() {
     const expanded = groups.filter((g) => state.expandedGroups.has(g)).length
     // Partly expanded (groups toggled one by one) lights neither segment.
     setSeg('groups-ctl', expanded === groups.length ? 'expanded' : expanded === 0 ? 'collapsed' : null)
-    setSeg('datasources-ctl', state.pipelinesOnlyView ? 'hide' : 'show')
-    setSeg('click-mode-ctl', state.clickMode)
 
     const recenter = document.getElementById('recenter-btn')
     if (recenter) {
@@ -1953,10 +1681,14 @@ function getAllGroupNames() {
     return Array.from(groups)
 }
 
+// Lineage view (pipelines and datasources) vs the Pipelines view.
 export function setDatasourcesVisible(show) {
     if (state.pipelinesOnlyView === !show) return
     state.pipelinesOnlyView = !show
-    syncGraphToolbar()
+    // Lineage differs between the two, so a focus cut in one doesn't carry over.
+    clearFocusState()
+    if (state.selectedNode && !getLineageModel().nodes.has(state.selectedNode)) clearSelection()
+    state.pendingFocusReset = true
     updateGraph(true)
 }
 

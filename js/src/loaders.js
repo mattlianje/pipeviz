@@ -1,4 +1,5 @@
-import { state, exampleConfig, clearViewStateCache } from './state.js'
+import { state, clearViewStateCache } from './state.js'
+import { exampleConfig } from './example.js'
 import { renderPipelines, renderDatasources } from './tables.js'
 import { updateFilters } from './filters.js'
 import { renderGraph } from './graph.js'

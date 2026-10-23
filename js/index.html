@@ -1273,7 +1273,6 @@
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
-            .focus-reach,
             .focus-banner-exit {
                 flex-shrink: 0;
             }
@@ -1292,38 +1291,6 @@
             }
             .focus-banner-exit:hover {
                 background: var(--accent-tint);
-            }
-            .focus-reach {
-                display: inline-flex;
-                align-items: stretch;
-                border: 1px solid var(--accent-border);
-                border-radius: var(--radius-sm);
-                overflow: hidden;
-            }
-            .focus-reach-seg {
-                padding: 3px 10px;
-                font-size: 11px;
-                font-weight: 500;
-                line-height: 1.2;
-                font-family: inherit;
-                border: none;
-                cursor: pointer;
-                background: var(--bg-primary);
-                color: var(--accent-hover);
-                transition:
-                    background 0.15s,
-                    color 0.15s;
-            }
-            .focus-reach-seg + .focus-reach-seg {
-                border-left: 1px solid var(--accent-border);
-            }
-            .focus-reach-seg:hover:not(.active) {
-                background: var(--accent-tint);
-            }
-            .focus-reach-seg.active {
-                background: var(--accent-hover);
-                color: var(--bg-primary);
-                cursor: default;
             }
             .lineage-section-label {
                 font-size: 11px;
@@ -1384,6 +1351,287 @@
                 max-height: 300px;
             }
 
+            /* Lineage reach slider, floating under the graph while a node is selected. */
+            .lineage-ctl {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 14px;
+                margin-inline: auto;
+                width: max-content;
+                max-width: calc(100% - 24px);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 5px 6px 5px 14px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 999px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+                font-size: 11px;
+                color: var(--text-muted);
+                user-select: none;
+                z-index: 40;
+            }
+            .lineage-ctl[hidden] {
+                display: none;
+            }
+            .details-col.visible ~ .lineage-ctl {
+                right: 340px;
+            }
+            .lc-label {
+                white-space: nowrap;
+                font-weight: 500;
+            }
+            .lc-label-up {
+                color: #2563eb;
+            }
+            .lc-label-down {
+                color: #ea580c;
+            }
+            .lc-label-off {
+                opacity: 0.45;
+            }
+            .lc-count {
+                color: var(--text-primary);
+                font-weight: 600;
+                font-variant-numeric: tabular-nums;
+            }
+            .lc-track {
+                position: relative;
+                height: 28px;
+                width: calc(var(--n) * 22px);
+                cursor: pointer;
+                touch-action: none;
+                outline: none;
+            }
+            .lc-track[data-dir='up'] {
+                color: #2563eb;
+            }
+            .lc-track[data-dir='down'] {
+                color: #ea580c;
+            }
+            .lc-track-empty {
+                width: auto;
+                height: auto;
+                cursor: default;
+                color: var(--text-muted) !important;
+                font-style: italic;
+            }
+            .lc-rail,
+            .lc-fill {
+                position: absolute;
+                top: 9px;
+                height: 2px;
+                border-radius: 1px;
+            }
+            .lc-rail {
+                left: 0;
+                right: 0;
+                background: var(--border-color);
+            }
+            .lc-fill {
+                width: calc(var(--pos) * 22px);
+                background: currentColor;
+            }
+            .lc-track[data-dir='up'] .lc-fill {
+                right: 0;
+            }
+            .lc-track[data-dir='down'] .lc-fill {
+                left: 0;
+            }
+            .lc-tick {
+                position: absolute;
+                top: 7px;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--border-color);
+            }
+            .lc-track[data-dir='up'] .lc-tick {
+                right: calc(var(--p) * 22px - 3px);
+            }
+            .lc-track[data-dir='down'] .lc-tick {
+                left: calc(var(--p) * 22px - 3px);
+            }
+            .lc-tick.on {
+                background: currentColor;
+            }
+            .lc-tick-label {
+                position: absolute;
+                top: 9px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 9px;
+                color: var(--text-muted);
+            }
+            .lc-handle {
+                position: absolute;
+                top: 4px;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: var(--bg-primary);
+                border: 2px solid currentColor;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+                transition:
+                    left 0.12s,
+                    right 0.12s;
+            }
+            .lc-track[data-dir='up'] .lc-handle {
+                right: calc(var(--pos) * 22px - 6px);
+            }
+            .lc-track[data-dir='down'] .lc-handle {
+                left: calc(var(--pos) * 22px - 6px);
+            }
+            .lc-track.dragging .lc-handle {
+                transition: none;
+            }
+            .lc-track:focus-visible .lc-handle {
+                box-shadow: 0 0 0 3px var(--accent-ring);
+            }
+            .lc-node {
+                flex-shrink: 0;
+                width: 12px;
+                height: 12px;
+                border-radius: 3px;
+                background: #fff3c4;
+                border: 2px solid #111827;
+            }
+            .lc-others {
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                padding-left: 10px;
+                border-left: 1px solid var(--border-color);
+            }
+            .lc-others-label {
+                margin-right: 4px;
+            }
+            .lc-others-btn {
+                padding: 3px 8px;
+                font-size: 11px;
+                font-family: inherit;
+                border: none;
+                border-radius: 999px;
+                cursor: pointer;
+                background: transparent;
+                color: var(--text-muted);
+            }
+            .lc-others-btn:hover:not(.active) {
+                color: var(--text-primary);
+            }
+            .lc-others-btn.active {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                box-shadow: inset 0 0 0 1px var(--border-color);
+                cursor: default;
+            }
+            .lc-focus {
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: 500;
+                font-family: inherit;
+                border: 1px solid var(--border-color);
+                border-radius: 999px;
+                cursor: pointer;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                transition: background 0.15s;
+            }
+            .lc-focus:hover {
+                background: var(--border-color);
+            }
+            .lc-focus.active {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+
+            /* Details panel lineage list, grouped by hop. */
+            .detail-description {
+                font-size: 12px;
+                line-height: 1.45;
+                color: var(--text-primary);
+                margin-bottom: 0.6rem;
+            }
+            .lineage-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.35rem;
+            }
+            .lineage-head .detail-label {
+                margin-bottom: 0;
+            }
+            .lineage-head .lineage-view-toggle {
+                margin-top: 0;
+            }
+            .lineage-dir {
+                margin-bottom: 0.5rem;
+            }
+            .lineage-dir-label {
+                font-size: 11px;
+                font-weight: 600;
+                margin-bottom: 0.2rem;
+            }
+            .lineage-dir-up .lineage-dir-label {
+                color: #2563eb;
+            }
+            .lineage-dir-down .lineage-dir-label {
+                color: #ea580c;
+            }
+            .lineage-hop {
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 2px 0;
+            }
+            .lineage-hop-n {
+                flex: 0 0 14px;
+                padding-top: 3px;
+                text-align: right;
+                font-size: 10px;
+                color: var(--text-muted);
+                font-variant-numeric: tabular-nums;
+            }
+            .lineage-hop-items {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3px;
+                min-width: 0;
+            }
+            .lineage-chip {
+                margin: 0;
+                border: 1px solid transparent;
+                font-family: inherit;
+                text-align: left;
+                word-break: break-all;
+                cursor: pointer;
+            }
+            .lineage-chip:hover {
+                border-color: currentColor;
+            }
+            .lineage-chip-offscreen {
+                opacity: 0.55;
+            }
+            .lineage-more {
+                padding: 2px 0 0 22px;
+                background: none;
+                border: none;
+                font-family: inherit;
+                font-size: 11px;
+                color: var(--accent);
+                cursor: pointer;
+            }
+            .lineage-more:hover {
+                text-decoration: underline;
+            }
+            .lineage-empty {
+                font-size: 12px;
+                color: var(--text-muted);
+            }
+
             /* Zoomed-out level of detail: hide labels, then arrowheads. */
             #graph.lod-far .node text:not([fill]),
             #graph.lod-far .edge text {
@@ -1397,34 +1645,67 @@
                 display: none;
             }
 
-            /* Node highlighting */
+            /* Selection: the node itself, its lineage (blue upstream, orange
+               downstream, fading with each hop), everything else dimmed. */
             .node-highlighted {
-                stroke: #e65100 !important;
-                stroke-width: 4px !important;
-                filter: drop-shadow(0 0 7px rgba(230, 81, 0, 0.7));
+                filter: drop-shadow(0 1px 4px rgba(17, 24, 39, 0.35));
             }
             .node-highlighted polygon,
             .node-highlighted ellipse,
             .node-highlighted path {
-                fill: #ffe0b2 !important;
+                fill: #fff3c4 !important;
+                stroke: #111827 !important;
+                stroke-width: 3px !important;
             }
             .node-highlighted text {
                 font-weight: bold !important;
                 stroke: none !important;
             }
-            .node-highlighted text:not([fill]) {
-                fill: #000;
-            }
-            .node-connected {
-                stroke: #7b1fa2 !important;
-                stroke-width: 1.5px !important;
-            }
-            .node-connected text {
-                font-weight: normal !important;
-                stroke: none !important;
-            }
+            .node-highlighted text:not([fill]),
             .node-connected text:not([fill]) {
                 fill: #000;
+            }
+            .node-connected polygon,
+            .node-connected ellipse,
+            .node-connected path {
+                stroke-width: 2px !important;
+            }
+            .lin-up.hop-1 {
+                --lin: #2563eb;
+            }
+            .lin-up.hop-2 {
+                --lin: #6a95f0;
+            }
+            .lin-up.hop-3 {
+                --lin: #a7c0f6;
+            }
+            .lin-down.hop-1 {
+                --lin: #ea580c;
+            }
+            .lin-down.hop-2 {
+                --lin: #f28b53;
+            }
+            .lin-down.hop-3 {
+                --lin: #f7b998;
+            }
+            .node-connected polygon,
+            .node-connected ellipse,
+            .node-connected path,
+            .edge-highlighted path {
+                stroke: var(--lin) !important;
+            }
+            .edge-highlighted polygon {
+                fill: var(--lin) !important;
+                stroke: var(--lin) !important;
+            }
+            .edge-highlighted.hop-1 path {
+                stroke-width: 2.2px !important;
+            }
+            .edge-highlighted.hop-2 path {
+                stroke-width: 1.8px !important;
+            }
+            .edge-highlighted.hop-3 path {
+                stroke-width: 1.4px !important;
             }
             /* Flat gray dim instead of group opacity: avoids per-group
                offscreen compositing, keeps pan/zoom cheap on big graphs. */
@@ -1438,17 +1719,37 @@
             .node-dimmed text {
                 fill: #c4c4c4 !important;
             }
-            .edge-highlighted path {
-                stroke-width: 2px !important;
-            }
-            .edge-highlighted polygon {
-            }
             .edge-dimmed path {
                 stroke: #dcdcdc !important;
             }
             .edge-dimmed polygon {
                 fill: #dcdcdc !important;
                 stroke: #dcdcdc !important;
+            }
+            /* "Others: Hide" removes off-lineage nodes in place, no re-layout. */
+            .node-hidden,
+            .edge-hidden,
+            .cluster-hidden {
+                display: none;
+            }
+            /* Hover previews a node's own edges, nothing more. */
+            .node-hover polygon,
+            .node-hover ellipse,
+            .node-hover path {
+                stroke-width: 2.5px !important;
+            }
+            .node-hover.node-dimmed polygon,
+            .node-hover.node-dimmed ellipse,
+            .node-hover.node-dimmed path {
+                stroke: #9e9e9e !important;
+            }
+            .edge-hover:not(.edge-highlighted) path {
+                stroke: #333 !important;
+                stroke-width: 1.8px !important;
+            }
+            .edge-hover:not(.edge-highlighted) polygon {
+                fill: #333 !important;
+                stroke: #333 !important;
             }
             .cluster-dimmed > polygon,
             .cluster-dimmed > path {
@@ -2128,10 +2429,29 @@
                 <div class="view-pane active" id="graph-pane">
                     <div class="graph-toolbar">
                         <div class="graph-subview-toggle">
-                            <button class="graph-subtab active" onclick="switchGraphSubview('pipelines')">
+                            <button
+                                class="graph-subtab active"
+                                data-subview="lineage"
+                                onclick="switchGraphSubview('lineage')"
+                                title="Pipelines and the datasources they read and write"
+                            >
+                                Lineage
+                            </button>
+                            <button
+                                class="graph-subtab"
+                                data-subview="pipelines"
+                                onclick="switchGraphSubview('pipelines')"
+                                title="Pipelines only, linked through the data they share"
+                            >
                                 Pipelines
                             </button>
-                            <button class="graph-subtab" onclick="switchGraphSubview('attributes')">Attributes</button>
+                            <button
+                                class="graph-subtab"
+                                data-subview="attributes"
+                                onclick="switchGraphSubview('attributes')"
+                            >
+                                Attributes
+                            </button>
                         </div>
                         <div id="pipeline-toolbar-items" style="display: contents">
                             <div class="search-wrapper">
@@ -2167,52 +2487,9 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="seg-field" id="datasources-ctl">
-                                <span class="seg-label">Datasources</span>
-                                <div class="seg-ctl" role="group" aria-label="Datasources">
-                                    <button
-                                        class="seg-btn"
-                                        data-value="show"
-                                        onclick="setDatasourcesVisible(true)"
-                                        title="Show tables and other datasources between pipelines"
-                                    >
-                                        Show
-                                    </button>
-                                    <button
-                                        class="seg-btn"
-                                        data-value="hide"
-                                        onclick="setDatasourcesVisible(false)"
-                                        title="Show pipelines only, linked directly to each other"
-                                    >
-                                        Hide
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="seg-field" id="click-mode-ctl">
-                                <span class="seg-label">On click</span>
-                                <div class="seg-ctl" role="group" aria-label="What clicking a node does">
-                                    <button
-                                        class="seg-btn"
-                                        data-value="focus"
-                                        onclick="setClickMode('focus')"
-                                        title="Clicking a node filters the graph down to its lineage"
-                                    >
-                                        Focus
-                                    </button>
-                                    <button
-                                        class="seg-btn"
-                                        data-value="highlight"
-                                        onclick="setClickMode('highlight')"
-                                        title="Clicking a node lights up its lineage and keeps the rest visible"
-                                    >
-                                        Highlight
-                                    </button>
-                                </div>
-                            </div>
                             <div class="graph-toolbar-right">
                                 <div id="focus-banner" class="focus-banner" style="display: none">
                                     <span class="focus-banner-text">Focused view</span>
-                                    <span id="focus-reach" class="focus-reach"></span>
                                     <button
                                         class="focus-banner-exit"
                                         onclick="unfocusNode()"
@@ -2287,6 +2564,11 @@
                                             <div>● = Data Source</div>
                                             <div style="color: #ff6b35">▣ = Group</div>
                                             <div>□ = Cluster</div>
+                                            <div style="color: #9e9e9e">┄▸ = Runs after (no shared data)</div>
+                                            <div>
+                                                <span style="color: #2563eb">■</span> upstream ·
+                                                <span style="color: #ea580c">■</span> downstream
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2300,6 +2582,7 @@
                                     <div class="node-details-body" id="details-content"></div>
                                 </div>
                             </div>
+                            <div class="lineage-ctl" id="lineage-ctl" hidden></div>
                         </div>
                     </div>
                     <div class="graph-subview" id="attributes-subview">

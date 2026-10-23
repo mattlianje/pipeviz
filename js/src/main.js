@@ -26,8 +26,9 @@ import {
     generateGraphvizDot,
     focusNode,
     unfocusNode,
-    setFocusReach,
-    setClickMode
+    toggleFocus,
+    toggleHideUnrelated,
+    stepBack
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -70,8 +71,6 @@ window.selectNodeFromHash = selectNodeFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 window.focusNode = focusNode
 window.unfocusNode = unfocusNode
-window.setFocusReach = setFocusReach
-window.setClickMode = setClickMode
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
@@ -164,9 +163,18 @@ document.addEventListener('keydown', (e) => {
         const openModals = document.querySelectorAll('#spec-modal.show, #blast-radius-modal.show')
         openModals.forEach((m) => m.classList.remove('show'))
         if (openModals.length) return
-        // Otherwise Esc on the pipeline graph means "back to everything".
+        // Otherwise Esc on the graph steps back: out of focus, then deselect.
         if (e.target.closest?.('input, textarea, select')) return
-        if (document.getElementById('pipelines-subview')?.offsetParent) showAll()
+        if (document.getElementById('pipelines-subview')?.offsetParent) stepBack()
+    }
+    // F focuses the selected node's lineage (and toggles back); H flips
+    // between dimming and hiding everything else.
+    const key = e.key.toLowerCase()
+    if ((key === 'f' || key === 'h') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.target.closest?.('input, textarea, select, [contenteditable]')) return
+        if (!document.getElementById('pipelines-subview')?.offsetParent) return
+        if (key === 'f') toggleFocus()
+        else toggleHideUnrelated()
     }
 })
 
@@ -183,25 +191,28 @@ window.switchView = function (paneId) {
     if (paneId === 'stats-pane') renderStats()
 }
 
+// Lineage and Pipelines share one graph (with and without datasources);
+// Attributes has its own.
 window.switchGraphSubview = function (subview) {
     document.querySelectorAll('.graph-subview').forEach((s) => s.classList.remove('active'))
-    document.querySelectorAll('.graph-subtab').forEach((b) => b.classList.remove('active'))
+    document.querySelectorAll('.graph-subtab').forEach((b) => {
+        b.classList.toggle('active', b.dataset.subview === subview)
+    })
 
     const pipelineToolbar = document.getElementById('pipeline-toolbar-items')
     const attributeToolbar = document.getElementById('attribute-toolbar-items')
 
     if (subview === 'attributes') {
         document.getElementById('attributes-subview').classList.add('active')
-        document.querySelectorAll('.graph-subtab')[1].classList.add('active')
         pipelineToolbar.style.display = 'none'
         attributeToolbar.style.display = 'contents'
         buildAttributeLineageMap()
         renderAttributeGraph()
     } else {
         document.getElementById('pipelines-subview').classList.add('active')
-        document.querySelectorAll('.graph-subtab')[0].classList.add('active')
         pipelineToolbar.style.display = 'contents'
         attributeToolbar.style.display = 'none'
+        setDatasourcesVisible(subview === 'lineage')
     }
 }
 
