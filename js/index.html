@@ -81,30 +81,55 @@
                 height: 100vh;
                 overflow: hidden;
             }
+            /* Editor docked beside the views; the views shrink to make room. */
+            .workspace {
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                position: relative;
+            }
+            .workspace-views {
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+            }
             .json-panel {
-                position: absolute;
-                top: 52px;
-                left: 8px;
-                bottom: 8px;
-                width: 480px;
-                border: 1px solid var(--border-color);
-                border-radius: 10px;
-                box-shadow: var(--shadow);
+                width: var(--editor-width, 440px);
+                flex-shrink: 0;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
                 background: var(--bg-primary);
-                z-index: 60;
-                transform: translateX(0);
-                transition:
-                    transform 0.25s ease,
-                    opacity 0.25s ease;
-                opacity: 1;
+                animation: json-panel-in 0.18s ease;
             }
-            .json-panel.hidden {
-                transform: translateX(-110%);
-                opacity: 0;
-                box-shadow: none;
+            @keyframes json-panel-in {
+                from {
+                    opacity: 0;
+                    transform: translateX(-12px);
+                }
+            }
+            .json-panel.hidden,
+            .json-panel.hidden + .json-panel-resizer {
+                display: none;
+            }
+            .json-panel-resizer {
+                flex: 0 0 5px;
+                margin-right: -4px;
+                position: relative;
+                z-index: 55;
+                cursor: col-resize;
+                border-left: 1px solid var(--border-color);
+                transition: border-color 0.15s;
+            }
+            .json-panel-resizer:hover,
+            .json-panel-resizer.dragging {
+                border-left: 2px solid var(--accent);
+            }
+            body.resizing-editor {
+                cursor: col-resize;
+                user-select: none;
             }
             /* Panel tabs (JSON / Mermaid / DOT) */
             .json-panel-tabs {
@@ -177,32 +202,166 @@
                 color: var(--text-primary);
                 border-color: var(--text-muted);
             }
-            .json-panel .json-editor {
+            /* Code area: line gutter + textarea over a layer of line highlights.
+               Fixed px line metrics so marks and gutter line up with the text. */
+            .json-code {
+                --code-line: 18px;
+                --code-pad: 10px;
                 flex: 1;
+                min-height: 0;
+                display: flex;
+                background: var(--bg-secondary);
+                position: relative;
+            }
+            .json-code.hidden {
+                display: none;
+            }
+            .json-gutter {
+                flex-shrink: 0;
+                overflow: hidden;
+                padding: var(--code-pad) 8px 0 10px;
+                font-family: Menlo, Consolas, 'Liberation Mono', monospace;
+                font-size: 11px;
+                line-height: var(--code-line);
+                color: var(--text-muted);
+                opacity: 0.6;
+                text-align: right;
+                white-space: pre;
+                user-select: none;
+                border-right: 1px solid var(--border-color);
+                font-variant-numeric: tabular-nums;
+            }
+            .json-code-main {
+                flex: 1;
+                min-width: 0;
+                position: relative;
+            }
+            .json-marks {
+                position: absolute;
+                inset: 0;
+                overflow: hidden;
+                pointer-events: none;
+            }
+            .json-mark {
+                position: absolute;
+                left: 0;
+                right: 0;
+                display: none;
+            }
+            .json-mark.show {
+                display: block;
+            }
+            .json-mark-node {
+                background: var(--accent-tint);
+                border-left: 2px solid var(--accent);
+            }
+            .json-mark-error {
+                height: var(--code-line);
+                background: rgba(220, 53, 69, 0.14);
+                border-left: 2px solid #dc3545;
+            }
+            .json-panel .json-editor {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
                 min-height: 0;
                 resize: none;
                 border: none;
                 border-radius: 0;
-                background: var(--bg-secondary);
-                padding: 0.75rem;
+                background: transparent;
+                padding: var(--code-pad) 12px;
+                line-height: var(--code-line);
+                white-space: pre;
+                overflow: auto;
             }
             .json-panel .json-editor:focus {
                 box-shadow: none;
                 border: none;
+            }
+            .json-goto {
+                position: absolute;
+                right: 10px;
+                z-index: 2;
+                padding: 2px 8px;
+                font-size: 11px;
+                font-family: inherit;
+                font-weight: 500;
+                color: var(--accent-hover);
+                background: var(--bg-primary);
+                border: 1px solid var(--accent-border);
+                border-radius: 999px;
+                box-shadow: var(--shadow);
+                cursor: pointer;
+                max-width: calc(100% - 20px);
+                overflow-wrap: anywhere;
+                text-align: left;
+            }
+            .json-goto:hover {
+                border-color: var(--accent);
+                background: var(--accent-tint);
+            }
+            .json-goto[hidden] {
+                display: none;
             }
             .json-panel-footer {
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 padding: 0 10px;
-                height: 32px;
+                min-height: 32px;
                 border-top: 1px solid var(--border-color);
                 flex-shrink: 0;
                 font-size: 11px;
             }
             .json-panel-footer .json-status {
+                flex: 1;
+                min-width: 0;
                 margin: 0;
                 font-size: 11px;
+                color: var(--text-muted);
+                padding: 6px 0;
+            }
+            .json-status-err {
+                padding: 0;
+                border: none;
+                background: none;
+                font: inherit;
+                color: #dc3545;
+                text-align: left;
+                cursor: pointer;
+                overflow-wrap: anywhere;
+            }
+            .json-status-err:hover {
+                text-decoration: underline;
+            }
+            .json-status-err b {
+                font-weight: 600;
+            }
+
+            /* Window-wide drop target for .json files */
+            .drop-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 200;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                background: rgba(37, 99, 235, 0.08);
+                border: 2px dashed var(--accent);
+                pointer-events: none;
+            }
+            .drop-overlay.show {
+                display: flex;
+            }
+            .drop-overlay span {
+                padding: 10px 18px;
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--accent-hover);
+                background: var(--bg-primary);
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow);
             }
             .json-panel-actions {
                 display: flex;
@@ -235,9 +394,8 @@
                 color: var(--text-muted);
                 font-size: 15px;
                 line-height: 1;
-                padding: 2px 4px;
-                border-radius: 3px;
-                margin-left: 4px;
+                padding: 0 12px;
+                margin-left: auto;
                 transition: color 0.15s;
             }
             .json-panel-close:hover {
@@ -301,6 +459,7 @@
             body.embedded .json-toggle-btn,
             body.embedded .json-toggle-btn + .tab-strip-sep,
             body.embedded #json-panel,
+            body.embedded #json-panel-resizer,
             body.embedded #auth-banner {
                 display: none !important;
             }
@@ -379,6 +538,9 @@
             .json-toggle-btn:hover {
                 color: var(--text-primary);
                 background: var(--bg-secondary);
+            }
+            .json-toggle-btn.active {
+                color: var(--text-primary);
             }
             .json-toggle-icon {
                 font-size: 13px;
@@ -540,9 +702,16 @@
                 background: var(--border-color);
             }
 
+            /* Too narrow to share: the editor covers the views instead. */
             @media (max-width: 768px) {
                 .json-panel {
-                    width: calc(100% - 16px);
+                    position: absolute;
+                    inset: 0;
+                    width: auto;
+                    z-index: 60;
+                }
+                .json-panel-resizer {
+                    display: none;
                 }
             }
 
@@ -620,6 +789,8 @@
                 border-top-color: var(--accent);
                 border-radius: 50%;
                 animation: graph-spin 0.7s linear infinite;
+                /* Composited, so it keeps turning while the main thread is busy rendering. */
+                will-change: transform;
             }
             @keyframes graph-spin {
                 to {
@@ -641,92 +812,23 @@
                 margin-bottom: 0;
             }
 
-            /* Labelled segmented controls: both options visible, current one filled. */
-            .seg-field {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .seg-label {
-                font-size: 11px;
-                color: var(--text-muted);
-                white-space: nowrap;
-            }
-            .seg-ctl {
-                display: inline-flex;
-                border: 1px solid var(--border-color);
-                border-radius: 6px;
-                overflow: hidden;
-                background: var(--bg-secondary);
-            }
-            .seg-btn {
-                padding: 4px 10px;
-                font-size: 12px;
-                font-weight: 500;
-                font-family: inherit;
-                line-height: 1.2;
-                border: none;
-                cursor: pointer;
-                background: transparent;
-                color: var(--text-muted);
-                transition:
-                    background 0.15s,
-                    color 0.15s;
-            }
-            .seg-btn + .seg-btn {
-                border-left: 1px solid var(--border-color);
-            }
-            .seg-btn:hover:not(.active) {
-                background: var(--border-color);
-                color: var(--text-primary);
-            }
-            .seg-btn.active {
-                background: var(--bg-primary);
-                color: var(--text-primary);
-                box-shadow: inset 0 -2px 0 var(--accent);
-                cursor: default;
-            }
-
             .graph-toolbar-right {
                 display: inline-flex;
                 align-items: center;
-                gap: 8px;
+                gap: 14px;
                 margin-left: auto;
-            }
-            .graph-nav {
-                display: inline-flex;
-                gap: 4px;
+                font-size: 12px;
             }
             .graph-nav-btn {
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                padding: 4px 10px;
-                font-size: 12px;
-                font-weight: 500;
-                font-family: inherit;
-                border: 1px solid var(--border-color);
-                border-radius: 6px;
+                padding: 0;
+                font: inherit;
+                border: none;
+                background: none;
                 cursor: pointer;
-                background: var(--bg-secondary);
+                color: var(--text-muted);
+            }
+            .graph-nav-btn:hover {
                 color: var(--text-primary);
-                transition: background 0.15s;
-            }
-            .graph-nav-btn svg {
-                width: 13px;
-                height: 13px;
-                fill: none;
-                stroke: currentColor;
-                stroke-width: 1.5;
-                stroke-linecap: round;
-                stroke-linejoin: round;
-            }
-            .graph-nav-btn:hover:not(:disabled) {
-                background: var(--border-color);
-            }
-            .graph-nav-btn:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
             }
             .graph-ctrl-btn {
                 padding: 5px 12px;
@@ -758,6 +860,20 @@
             .planner-graph svg {
                 width: 100%;
                 height: 100%;
+            }
+            /* Keep the graph out from under the details drawer, so fitting centres it in what's visible. */
+            .graph-row:has(.details-col.visible) #graph svg {
+                width: calc(100% - 340px);
+            }
+            /* Big graphs: dragging would otherwise run text selection over
+               every label, and stroke hit-testing thousands of edge paths on
+               each mousemove (edges have no handlers) stalls hover and pan. */
+            #graph {
+                user-select: none;
+                -webkit-user-select: none;
+            }
+            #graph .edge {
+                pointer-events: none;
             }
             .legend {
                 position: absolute;
@@ -802,22 +918,26 @@
             }
             .node-details-header {
                 display: flex;
-                align-items: center;
+                align-items: flex-start;
                 justify-content: space-between;
+                gap: 8px;
                 padding: 0.6rem 0.75rem;
                 border-bottom: 1px solid var(--border-color);
                 flex-shrink: 0;
             }
+            /* Names wrap in full (at any character, they're often snake_case). */
             .node-details-header h5 {
                 font-size: 13px;
                 font-weight: 600;
+                line-height: 1.35;
                 margin: 0;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                padding-top: 4px;
                 min-width: 0;
+                overflow-wrap: anywhere;
+                user-select: text;
             }
             .node-details-close {
+                flex-shrink: 0;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -1223,6 +1343,7 @@
                 color: var(--accent);
                 border-radius: var(--radius-sm);
                 transition: background 0.1s;
+                overflow-wrap: anywhere;
             }
             .lineage-item:hover,
             .lineage-link:hover {
@@ -1252,78 +1373,32 @@
                 margin-bottom: 1rem;
             }
 
-            /* Tree/JSON toggle */
             .focus-banner {
                 display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                padding: 4px 6px 4px 12px;
-                background: var(--accent-tint);
-                border: 1px solid var(--accent-border);
-                border-radius: var(--radius);
-                font-size: 12px;
-                max-width: min(360px, 28vw);
+                align-items: baseline;
+                gap: 6px;
+                max-width: min(420px, 32vw);
             }
             .focus-banner-text {
-                color: var(--accent-hover);
-                font-weight: 500;
+                color: var(--text-primary);
                 min-width: 0;
-                line-height: 1.35;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
-            .focus-reach,
             .focus-banner-exit {
                 flex-shrink: 0;
-            }
-            .focus-banner-exit {
-                padding: 1px 7px;
+                padding: 0;
+                font: inherit;
                 font-size: 14px;
-                line-height: 1.2;
-                font-weight: 500;
-                font-family: inherit;
-                border: 1px solid var(--accent-border);
-                border-radius: var(--radius-sm);
+                line-height: 1;
+                border: none;
+                background: none;
                 cursor: pointer;
-                background: var(--bg-primary);
-                color: var(--accent-hover);
-                transition: background 0.15s;
+                color: var(--text-muted);
             }
             .focus-banner-exit:hover {
-                background: var(--accent-tint);
-            }
-            .focus-reach {
-                display: inline-flex;
-                align-items: stretch;
-                border: 1px solid var(--accent-border);
-                border-radius: var(--radius-sm);
-                overflow: hidden;
-            }
-            .focus-reach-seg {
-                padding: 3px 10px;
-                font-size: 11px;
-                font-weight: 500;
-                line-height: 1.2;
-                font-family: inherit;
-                border: none;
-                cursor: pointer;
-                background: var(--bg-primary);
-                color: var(--accent-hover);
-                transition:
-                    background 0.15s,
-                    color 0.15s;
-            }
-            .focus-reach-seg + .focus-reach-seg {
-                border-left: 1px solid var(--accent-border);
-            }
-            .focus-reach-seg:hover:not(.active) {
-                background: var(--accent-tint);
-            }
-            .focus-reach-seg.active {
-                background: var(--accent-hover);
-                color: var(--bg-primary);
-                cursor: default;
+                color: var(--text-primary);
             }
             .lineage-section-label {
                 font-size: 11px;
@@ -1384,6 +1459,236 @@
                 max-height: 300px;
             }
 
+            /* Lineage reach slider, floating under the graph while a node is selected. */
+            .lineage-ctl {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 14px;
+                margin-inline: auto;
+                width: max-content;
+                max-width: calc(100% - 24px);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 5px 6px 5px 14px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 999px;
+                font-size: 11px;
+                color: var(--text-muted);
+                user-select: none;
+                z-index: 40;
+            }
+            .lineage-ctl[hidden] {
+                display: none;
+            }
+            .details-col.visible ~ .lineage-ctl {
+                right: 340px;
+            }
+            .lc-label {
+                white-space: nowrap;
+                font-weight: 500;
+            }
+            .lc-label-up {
+                color: #2563eb;
+            }
+            .lc-label-down {
+                color: #ea580c;
+            }
+            .lc-label-off {
+                opacity: 0.45;
+            }
+            .lc-count {
+                color: var(--text-primary);
+                font-weight: 600;
+                font-variant-numeric: tabular-nums;
+            }
+            .lc-track {
+                position: relative;
+                height: 28px;
+                width: calc(var(--n) * 22px);
+                cursor: pointer;
+                touch-action: none;
+                outline: none;
+            }
+            .lc-track[data-dir='up'] {
+                color: #2563eb;
+            }
+            .lc-track[data-dir='down'] {
+                color: #ea580c;
+            }
+            .lc-track-empty {
+                width: auto;
+                height: auto;
+                cursor: default;
+                color: var(--text-muted) !important;
+                font-style: italic;
+            }
+            .lc-rail,
+            .lc-fill {
+                position: absolute;
+                top: 9px;
+                height: 2px;
+                border-radius: 1px;
+            }
+            .lc-rail {
+                left: 0;
+                right: 0;
+                background: var(--border-color);
+            }
+            .lc-fill {
+                width: calc(var(--pos) * 22px);
+                background: currentColor;
+            }
+            .lc-track[data-dir='up'] .lc-fill {
+                right: 0;
+            }
+            .lc-track[data-dir='down'] .lc-fill {
+                left: 0;
+            }
+            .lc-tick {
+                position: absolute;
+                top: 7px;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--border-color);
+            }
+            .lc-track[data-dir='up'] .lc-tick {
+                right: calc(var(--p) * 22px - 3px);
+            }
+            .lc-track[data-dir='down'] .lc-tick {
+                left: calc(var(--p) * 22px - 3px);
+            }
+            .lc-tick.on {
+                background: currentColor;
+            }
+            .lc-tick-label {
+                position: absolute;
+                top: 9px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 9px;
+                color: var(--text-muted);
+            }
+            .lc-handle {
+                position: absolute;
+                top: 4px;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: var(--bg-primary);
+                border: 2px solid currentColor;
+                transition:
+                    left 0.12s,
+                    right 0.12s;
+            }
+            .lc-track[data-dir='up'] .lc-handle {
+                right: calc(var(--pos) * 22px - 6px);
+            }
+            .lc-track[data-dir='down'] .lc-handle {
+                left: calc(var(--pos) * 22px - 6px);
+            }
+            .lc-track.dragging .lc-handle {
+                transition: none;
+            }
+            .lc-track:focus-visible .lc-handle {
+                box-shadow: 0 0 0 3px var(--accent-ring);
+            }
+            .lc-node {
+                flex-shrink: 0;
+                width: 12px;
+                height: 12px;
+                border-radius: 3px;
+                background: #fff3c4;
+                border: 2px solid #111827;
+            }
+
+            /* Details panel lineage list, grouped by hop. */
+            .detail-description {
+                font-size: 12px;
+                line-height: 1.45;
+                color: var(--text-primary);
+                margin-bottom: 0.6rem;
+            }
+            .lineage-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.35rem;
+            }
+            .lineage-head .detail-label {
+                margin-bottom: 0;
+            }
+            .lineage-head .lineage-view-toggle {
+                margin-top: 0;
+            }
+            .lineage-dir {
+                margin-bottom: 0.5rem;
+            }
+            .lineage-dir-label {
+                font-size: 11px;
+                font-weight: 600;
+                margin-bottom: 0.2rem;
+            }
+            .lineage-dir-up .lineage-dir-label {
+                color: #2563eb;
+            }
+            .lineage-dir-down .lineage-dir-label {
+                color: #ea580c;
+            }
+            .lineage-hop {
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 2px 0;
+            }
+            .lineage-hop-n {
+                flex: 0 0 14px;
+                padding-top: 3px;
+                text-align: right;
+                font-size: 10px;
+                color: var(--text-muted);
+                font-variant-numeric: tabular-nums;
+            }
+            .lineage-hop-items {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3px;
+                min-width: 0;
+            }
+            .lineage-chip {
+                margin: 0;
+                border: 1px solid transparent;
+                font-family: inherit;
+                text-align: left;
+                overflow-wrap: anywhere;
+                cursor: pointer;
+            }
+            .lineage-chip:hover {
+                border-color: currentColor;
+            }
+            .lineage-chip-offscreen {
+                opacity: 0.55;
+            }
+            .lineage-more {
+                padding: 2px 0 0 22px;
+                background: none;
+                border: none;
+                font-family: inherit;
+                font-size: 11px;
+                color: var(--accent);
+                cursor: pointer;
+            }
+            .lineage-more:hover {
+                text-decoration: underline;
+            }
+            .lineage-empty {
+                font-size: 12px;
+                color: var(--text-muted);
+            }
+
             /* Zoomed-out level of detail: hide labels, then arrowheads. */
             #graph.lod-far .node text:not([fill]),
             #graph.lod-far .edge text {
@@ -1396,35 +1701,74 @@
             #graph.lod-veryfar .edge polygon {
                 display: none;
             }
+            /* Dashed strokes are by far the costliest thing to raster (seconds
+               per frame with thousands of "run after" edges) and unreadable
+               this far out anyway; their lighter grey still sets them apart. */
+            #graph.lod-far .edge path {
+                stroke-dasharray: none;
+            }
 
-            /* Node highlighting */
+            /* Selection: the node itself, its lineage (blue upstream, orange
+               downstream, fading with each hop), everything else dimmed. */
             .node-highlighted {
-                stroke: #e65100 !important;
-                stroke-width: 4px !important;
-                filter: drop-shadow(0 0 7px rgba(230, 81, 0, 0.7));
+                filter: drop-shadow(0 1px 4px rgba(17, 24, 39, 0.35));
             }
             .node-highlighted polygon,
             .node-highlighted ellipse,
             .node-highlighted path {
-                fill: #ffe0b2 !important;
+                fill: #fff3c4 !important;
+                stroke: #111827 !important;
+                stroke-width: 3px !important;
             }
             .node-highlighted text {
                 font-weight: bold !important;
                 stroke: none !important;
             }
-            .node-highlighted text:not([fill]) {
-                fill: #000;
-            }
-            .node-connected {
-                stroke: #7b1fa2 !important;
-                stroke-width: 1.5px !important;
-            }
-            .node-connected text {
-                font-weight: normal !important;
-                stroke: none !important;
-            }
+            .node-highlighted text:not([fill]),
             .node-connected text:not([fill]) {
                 fill: #000;
+            }
+            .node-connected polygon,
+            .node-connected ellipse,
+            .node-connected path {
+                stroke-width: 2px !important;
+            }
+            .lin-up.hop-1 {
+                --lin: #2563eb;
+            }
+            .lin-up.hop-2 {
+                --lin: #6a95f0;
+            }
+            .lin-up.hop-3 {
+                --lin: #a7c0f6;
+            }
+            .lin-down.hop-1 {
+                --lin: #ea580c;
+            }
+            .lin-down.hop-2 {
+                --lin: #f28b53;
+            }
+            .lin-down.hop-3 {
+                --lin: #f7b998;
+            }
+            .node-connected polygon,
+            .node-connected ellipse,
+            .node-connected path,
+            .edge-highlighted path {
+                stroke: var(--lin) !important;
+            }
+            .edge-highlighted polygon {
+                fill: var(--lin) !important;
+                stroke: var(--lin) !important;
+            }
+            .edge-highlighted.hop-1 path {
+                stroke-width: 2.2px !important;
+            }
+            .edge-highlighted.hop-2 path {
+                stroke-width: 1.8px !important;
+            }
+            .edge-highlighted.hop-3 path {
+                stroke-width: 1.4px !important;
             }
             /* Flat gray dim instead of group opacity: avoids per-group
                offscreen compositing, keeps pan/zoom cheap on big graphs. */
@@ -1438,17 +1782,36 @@
             .node-dimmed text {
                 fill: #c4c4c4 !important;
             }
-            .edge-highlighted path {
-                stroke-width: 2px !important;
-            }
-            .edge-highlighted polygon {
-            }
             .edge-dimmed path {
                 stroke: #dcdcdc !important;
             }
             .edge-dimmed polygon {
                 fill: #dcdcdc !important;
                 stroke: #dcdcdc !important;
+            }
+            /* "Others: Hide" removes off-lineage nodes in place, no re-layout. */
+            .node-hidden,
+            .edge-hidden {
+                display: none;
+            }
+            /* Hover previews a node's own edges, nothing more. */
+            .node-hover polygon,
+            .node-hover ellipse,
+            .node-hover path {
+                stroke-width: 2.5px !important;
+            }
+            .node-hover.node-dimmed polygon,
+            .node-hover.node-dimmed ellipse,
+            .node-hover.node-dimmed path {
+                stroke: #9e9e9e !important;
+            }
+            .edge-hover:not(.edge-highlighted) path {
+                stroke: #333 !important;
+                stroke-width: 1.8px !important;
+            }
+            .edge-hover:not(.edge-highlighted) polygon {
+                fill: #333 !important;
+                stroke: #333 !important;
             }
             .cluster-dimmed > polygon,
             .cluster-dimmed > path {
@@ -2056,43 +2419,6 @@
                         <span class="app-ext">.json</span>
                     </p>
                 </header>
-                <!-- JSON Panel (slide-over from left) -->
-                <div class="json-panel" id="json-panel">
-                    <div class="json-panel-tabs">
-                        <button class="json-panel-tab active" onclick="switchPanelTab('json')">JSON</button>
-                        <button class="json-panel-tab" onclick="switchPanelTab('mermaid')">Mermaid</button>
-                        <button class="json-panel-tab" onclick="switchPanelTab('dot')">DOT</button>
-                    </div>
-                    <textarea class="json-editor" id="json-input" placeholder='{ "pipelines": [...] }'></textarea>
-                    <div class="json-panel-export" id="panel-export-mermaid">
-                        <pre id="panel-mermaid-output"></pre>
-                        <button class="json-panel-copy" onclick="copyPanelExport('mermaid')">Copy</button>
-                    </div>
-                    <div class="json-panel-export" id="panel-export-dot">
-                        <pre id="panel-dot-output"></pre>
-                        <button class="json-panel-copy" onclick="copyPanelExport('dot')">Copy</button>
-                    </div>
-                    <div class="json-panel-footer">
-                        <div class="json-status" id="json-status"></div>
-                        <div class="json-panel-actions">
-                            <button class="json-action" onclick="loadExample()">Example</button>
-                            <span class="json-action-sep">·</span>
-                            <button class="json-action" onclick="formatJson()">Format</button>
-                            <span class="json-action-sep">·</span>
-                            <button class="json-action" onclick="generateShareableUrl()">Share</button>
-                            <span class="json-action-sep">·</span>
-                            <label class="json-action" style="cursor: pointer"
-                                >File<input
-                                    type="file"
-                                    id="file-input"
-                                    accept=".json"
-                                    onchange="loadFromFile(event)"
-                                    style="display: none"
-                            /></label>
-                        </div>
-                        <button class="json-panel-close" onclick="toggleJsonPanel()">&times;</button>
-                    </div>
-                </div>
                 <div class="top-bar">
                     <nav class="tab-strip">
                         <button class="json-toggle-btn" onclick="toggleJsonPanel()" title="Toggle JSON editor (⌘J)">
@@ -2124,324 +2450,337 @@
 
                 <div id="auth-banner"></div>
 
-                <!-- Graph -->
-                <div class="view-pane active" id="graph-pane">
-                    <div class="graph-toolbar">
-                        <div class="graph-subview-toggle">
-                            <button class="graph-subtab active" onclick="switchGraphSubview('pipelines')">
-                                Pipelines
+                <div class="workspace">
+                    <!-- JSON editor, docked left of the views -->
+                    <aside class="json-panel" id="json-panel">
+                        <div class="json-panel-tabs">
+                            <button class="json-panel-tab active" onclick="switchPanelTab('json')">JSON</button>
+                            <button class="json-panel-tab" onclick="switchPanelTab('mermaid')">Mermaid</button>
+                            <button class="json-panel-tab" onclick="switchPanelTab('dot')">DOT</button>
+                            <button class="json-panel-close" onclick="toggleJsonPanel(false)" title="Close editor (⌘J)">
+                                &times;
                             </button>
-                            <button class="graph-subtab" onclick="switchGraphSubview('attributes')">Attributes</button>
                         </div>
-                        <div id="pipeline-toolbar-items" style="display: contents">
-                            <div class="search-wrapper">
-                                <input
-                                    type="text"
-                                    class="search-input"
-                                    id="graph-search"
-                                    placeholder="Search nodes..."
+                        <div class="json-code" id="json-code">
+                            <div class="json-gutter" aria-hidden="true"><div id="json-gutter"></div></div>
+                            <div class="json-code-main">
+                                <div class="json-marks" id="json-marks" aria-hidden="true">
+                                    <div class="json-mark json-mark-node" id="json-mark-node"></div>
+                                    <div class="json-mark json-mark-error" id="json-mark-error"></div>
+                                </div>
+                                <textarea
+                                    class="json-editor"
+                                    id="json-input"
+                                    wrap="off"
+                                    spellcheck="false"
                                     autocomplete="off"
-                                    oninput="searchNodes(event)"
-                                    onkeydown="searchNodes(event)"
-                                />
-                                <div id="graph-search-results" class="search-results-dropdown"></div>
-                            </div>
-                            <div class="seg-field" id="groups-ctl">
-                                <span class="seg-label">Groups</span>
-                                <div class="seg-ctl" role="group" aria-label="Groups">
-                                    <button
-                                        class="seg-btn"
-                                        data-value="expanded"
-                                        onclick="setGroupsExpanded(true)"
-                                        title="Show every pipeline inside its group"
-                                    >
-                                        Expanded
-                                    </button>
-                                    <button
-                                        class="seg-btn"
-                                        data-value="collapsed"
-                                        onclick="setGroupsExpanded(false)"
-                                        title="Fold each group into a single node (double-click a group to open it)"
-                                    >
-                                        Collapsed
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="seg-field" id="datasources-ctl">
-                                <span class="seg-label">Datasources</span>
-                                <div class="seg-ctl" role="group" aria-label="Datasources">
-                                    <button
-                                        class="seg-btn"
-                                        data-value="show"
-                                        onclick="setDatasourcesVisible(true)"
-                                        title="Show tables and other datasources between pipelines"
-                                    >
-                                        Show
-                                    </button>
-                                    <button
-                                        class="seg-btn"
-                                        data-value="hide"
-                                        onclick="setDatasourcesVisible(false)"
-                                        title="Show pipelines only, linked directly to each other"
-                                    >
-                                        Hide
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="seg-field" id="click-mode-ctl">
-                                <span class="seg-label">On click</span>
-                                <div class="seg-ctl" role="group" aria-label="What clicking a node does">
-                                    <button
-                                        class="seg-btn"
-                                        data-value="focus"
-                                        onclick="setClickMode('focus')"
-                                        title="Clicking a node filters the graph down to its lineage"
-                                    >
-                                        Focus
-                                    </button>
-                                    <button
-                                        class="seg-btn"
-                                        data-value="highlight"
-                                        onclick="setClickMode('highlight')"
-                                        title="Clicking a node lights up its lineage and keeps the rest visible"
-                                    >
-                                        Highlight
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="graph-toolbar-right">
-                                <div id="focus-banner" class="focus-banner" style="display: none">
-                                    <span class="focus-banner-text">Focused view</span>
-                                    <span id="focus-reach" class="focus-reach"></span>
-                                    <button
-                                        class="focus-banner-exit"
-                                        onclick="unfocusNode()"
-                                        title="Exit focus"
-                                        aria-label="Exit focus"
-                                    >
-                                        &times;
-                                    </button>
-                                </div>
-                                <div class="graph-nav">
-                                    <button
-                                        class="graph-nav-btn"
-                                        id="recenter-btn"
-                                        onclick="recenterSelection()"
-                                        title="Center and fit the graph (keeps focus and selection)"
-                                    >
-                                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                                            <circle cx="8" cy="8" r="4.5" />
-                                            <circle cx="8" cy="8" r="1" fill="currentColor" />
-                                            <path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" />
-                                        </svg>
-                                        Recenter
-                                    </button>
-                                    <button
-                                        class="graph-nav-btn"
-                                        onclick="showAll()"
-                                        title="Back to the full graph: exit focus, clear selection, fit to screen (Esc)"
-                                    >
-                                        <svg viewBox="0 0 16 16" aria-hidden="true">
-                                            <path
-                                                d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4M1.5 1.5l4 4M14.5 1.5l-4 4M14.5 14.5l-4-4M1.5 14.5l4-4"
-                                            />
-                                        </svg>
-                                        Show all
-                                    </button>
-                                </div>
+                                    placeholder='{ "pipelines": [...] }'
+                                ></textarea>
+                                <button class="json-goto" id="json-goto" hidden></button>
                             </div>
                         </div>
-                        <div id="attribute-toolbar-items" style="display: none">
-                            <div class="search-wrapper">
-                                <input
-                                    type="text"
-                                    class="search-input"
-                                    id="attribute-search"
-                                    placeholder="Search attributes..."
-                                    autocomplete="off"
-                                    oninput="searchAttributes(event)"
-                                    onkeydown="searchAttributes(event)"
-                                />
-                                <div id="attribute-search-results" class="search-results-dropdown"></div>
+                        <div class="json-panel-export" id="panel-export-mermaid">
+                            <pre id="panel-mermaid-output"></pre>
+                            <button class="json-panel-copy" onclick="copyPanelExport('mermaid')">Copy</button>
+                        </div>
+                        <div class="json-panel-export" id="panel-export-dot">
+                            <pre id="panel-dot-output"></pre>
+                            <button class="json-panel-copy" onclick="copyPanelExport('dot')">Copy</button>
+                        </div>
+                        <div class="json-panel-footer">
+                            <div class="json-status" id="json-status"></div>
+                            <div class="json-panel-actions">
+                                <button class="json-action" onclick="loadExample()">Example</button>
+                                <span class="json-action-sep">·</span>
+                                <button class="json-action" onclick="formatJson()" title="Format (⇧⌥F)">Format</button>
+                                <span class="json-action-sep">·</span>
+                                <button class="json-action" onclick="generateShareableUrl()">Share</button>
+                                <span class="json-action-sep">·</span>
+                                <label
+                                    class="json-action"
+                                    style="cursor: pointer"
+                                    title="Open a .json file (or drop one anywhere)"
+                                    >Open<input
+                                        type="file"
+                                        id="file-input"
+                                        accept=".json"
+                                        onchange="loadFromFile(event)"
+                                        style="display: none"
+                                /></label>
                             </div>
                         </div>
-                    </div>
-                    <div class="graph-subview active" id="pipelines-subview">
-                        <div class="graph-row">
-                            <div class="graph-col" id="graph-col">
-                                <div class="graph-container">
-                                    <div id="graph"></div>
-                                    <div class="graph-spinner" id="graph-spinner">
-                                        <div class="graph-spinner-dot"></div>
-                                        <span>Rendering…</span>
+                    </aside>
+                    <div class="json-panel-resizer" id="json-panel-resizer" title="Drag to resize"></div>
+                    <div class="workspace-views">
+                        <!-- Graph -->
+                        <div class="view-pane active" id="graph-pane">
+                            <div class="graph-toolbar">
+                                <div class="graph-subview-toggle">
+                                    <button
+                                        class="graph-subtab active"
+                                        data-subview="lineage"
+                                        onclick="switchGraphSubview('lineage')"
+                                        title="Pipelines and the datasources they read and write"
+                                    >
+                                        Lineage
+                                    </button>
+                                    <button
+                                        class="graph-subtab"
+                                        data-subview="pipelines"
+                                        onclick="switchGraphSubview('pipelines')"
+                                        title="Pipelines only, linked through the data they share"
+                                    >
+                                        Pipelines
+                                    </button>
+                                    <button
+                                        class="graph-subtab"
+                                        data-subview="attributes"
+                                        onclick="switchGraphSubview('attributes')"
+                                    >
+                                        Attributes
+                                    </button>
+                                </div>
+                                <div id="pipeline-toolbar-items" style="display: contents">
+                                    <div class="search-wrapper">
+                                        <input
+                                            type="text"
+                                            class="search-input"
+                                            id="graph-search"
+                                            placeholder="Search nodes..."
+                                            autocomplete="off"
+                                            oninput="searchNodes(event)"
+                                            onkeydown="searchNodes(event)"
+                                        />
+                                        <div id="graph-search-results" class="search-results-dropdown"></div>
                                     </div>
-                                    <div class="legend">
-                                        <div
-                                            class="legend-toggle"
-                                            onclick="this.parentElement.classList.toggle('expanded')"
+                                    <div class="graph-toolbar-right">
+                                        <div id="focus-banner" class="focus-banner" style="display: none">
+                                            <span class="focus-banner-text"></span>
+                                            <button
+                                                class="focus-banner-exit"
+                                                onclick="stepBack()"
+                                                title="Back to the full graph (Esc)"
+                                            >
+                                                &times;
+                                            </button>
+                                        </div>
+                                        <button
+                                            class="graph-nav-btn"
+                                            onclick="resetGraph()"
+                                            title="Fit the whole graph on screen"
                                         >
-                                            Legend
-                                        </div>
-                                        <div class="legend-content">
-                                            <div>■ = Pipeline</div>
-                                            <div>● = Data Source</div>
-                                            <div style="color: #ff6b35">▣ = Group</div>
-                                            <div>□ = Cluster</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="details-col" id="details-col">
-                                <div class="node-details-panel" id="node-details">
-                                    <div class="node-details-header">
-                                        <h5 id="details-title">Details</h5>
-                                        <button class="node-details-close" onclick="clearSelection()">&times;</button>
-                                    </div>
-                                    <div class="node-details-body" id="details-content"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="graph-subview" id="attributes-subview">
-                        <div class="graph-row">
-                            <div class="graph-col" id="attribute-graph-col">
-                                <div class="graph-container">
-                                    <div id="attribute-graph"></div>
-                                    <div class="legend">
-                                        <div
-                                            class="legend-toggle"
-                                            onclick="this.parentElement.classList.toggle('expanded')"
-                                        >
-                                            Legend
-                                        </div>
-                                        <div class="legend-content">
-                                            <div>▢ = Data Source</div>
-                                            <div>· = Attribute</div>
-                                            <div>→ = Derived from</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="details-col" id="attribute-details-col">
-                                <div class="node-details-panel" id="attribute-details-panel">
-                                    <div class="node-details-header">
-                                        <h5>Details</h5>
-                                        <button class="node-details-close" onclick="clearAttributeSelection()">
-                                            &times;
+                                            Fit to screen
                                         </button>
                                     </div>
-                                    <div class="node-details-body" id="attribute-details-content"></div>
+                                </div>
+                                <div id="attribute-toolbar-items" style="display: none">
+                                    <div class="search-wrapper">
+                                        <input
+                                            type="text"
+                                            class="search-input"
+                                            id="attribute-search"
+                                            placeholder="Search attributes..."
+                                            autocomplete="off"
+                                            oninput="searchAttributes(event)"
+                                            onkeydown="searchAttributes(event)"
+                                        />
+                                        <div id="attribute-search-results" class="search-results-dropdown"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="graph-subview active" id="pipelines-subview">
+                                <div class="graph-row">
+                                    <div class="graph-col" id="graph-col">
+                                        <div class="graph-container">
+                                            <div id="graph"></div>
+                                            <!-- Shown from first paint: the page can't be used until the first graph is up. -->
+                                            <div class="graph-spinner show" id="graph-spinner">
+                                                <div class="graph-spinner-dot"></div>
+                                                <span>Loading…</span>
+                                            </div>
+                                            <div class="legend">
+                                                <div
+                                                    class="legend-toggle"
+                                                    onclick="this.parentElement.classList.toggle('expanded')"
+                                                >
+                                                    Legend
+                                                </div>
+                                                <div class="legend-content">
+                                                    <div>■ = Pipeline</div>
+                                                    <div>● = Data Source</div>
+                                                    <div style="color: #ff6b35">▣ = Group</div>
+                                                    <div>□ = Cluster</div>
+                                                    <div style="color: #9e9e9e">┄▸ = Runs after (no shared data)</div>
+                                                    <div>
+                                                        <span style="color: #2563eb">■</span> upstream ·
+                                                        <span style="color: #ea580c">■</span> downstream
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="details-col" id="details-col">
+                                        <div class="node-details-panel" id="node-details">
+                                            <div class="node-details-header">
+                                                <h5 id="details-title">Details</h5>
+                                                <button class="node-details-close" onclick="stepBack()">&times;</button>
+                                            </div>
+                                            <div class="node-details-body" id="details-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="lineage-ctl" id="lineage-ctl" hidden></div>
+                                </div>
+                            </div>
+                            <div class="graph-subview" id="attributes-subview">
+                                <div class="graph-row">
+                                    <div class="graph-col" id="attribute-graph-col">
+                                        <div class="graph-container">
+                                            <div id="attribute-graph"></div>
+                                            <div class="legend">
+                                                <div
+                                                    class="legend-toggle"
+                                                    onclick="this.parentElement.classList.toggle('expanded')"
+                                                >
+                                                    Legend
+                                                </div>
+                                                <div class="legend-content">
+                                                    <div>▢ = Data Source</div>
+                                                    <div>· = Attribute</div>
+                                                    <div>→ = Derived from</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="details-col" id="attribute-details-col">
+                                        <div class="node-details-panel" id="attribute-details-panel">
+                                            <div class="node-details-header">
+                                                <h5>Details</h5>
+                                                <button class="node-details-close" onclick="clearAttributeSelection()">
+                                                    &times;
+                                                </button>
+                                            </div>
+                                            <div class="node-details-body" id="attribute-details-content"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Planner -->
-                <div class="view-pane" id="planner-pane">
-                    <div class="planner-header">
-                        <button class="graph-ctrl-btn" onclick="clearPlannerSelection()">Clear selection</button>
-                    </div>
-                    <div class="planner-body">
-                        <div class="planner-sidebar">
-                            <input
-                                type="text"
-                                class="search-input"
-                                placeholder="Filter pipelines..."
-                                oninput="filterPlannerItems(this.value)"
-                                autocomplete="off"
-                                id="planner-picker-filter"
-                            />
-                            <div class="planner-pipeline-list" id="planner-picker-list"></div>
-                            <div class="planner-sidebar-footer">
-                                <span id="planner-picker-count"></span>
-                                <span id="planner-selected-count"></span>
-                            </div>
-                        </div>
-                        <div class="planner-main">
-                            <div class="planner-graph" id="planner-graph">
-                                <div class="planner-placeholder">Select pipelines to see the execution plan</div>
-                            </div>
-                            <div class="planner-output-wrap">
-                                <button
-                                    class="planner-copy-btn"
-                                    onclick="copyPlannerOutput()"
-                                    title="Copy to clipboard"
-                                >
-                                    <svg
-                                        width="14"
-                                        height="14"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                    >
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                    </svg>
+                        <!-- Planner -->
+                        <div class="view-pane" id="planner-pane">
+                            <div class="planner-header">
+                                <button class="graph-ctrl-btn" onclick="clearPlannerSelection()">
+                                    Clear selection
                                 </button>
-                                <pre class="planner-output" id="planner-output"></pre>
+                            </div>
+                            <div class="planner-body">
+                                <div class="planner-sidebar">
+                                    <input
+                                        type="text"
+                                        class="search-input"
+                                        placeholder="Filter pipelines..."
+                                        oninput="filterPlannerItems(this.value)"
+                                        autocomplete="off"
+                                        id="planner-picker-filter"
+                                    />
+                                    <div class="planner-pipeline-list" id="planner-picker-list"></div>
+                                    <div class="planner-sidebar-footer">
+                                        <span id="planner-picker-count"></span>
+                                        <span id="planner-selected-count"></span>
+                                    </div>
+                                </div>
+                                <div class="planner-main">
+                                    <div class="planner-graph" id="planner-graph">
+                                        <div class="planner-placeholder">
+                                            Select pipelines to see the execution plan
+                                        </div>
+                                    </div>
+                                    <div class="planner-output-wrap">
+                                        <button
+                                            class="planner-copy-btn"
+                                            onclick="copyPlannerOutput()"
+                                            title="Copy to clipboard"
+                                        >
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                            >
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                            </svg>
+                                        </button>
+                                        <pre class="planner-output" id="planner-output"></pre>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Pipelines -->
-                <div class="view-pane" id="pipelines-pane">
-                    <div style="padding: 0.75rem">
-                        <div class="table-toolbar">
-                            <div class="search-wrapper">
-                                <input
-                                    type="text"
-                                    class="search-input"
-                                    id="pipeline-search"
-                                    placeholder="Search pipelines..."
-                                    autocomplete="off"
-                                    oninput="filterPipelines()"
-                                />
+                        <!-- Pipelines -->
+                        <div class="view-pane" id="pipelines-pane">
+                            <div style="padding: 0.75rem">
+                                <div class="table-toolbar">
+                                    <div class="search-wrapper">
+                                        <input
+                                            type="text"
+                                            class="search-input"
+                                            id="pipeline-search"
+                                            placeholder="Search pipelines..."
+                                            autocomplete="off"
+                                            oninput="filterPipelines()"
+                                        />
+                                    </div>
+                                    <div class="filter-bar" id="pipeline-filters"></div>
+                                </div>
+                                <div id="pipelines-table-container">
+                                    <p class="table-empty">Load a configuration to see your pipelines</p>
+                                </div>
                             </div>
-                            <div class="filter-bar" id="pipeline-filters"></div>
                         </div>
-                        <div id="pipelines-table-container">
-                            <p class="table-empty">Load a configuration to see your pipelines</p>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Datasources -->
-                <div class="view-pane" id="datasources-pane">
-                    <div style="padding: 0.75rem">
-                        <div class="table-toolbar">
-                            <div class="search-wrapper">
-                                <input
-                                    type="text"
-                                    class="search-input"
-                                    id="datasource-search"
-                                    placeholder="Search datasources..."
-                                    autocomplete="off"
-                                    oninput="filterDatasources()"
-                                />
+                        <!-- Datasources -->
+                        <div class="view-pane" id="datasources-pane">
+                            <div style="padding: 0.75rem">
+                                <div class="table-toolbar">
+                                    <div class="search-wrapper">
+                                        <input
+                                            type="text"
+                                            class="search-input"
+                                            id="datasource-search"
+                                            placeholder="Search datasources..."
+                                            autocomplete="off"
+                                            oninput="filterDatasources()"
+                                        />
+                                    </div>
+                                    <div class="filter-bar" id="datasource-filters"></div>
+                                </div>
+                                <div id="datasources-table-container">
+                                    <p class="table-empty">Load a configuration to see your datasources</p>
+                                </div>
                             </div>
-                            <div class="filter-bar" id="datasource-filters"></div>
                         </div>
-                        <div id="datasources-table-container">
-                            <p class="table-empty">Load a configuration to see your datasources</p>
+
+                        <!-- Stats -->
+                        <div class="view-pane" id="stats-pane">
+                            <div style="padding: 0.75rem">
+                                <div id="stats-content"></div>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Stats -->
-                <div class="view-pane" id="stats-pane">
-                    <div style="padding: 0.75rem">
-                        <div id="stats-content"></div>
+                        <!-- docs pane removed -->
                     </div>
+                    <!-- end workspace-views -->
                 </div>
-
-                <!-- docs pane removed -->
+                <!-- end workspace -->
             </div>
             <!-- end main-area -->
         </div>
         <!-- end app-layout -->
+
+        <div class="drop-overlay" id="drop-overlay"><span>Drop a .json file to load it</span></div>
 
         <!-- Blast Radius Modal -->
         <div class="modal" id="blast-radius-modal">

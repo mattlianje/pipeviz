@@ -12,9 +12,7 @@ import { filterPipelines, filterDatasources } from './filters.js'
 import {
     clearSelection,
     resetGraph,
-    recenterSelection,
     showAll,
-    setGroupsExpanded,
     toggleGroup,
     setDatasourcesVisible,
     searchNodes,
@@ -25,9 +23,7 @@ import {
     hideBlastRadiusModal,
     generateGraphvizDot,
     focusNode,
-    unfocusNode,
-    setFocusReach,
-    setClickMode
+    stepBack
 } from './graph.js'
 import {
     clearAttributeSelection,
@@ -47,6 +43,7 @@ import {
     generateMermaidExport
 } from './export.js'
 import { renderStats } from './stats.js'
+import { setupEditor, toggleJsonPanel } from './editor.js'
 
 window.loadExample = loadExample
 window.loadFromFile = loadFromFile
@@ -57,9 +54,7 @@ window.filterPipelines = filterPipelines
 window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection
 window.resetGraph = resetGraph
-window.recenterSelection = recenterSelection
 window.showAll = showAll
-window.setGroupsExpanded = setGroupsExpanded
 window.toggleGroup = toggleGroup
 window.setDatasourcesVisible = setDatasourcesVisible
 window.searchNodes = searchNodes
@@ -69,9 +64,7 @@ window.hideBlastRadiusModal = hideBlastRadiusModal
 window.selectNodeFromHash = selectNodeFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 window.focusNode = focusNode
-window.unfocusNode = unfocusNode
-window.setFocusReach = setFocusReach
-window.setClickMode = setClickMode
+window.stepBack = stepBack
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
@@ -91,21 +84,7 @@ window.toggleSpecModal = function () {
     modal.classList.toggle('show')
 }
 
-window.toggleJsonPanel = function () {
-    document.getElementById('json-panel').classList.toggle('hidden')
-}
-
-document.addEventListener(
-    'pointerdown',
-    function (e) {
-        const panel = document.getElementById('json-panel')
-        if (!panel || panel.classList.contains('hidden')) return
-        if (panel.contains(e.target)) return
-        if (e.target.closest('.json-panel-handle')) return
-        panel.classList.add('hidden')
-    },
-    true
-)
+window.toggleJsonPanel = toggleJsonPanel
 
 window.switchPanelTab = function (tab) {
     // Update tab buttons
@@ -113,12 +92,12 @@ window.switchPanelTab = function (tab) {
     document.querySelector(`.json-panel-tab[onclick*="${tab}"]`)?.classList.add('active')
 
     // Show/hide content areas
-    const editor = document.getElementById('json-input')
+    const editor = document.getElementById('json-code')
     const mermaidPane = document.getElementById('panel-export-mermaid')
     const dotPane = document.getElementById('panel-export-dot')
     const footer = document.querySelector('.json-panel-footer')
 
-    editor.style.display = tab === 'json' ? '' : 'none'
+    editor.classList.toggle('hidden', tab !== 'json')
     mermaidPane.classList.toggle('active', tab === 'mermaid')
     dotPane.classList.toggle('active', tab === 'dot')
     footer.style.display = tab === 'json' ? '' : 'none'
@@ -156,17 +135,12 @@ document.addEventListener('keydown', (e) => {
         window.toggleJsonPanel()
     }
     if (e.key === 'Escape') {
-        const jsonPanel = document.getElementById('json-panel')
-        if (jsonPanel && !jsonPanel.classList.contains('hidden')) {
-            jsonPanel.classList.add('hidden')
-            return
-        }
         const openModals = document.querySelectorAll('#spec-modal.show, #blast-radius-modal.show')
         openModals.forEach((m) => m.classList.remove('show'))
         if (openModals.length) return
-        // Otherwise Esc on the pipeline graph means "back to everything".
+        // Otherwise Esc on the graph goes back to the full graph.
         if (e.target.closest?.('input, textarea, select')) return
-        if (document.getElementById('pipelines-subview')?.offsetParent) showAll()
+        if (document.getElementById('pipelines-subview')?.offsetParent) stepBack()
     }
 })
 
@@ -183,25 +157,28 @@ window.switchView = function (paneId) {
     if (paneId === 'stats-pane') renderStats()
 }
 
+// Lineage and Pipelines share one graph (with and without datasources);
+// Attributes has its own.
 window.switchGraphSubview = function (subview) {
     document.querySelectorAll('.graph-subview').forEach((s) => s.classList.remove('active'))
-    document.querySelectorAll('.graph-subtab').forEach((b) => b.classList.remove('active'))
+    document.querySelectorAll('.graph-subtab').forEach((b) => {
+        b.classList.toggle('active', b.dataset.subview === subview)
+    })
 
     const pipelineToolbar = document.getElementById('pipeline-toolbar-items')
     const attributeToolbar = document.getElementById('attribute-toolbar-items')
 
     if (subview === 'attributes') {
         document.getElementById('attributes-subview').classList.add('active')
-        document.querySelectorAll('.graph-subtab')[1].classList.add('active')
         pipelineToolbar.style.display = 'none'
         attributeToolbar.style.display = 'contents'
         buildAttributeLineageMap()
         renderAttributeGraph()
     } else {
         document.getElementById('pipelines-subview').classList.add('active')
-        document.querySelectorAll('.graph-subtab')[0].classList.add('active')
         pipelineToolbar.style.display = 'contents'
         attributeToolbar.style.display = 'none'
+        setDatasourcesVisible(subview === 'lineage')
     }
 }
 
@@ -233,6 +210,7 @@ window.addEventListener('load', () => {
     if (new URLSearchParams(window.location.search).get('embed') === '1') {
         document.body.classList.add('embedded')
     }
+    setupEditor()
     setupDragDrop()
     setupAutoProcess()
     loadFromUrl()
