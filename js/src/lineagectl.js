@@ -7,7 +7,7 @@ import { escapeHtml } from './escape.js'
 const STEP = 22 // px between stops
 const MAX_STOPS = 8 // past this, the last stop is "all"
 
-let current = null // { name, maxUp, maxDown, onReach, onFocus }
+let current = null // { name, maxUp, maxDown, onReach }
 
 // Stops are positions 0..n out from the node; 0 = none, n = all.
 function stopCount(max) {
@@ -50,13 +50,7 @@ function build(root, info) {
         ${trackHtml('up', info.maxUp)}
         <span class="lc-node" title="${escapeHtml(info.name)}"></span>
         ${trackHtml('down', info.maxDown)}
-        <span class="lc-label lc-label-down">Downstream <span class="lc-count" data-dir="down"></span></span>
-        <span class="lc-others" role="group" aria-label="Nodes outside this lineage" title="Nodes outside this lineage (H)">
-            <span class="lc-others-label">Others</span>
-            <button class="lc-others-btn" data-hide="false">Dim</button>
-            <button class="lc-others-btn" data-hide="true">Hide</button>
-        </span>
-        <button class="lc-focus" title="Re-lay out just this lineage (F, or double-click the node)"></button>`
+        <span class="lc-label lc-label-down">Downstream <span class="lc-count" data-dir="down"></span></span>`
 
     root.querySelectorAll('.lc-track[role="slider"]').forEach((track) => {
         const dir = track.dataset.dir
@@ -101,11 +95,6 @@ function build(root, info) {
             e.preventDefault()
         })
     })
-
-    root.querySelector('.lc-focus').addEventListener('click', () => current.onFocus())
-    root.querySelectorAll('.lc-others-btn').forEach((btn) => {
-        btn.addEventListener('click', () => current.onHide(btn.dataset.hide === 'true'))
-    })
 }
 
 // `info` null hides the control.
@@ -139,14 +128,4 @@ export function updateLineageControl(info) {
         track.setAttribute('aria-valuetext', valueText(value, max))
         track.querySelectorAll('.lc-tick').forEach((t, i) => t.classList.toggle('on', i + 1 <= pos))
     }
-
-    root.querySelectorAll('.lc-others-btn').forEach((btn) => {
-        const on = (btn.dataset.hide === 'true') === info.hiding
-        btn.classList.toggle('active', on)
-        btn.setAttribute('aria-pressed', on)
-    })
-
-    const focus = root.querySelector('.lc-focus')
-    focus.textContent = info.focused ? 'Unfocus' : 'Focus'
-    focus.classList.toggle('active', info.focused)
 }

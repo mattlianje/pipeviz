@@ -11,7 +11,7 @@ import {
 } from './tabs.js'
 import { formatSchedule } from './cron.js'
 import { escapeHtml, jsArg, safeUrl, escapeDot } from './escape.js'
-import { getLineageModel, litLineage } from './lineage.js'
+import { getLineageModel, lineageHops, litLineage } from './lineage.js'
 import { updateLineageControl } from './lineagectl.js'
 
 let blastRadiusGraphInstance = null
@@ -41,7 +41,6 @@ export function generateGraphvizDot() {
 
     let pipelines = state.currentConfig.pipelines || []
     const datasources = state.currentConfig.datasources || []
-    const explicitClusters = state.currentConfig.clusters || []
 
     if (state.groupedView) {
         const groups = new Map()
@@ -118,38 +117,6 @@ export function generateGraphvizDot() {
         }
     }
 
-    const allClusterNames = new Set()
-    pipelines.forEach((p) => {
-        if (p.cluster) allClusterNames.add(p.cluster)
-    })
-    allDataSources.forEach((ds) => {
-        if (ds.cluster) allClusterNames.add(ds.cluster)
-    })
-
-    const clusterDefinitions = new Map()
-    const clusterHierarchy = new Map() // child -> parent
-    const clusterChildren = new Map() // parent -> [children]
-
-    explicitClusters.forEach((cluster) => {
-        clusterDefinitions.set(cluster.name, cluster)
-        allClusterNames.add(cluster.name)
-
-        if (cluster.parent) {
-            clusterHierarchy.set(cluster.name, cluster.parent)
-            if (!clusterChildren.has(cluster.parent)) {
-                clusterChildren.set(cluster.parent, [])
-            }
-            clusterChildren.get(cluster.parent).push(cluster.name)
-            allClusterNames.add(cluster.parent)
-        }
-    })
-
-    allClusterNames.forEach((name) => {
-        if (!clusterDefinitions.has(name)) {
-            clusterDefinitions.set(name, { name, description: `Auto-generated cluster: ${name}` })
-        }
-    })
-
     let dot = `digraph PipevizGraph {
     rankdir=LR;
     bgcolor="transparent";
@@ -158,155 +125,56 @@ export function generateGraphvizDot() {
 
 `
 
-    const clusterColors = [
-        '#1976d2',
-        '#7b1fa2',
-        '#388e3c',
-        '#f57c00',
-        '#d32f2f',
-        '#1976d2',
-        '#616161',
-        '#c2185b',
-        '#303f9f',
-        '#f57c00'
-    ]
-
-    const nodesByCluster = new Map()
-
-    pipelines.forEach((pipeline) => {
-        const cluster = pipeline.cluster || '_unclustered'
-        if (!nodesByCluster.has(cluster)) {
-            nodesByCluster.set(cluster, [])
-        }
-        nodesByCluster.get(cluster).push({ type: 'pipeline', node: pipeline })
-    })
-
-    // The Pipelines view draws no datasources; don't let them hold clusters open.
+    // The Pipelines view draws no datasources.
     if (state.pipelinesOnlyView) allDataSources.clear()
 
-    allDataSources.forEach((ds) => {
-        const cluster = ds.cluster || '_unclustered'
-        if (!nodesByCluster.has(cluster)) {
-            nodesByCluster.set(cluster, [])
-        }
-        nodesByCluster.get(cluster).push({ type: 'datasource', node: ds })
-    })
-
-    // Recurse into descendants: skipping a cluster whose nodes live only in
-    // grandchildren leaves edges to undeclared nodes (drawn as bare circles).
-    function clusterHasNodes(name) {
-        return nodesByCluster.get(name)?.length > 0 || (clusterChildren.get(name) || []).some(clusterHasNodes)
-    }
-
-    const rootClusters = []
-    clusterDefinitions.forEach((cluster, name) => {
-        if (!clusterHierarchy.has(name) && clusterHasNodes(name)) {
-            rootClusters.push(name)
-        }
-    })
-
-    let colorIndex = 0
-
-    function renderCluster(clusterName, depth = 0) {
-        const cluster = clusterDefinitions.get(clusterName)
-        if (!cluster) return ''
-
-        if (!clusterHasNodes(clusterName)) return ''
-
-        const nodesInCluster = nodesByCluster.get(clusterName) || []
-        const children = clusterChildren.get(clusterName) || []
-
-        const clusterColor = clusterColors[colorIndex % clusterColors.length]
-        colorIndex++
-
-        let result = `${'    '.repeat(depth + 1)}subgraph cluster_${clusterName.replace(/[^a-zA-Z0-9]/g, '_')} {
-${'    '.repeat(depth + 2)}label="${escapeDot(clusterName)}";
-${'    '.repeat(depth + 2)}style="dotted";
-${'    '.repeat(depth + 2)}color="#666666";
-${'    '.repeat(depth + 2)}fontsize=11;
-${'    '.repeat(depth + 2)}fontname="Arial";
-
-`
-
-        nodesInCluster.forEach((item) => {
-            if (item.type === 'pipeline') {
-                const pipeline = item.node
-                const isGroup = pipeline._isGroup
-                const memberCount = pipeline._members?.length || 0
-                const scheduleDisplay = formatSchedule(pipeline.schedule)
-                const label = isGroup
-                    ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
-                    : scheduleDisplay
-                      ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${escapeHtml(scheduleDisplay)}</I></FONT>>`
-                      : `"${escapeDot(pipeline.name)}"`
-                const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
-                const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
-                const shape = isGroup ? 'box3d' : 'box'
-                const style = isGroup ? 'filled' : 'filled,rounded'
-                const penWidth = isGroup ? '2' : '1'
-                result += `${'    '.repeat(depth + 2)}"${escapeDot(pipeline.name)}" [shape=${shape}, style="${style}",
-${'    '.repeat(depth + 3)}fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
-${'    '.repeat(depth + 3)}fontname="Arial",
-${'    '.repeat(depth + 3)}label=${label}];
-`
-            } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
-                const ds = item.node
-                result += `${'    '.repeat(depth + 2)}"${escapeDot(ds.name)}" [shape=ellipse, style=filled,
-${'    '.repeat(depth + 3)}fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
-${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
-`
-            }
-        })
-
-        children.forEach((childName) => {
-            result += renderCluster(childName, depth + 1)
-        })
-
-        result += `${'    '.repeat(depth + 1)}}
-
-`
-        return result
-    }
-
-    rootClusters.forEach((clusterName) => {
-        dot += renderCluster(clusterName)
-    })
-
-    const unclusteredNodes = nodesByCluster.get('_unclustered') || []
-    unclusteredNodes.forEach((item) => {
-        if (item.type === 'pipeline') {
-            const pipeline = item.node
-            const isGroup = pipeline._isGroup
-            const memberCount = pipeline._members?.length || 0
-            const scheduleDisplay = formatSchedule(pipeline.schedule)
-            const label = isGroup
-                ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
-                : scheduleDisplay
-                  ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${escapeHtml(scheduleDisplay)}</I></FONT>>`
-                  : `"${escapeDot(pipeline.name)}"`
-            const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
-            const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
-            const shape = isGroup ? 'box3d' : 'box'
-            const style = isGroup ? 'filled' : 'filled,rounded'
-            const penWidth = isGroup ? '2' : '1'
-            dot += `    "${escapeDot(pipeline.name)}" [shape=${shape}, style="${style}",
+    pipelines.forEach((pipeline) => {
+        const isGroup = pipeline._isGroup
+        const memberCount = pipeline._members?.length || 0
+        const scheduleDisplay = formatSchedule(pipeline.schedule)
+        const label = isGroup
+            ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#666">(${memberCount} pipelines)</FONT>>`
+            : scheduleDisplay
+              ? `<${escapeHtml(pipeline.name)}<BR/><FONT POINT-SIZE="9" COLOR="#d63384"><I>${escapeHtml(scheduleDisplay)}</I></FONT>>`
+              : `"${escapeDot(pipeline.name)}"`
+        const fillColor = isGroup ? nodeColors.group.fill : nodeColors.pipeline.fill
+        const borderColor = isGroup ? nodeColors.group.border : nodeColors.pipeline.border
+        const shape = isGroup ? 'box3d' : 'box'
+        const style = isGroup ? 'filled' : 'filled,rounded'
+        const penWidth = isGroup ? '2' : '1'
+        dot += `    "${escapeDot(pipeline.name)}" [shape=${shape}, style="${style}",
         fillcolor="${fillColor}", color="${borderColor}", penwidth=${penWidth},
         fontname="Arial",
         label=${label}];
 `
-        } else if (item.type === 'datasource' && !state.pipelinesOnlyView) {
-            const ds = item.node
-            dot += `    "${escapeDot(ds.name)}" [shape=ellipse, style=filled,
+    })
+
+    allDataSources.forEach((ds) => {
+        dot += `    "${escapeDot(ds.name)}" [shape=ellipse, style=filled,
         fillcolor="${nodeColors.datasource.fill}", color="${nodeColors.datasource.border}",
         fontname="Arial", fontsize=10];
 `
-        }
     })
 
     // Edges come from the same model lineage walks, so what's lit always matches
     // what's drawn. Only emit edges between drawn nodes; otherwise Graphviz
     // auto-creates the node, resurrecting off-path datasources when focused.
     const drawn = new Set([...pipelines.map((p) => p.name), ...allDataSources.keys()])
+
+    // Focused: place upstream left and downstream right of the focus. Collapsed
+    // groups can be both (cycles), and Graphviz breaks cycles arbitrarily, so
+    // edges pointing backward along -hops..0..+hops don't constrain ranking.
+    const focusPos = new Map()
+    if (state.focusedNode) {
+        const { up, down } = lineageHops(state.focusedNode)
+        up.forEach((h, n) => focusPos.set(n, -h))
+        down.forEach((h, n) => {
+            if (!up.has(n) || h < up.get(n)) focusPos.set(n, h)
+        })
+        focusPos.set(state.focusedNode, 0)
+    }
+    const isBackward = (from, to) => focusPos.has(from) && focusPos.has(to) && focusPos.get(from) > focusPos.get(to)
+
     dot += '\n'
     getLineageModel().edges.forEach(({ from, to, kind }) => {
         if (!drawn.has(from) || !drawn.has(to)) return
@@ -314,7 +182,8 @@ ${'    '.repeat(depth + 3)}fontname="Arial", fontsize=10];
             kind === 'explicit'
                 ? `color="${explicitEdgeColor}", style="dashed", arrowsize=0.7`
                 : `color="${edgeColor}", arrowsize=0.8`
-        dot += `    "${escapeDot(from)}" -> "${escapeDot(to)}" [${style}];\n`
+        const constraint = isBackward(from, to) ? ', constraint=false' : ''
+        dot += `    "${escapeDot(from)}" -> "${escapeDot(to)}" [${style}${constraint}];\n`
     })
 
     const nodeCount = pipelines.length + allDataSources.size
@@ -429,8 +298,15 @@ function recreateGraphviz() {
     createGraphviz(el)
 }
 
-function setGraphSpinner(show) {
-    document.getElementById('graph-spinner')?.classList.toggle('show', show)
+let spinnerToken = 0
+// Hiding waits for a painted frame: a big SVG's first paint can block for a
+// while after it's in the DOM.
+export function setGraphSpinner(show) {
+    const el = document.getElementById('graph-spinner')
+    if (!el) return
+    const token = ++spinnerToken
+    if (show) return el.classList.add('show')
+    requestAnimationFrame(() => requestAnimationFrame(() => token === spinnerToken && el.classList.remove('show')))
 }
 
 // Shared tail of the layout path and the cached-SVG restore path.
@@ -440,7 +316,6 @@ function finishRender(restored) {
 
     applyCriticalPathHighlighting()
     if (state.showCostLabels) showCostLabels()
-    syncGraphToolbar()
 
     // Fit here rather than on a timer, otherwise d3-graphviz keeps the previous
     // transform and focused subgraphs land off-center.
@@ -452,12 +327,11 @@ function finishRender(restored) {
     if (state.selectedNode) {
         refreshSelection()
         renderDetailsLineage()
-        revealLineage()
     } else {
         selectNodeFromHash()
     }
 
-    if (!flushPendingUpdate()) setTimeout(precomputeAdjacentStates, 100)
+    flushPendingUpdate()
 }
 
 // graphviz's zoom is bound to the SVG it rendered, so a restored SVG needs its
@@ -572,7 +446,8 @@ function currentGraphScale() {
 function applyLodClass() {
     const graphEl = document.getElementById('graph')
     if (!graphEl) return
-    const s = currentGraphScale()
+    // A focused view is small enough to read whole, so it keeps every label.
+    const s = state.focusedNode ? Infinity : currentGraphScale()
     graphEl.classList.toggle('lod-far', s < 0.32)
     graphEl.classList.toggle('lod-veryfar', s < 0.18)
 }
@@ -582,7 +457,7 @@ function applyLodClass() {
 function presetLodForPaint(nodeCount) {
     const graphEl = document.getElementById('graph')
     if (!graphEl) return
-    const big = nodeCount > BIG_GRAPH_THRESHOLD
+    const big = !state.focusedNode && nodeCount > BIG_GRAPH_THRESHOLD
     graphEl.classList.toggle('lod-far', big)
     graphEl.classList.toggle('lod-veryfar', big)
 }
@@ -644,60 +519,6 @@ function applyCriticalPathHighlighting() {
         })
 }
 
-function precomputeAdjacentStates() {
-    if (!state.currentConfig?.pipelines) return
-
-    const groupNames = []
-    state.currentConfig.pipelines.forEach((p) => {
-        if (p.group && !groupNames.includes(p.group)) groupNames.push(p.group)
-    })
-
-    const currentExpanded = new Set(state.expandedGroups)
-
-    const bulkStates = [new Set(), new Set(groupNames)]
-    bulkStates.forEach((bulkExpanded) => {
-        const bulkKey = getViewStateKey(bulkExpanded, '')
-        if (!state.viewStateCache.has(bulkKey)) {
-            const savedExpanded = state.expandedGroups
-            state.expandedGroups = bulkExpanded
-            const bulkDot = generateGraphvizDot()
-            state.expandedGroups = savedExpanded
-            addToViewCache(bulkKey, { dot: bulkDot })
-        }
-    })
-
-    let index = 0
-    function processNext() {
-        if (index >= groupNames.length) return
-
-        const groupName = groupNames[index++]
-        const wasExpanded = currentExpanded.has(groupName)
-
-        const altExpanded = new Set(currentExpanded)
-        if (wasExpanded) {
-            altExpanded.delete(groupName)
-        } else {
-            altExpanded.add(groupName)
-        }
-
-        const altKey = getViewStateKey(altExpanded, '')
-
-        if (!state.viewStateCache.has(altKey)) {
-            const savedExpanded = state.expandedGroups
-            state.expandedGroups = altExpanded
-            const altDot = generateGraphvizDot()
-            state.expandedGroups = savedExpanded
-            addToViewCache(altKey, { dot: altDot })
-        }
-
-        if (index < groupNames.length) {
-            setTimeout(processNext, 10)
-        }
-    }
-
-    processNext()
-}
-
 // On-screen node name -> its <g>, and each drawn edge with its endpoints.
 // Rebuilt after every render.
 let nodeEls = new Map()
@@ -741,8 +562,8 @@ export function setupGraphInteractivity() {
         ;(incident.get(nodeName) || []).forEach((e) => e.classList.toggle('edge-hover', on))
     }
 
-    // Click selects in place; double-click focuses, or opens a group. Group-node
-    // clicks are delayed so a double-click doesn't also select.
+    // Click focuses the node's lineage; double-click opens a group. Group-node
+    // clicks are delayed so a double-click doesn't also focus.
     let nodeClickTimer = null
     d3.select('#graph')
         .selectAll('.node')
@@ -750,16 +571,15 @@ export function setupGraphInteractivity() {
         .on('click', function (event) {
             event.stopPropagation()
             const nodeName = d3.select(this).select('title').text()
-            if (!isGroupNode(nodeName)) return selectNode(nodeName)
+            if (!isGroupNode(nodeName)) return focusNode(nodeName)
             clearTimeout(nodeClickTimer)
-            nodeClickTimer = setTimeout(() => selectNode(nodeName), 220)
+            nodeClickTimer = setTimeout(() => focusNode(nodeName), 220)
         })
         .on('dblclick', function (event) {
             event.stopPropagation()
             clearTimeout(nodeClickTimer)
             const nodeName = d3.select(this).select('title').text()
             if (isGroupNode(nodeName)) toggleGroup(nodeName)
-            else toggleFocus(nodeName)
         })
         // Hover just previews the node's own edges; details live in the panel.
         .on('mouseenter', function () {
@@ -769,11 +589,11 @@ export function setupGraphInteractivity() {
             setHover(this, false)
         })
 
-    // Clicking empty canvas (not the end of a pan) clears the selection.
+    // Clicking empty canvas (not the end of a pan) goes back to the full graph.
     d3.select('#graph').on('click', function (event) {
         if (event.target.closest('.node')) return
         if (Math.abs(event.clientX - bgClickDownX) > 4 || Math.abs(event.clientY - bgClickDownY) > 4) return
-        clearSelection()
+        stepBack()
     })
 
     restoreBlastRadiusFromHash()
@@ -782,7 +602,7 @@ export function setupGraphInteractivity() {
 export function selectNodeFromHash() {
     const nodeName = getNodeFromHash()
     if (!nodeName || nodeName === state.selectedNode) return
-    if (nodeEls.has(nodeName)) selectNode(nodeName)
+    if (nodeEls.has(nodeName)) focusNode(nodeName)
     else if (state.currentConfig) showNodeDetails(nodeName)
 }
 
@@ -793,36 +613,21 @@ export function restoreBlastRadiusFromHash() {
     }
 }
 
-export function selectNode(nodeName) {
-    state.selectedNode = nodeName
-    updateHashWithNode(nodeName)
-    refreshSelection()
-    showNodeDetails(nodeName)
-    syncGraphToolbar()
-    revealLineage()
-}
-
 const hopClass = (h) => `hop-${Math.min(h, 3)}`
 
-// Off-lineage nodes are dimmed, or hidden in place. Big graphs default to
-// hiding, since a sea of grey doesn't help there; an explicit choice sticks.
-const hidingOthers = () => state.hideUnrelated ?? nodeEls.size > BIG_GRAPH_THRESHOLD
-
 // Light the selection's lineage within the current reach, upstream and
-// downstream told apart, fading with distance; dim or hide everything else.
+// downstream told apart, fading with distance; hide anything else (only
+// briefly drawn, while a narrowed reach waits to be re-focused).
 function refreshSelection() {
     clearHighlights()
     const name = state.selectedNode
     if (name && nodeEls.has(name)) {
         const { up, down } = litLineage(name)
-        const hide = hidingOthers()
-        const offNode = hide ? 'node-hidden' : 'node-dimmed'
-        const offEdge = hide ? 'edge-hidden' : 'edge-dimmed'
         for (const [n, el] of nodeEls) {
             if (n === name) el.classList.add('node-highlighted')
             else if (up.has(n)) el.classList.add('node-connected', 'lin-up', hopClass(up.get(n)))
             else if (down.has(n)) el.classList.add('node-connected', 'lin-down', hopClass(down.get(n)))
-            else el.classList.add(offNode)
+            else el.classList.add('node-hidden')
         }
         for (const { el, from, to } of edgeEls) {
             if (up.has(from) && (to === name || up.has(to))) {
@@ -830,56 +635,11 @@ function refreshSelection() {
             } else if (down.has(to) && (from === name || down.has(from))) {
                 el.classList.add('edge-highlighted', 'lin-down', hopClass(down.get(to)))
             } else {
-                el.classList.add(offEdge)
+                el.classList.add('edge-hidden')
             }
         }
-        if (hide) hideEmptyClusters()
     }
     syncLineageControl()
-}
-
-// Cluster boxes don't contain their nodes in the SVG, so match by position.
-function hideEmptyClusters() {
-    const centers = []
-    for (const el of nodeEls.values()) {
-        if (el.classList.contains('node-hidden')) continue
-        const b = el.getBBox()
-        centers.push([b.x + b.width / 2, b.y + b.height / 2])
-    }
-    d3.select('#graph')
-        .selectAll('.cluster')
-        .each(function () {
-            const b = this.getBBox()
-            const used = centers.some(([x, y]) => x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height)
-            if (!used) this.classList.add('cluster-hidden')
-        })
-}
-
-// When hiding, the remaining lineage can be scattered across a huge canvas:
-// bring it into view if part of it is off screen or too small to read.
-function revealLineage() {
-    if (!state.selectedNode || !hidingOthers()) return
-    const rects = [...document.querySelectorAll('#graph .node-highlighted, #graph .node-connected')].map((el) =>
-        el.getBoundingClientRect()
-    )
-    if (!rects.length) return
-    const box = {
-        left: Math.min(...rects.map((r) => r.left)),
-        top: Math.min(...rects.map((r) => r.top)),
-        right: Math.max(...rects.map((r) => r.right)),
-        bottom: Math.max(...rects.map((r) => r.bottom))
-    }
-    moveView(box, { onlyIfHidden: true, fit: true })
-}
-
-export function toggleHideUnrelated() {
-    if (state.selectedNode) setHideUnrelated(!hidingOthers())
-}
-
-export function setHideUnrelated(hide) {
-    state.hideUnrelated = hide
-    refreshSelection()
-    revealLineage()
 }
 
 // The floating up/down reach slider; shown while a drawn node is selected.
@@ -895,28 +655,20 @@ function syncLineageControl() {
         reachDown: state.reachDown,
         upCount: up.size,
         downCount: down.size,
-        focused: state.focusedNode === name,
-        hiding: hidingOthers(),
-        onReach: setLineageReach,
-        onFocus: () => toggleFocus(name),
-        onHide: setHideUnrelated
+        onReach: setLineageReach
     })
 }
 
 let refocusTimer = null
-let revealTimer = null
 export function setLineageReach(dir, value) {
     if (dir === 'up') state.reachUp = value
     else state.reachDown = value
     refreshSelection()
     renderDetailsLineage()
-    // A focused view shows exactly the slider's range; re-cut it once dragging settles.
-    if (state.focusedNode && state.focusedNode === state.selectedNode) {
+    // The focused view shows exactly the slider's range; re-cut it once dragging settles.
+    if (state.focusedNode) {
         clearTimeout(refocusTimer)
         refocusTimer = setTimeout(() => state.focusedNode && focusNode(state.focusedNode), 350)
-    } else {
-        clearTimeout(revealTimer)
-        revealTimer = setTimeout(revealLineage, 350)
     }
 }
 
@@ -926,6 +678,7 @@ let detailsNode = null
 
 export function showNodeDetails(nodeName) {
     detailsNode = nodeName
+    document.dispatchEvent(new CustomEvent('pipeviz:details', { detail: nodeName }))
     const col = document.getElementById('details-col')
     const content = document.getElementById('details-content')
 
@@ -993,14 +746,6 @@ export function showNodeDetails(nodeName) {
 
     html = `<div class="detail-actions">`
     html += `<span class="badge ${nodeTypeBadge}">${nodeType}</span>`
-    if (nodeType === 'Pipeline Group') {
-        const isExpanded = state.expandedGroups.has(nodeName)
-        html += `<button class="graph-ctrl-btn" onclick="toggleGroup(${jsArg(nodeName)})">${isExpanded ? 'Collapse' : 'Expand'}</button>`
-    }
-    if (nodeType === 'Pipeline' && nodeData.group && state.expandedGroups.has(nodeData.group)) {
-        html += `<button class="graph-ctrl-btn" onclick="toggleGroup(${jsArg(nodeData.group)})">Collapse group</button>`
-    }
-    html += `<button class="graph-ctrl-btn danger" onclick="showBlastRadius(${jsArg(nodeName)})">Blast radius</button>`
     html += `</div>`
 
     if (nodeData.description) {
@@ -1238,18 +983,11 @@ function renderDetailsLineage() {
     })
 }
 
-// Select a node from the panel or search: in place if it's drawn, refocusing
-// if it's outside the focused subgraph.
-function goToNode(name, { zoomIn = false } = {}) {
-    const el = nodeEls.get(name)
-    if (el) {
-        selectNode(name)
-        if (!hidingOthers()) panToNode(el, { onlyIfHidden: !zoomIn, zoomIn })
-    } else if (state.focusedNode && getLineageModel().nodes.has(name)) {
-        focusNode(name)
-    } else {
-        showNodeDetails(name)
-    }
+// Select a node from the panel or search: focus it if this view can draw it,
+// otherwise just show its details.
+export function goToNode(name) {
+    if (getLineageModel().nodes.has(name)) focusNode(name)
+    else showNodeDetails(name)
 }
 
 function updateFocusBanner(nodeName) {
@@ -1258,12 +996,13 @@ function updateFocusBanner(nodeName) {
     banner.style.display = ''
     const label = banner.querySelector('.focus-banner-text')
     if (label) {
-        label.textContent = `Focused: ${nodeName}`
+        label.textContent = nodeName
         label.title = nodeName
     }
 }
 
-// Filter the graph to `nodeName` plus whatever the reach slider currently lights.
+// Selecting a node focuses it: filter the graph to `nodeName` plus whatever
+// the reach slider currently lights, laid out on its own.
 export function focusNode(nodeName) {
     const { up, down, maxUp, maxDown } = litLineage(nodeName)
     state.focusedNode = nodeName
@@ -1278,24 +1017,28 @@ export function focusNode(nodeName) {
     updateGraph(true)
 }
 
-export function toggleFocus(nodeName = state.selectedNode) {
-    if (!nodeName) return
-    if (state.focusedNode === nodeName) unfocusNode()
-    else focusNode(nodeName)
-}
-
-// Back to the full graph, keeping the selection lit.
-export function unfocusNode() {
+function unfocusNode() {
     clearTimeout(refocusTimer)
     clearFocusState()
     state.pendingFocusReset = true
     updateGraph(true)
 }
 
-// Esc: leave focus first, then drop the selection.
+// Esc, empty-canvas click, closing the panel or banner: drop the selection
+// and its focus, back to the full graph.
 export function stepBack() {
-    if (state.focusedNode) unfocusNode()
-    else if (state.selectedNode) clearSelection()
+    if (state.focusedNode) showAll()
+    else clearSelection()
+}
+
+// After the view's shape changes, re-cut the selection's focus, or go back to
+// the full graph if the selection isn't drawn in this view.
+function refocusSelection() {
+    const name = state.selectedNode
+    if (name && getLineageModel().nodes.has(name)) return focusNode(name)
+    clearSelection()
+    state.pendingFocusReset = true
+    updateGraph(true)
 }
 
 // Reset focus without re-rendering, for callers that re-render anyway.
@@ -1312,8 +1055,8 @@ export function clearSelection() {
     clearHighlights()
     applyCriticalPathHighlighting()
     updateHashWithNode(null)
-    syncGraphToolbar()
     updateLineageControl(null)
+    document.dispatchEvent(new CustomEvent('pipeviz:details', { detail: null }))
     const col = document.getElementById('details-col')
     if (col) {
         col.classList.remove('visible')
@@ -1333,7 +1076,6 @@ export function clearHighlights() {
             'edge-highlighted edge-dimmed edge-hidden edge-critical-path edge-costliest-path lin-up lin-down hop-1 hop-2 hop-3',
             false
         )
-    d3.select('#graph').selectAll('.cluster').classed('cluster-hidden', false)
 }
 
 export function fuzzyMatch(text, query) {
@@ -1516,7 +1258,7 @@ export function selectSearchResult(nodeName) {
         if (p?.group && !state.expandedGroups.has(p.group)) target = p.group
     }
 
-    goToNode(nodeEls.has(target) || state.focusedNode ? target : nodeName, { zoomIn: true })
+    goToNode(target)
 }
 
 document.addEventListener('click', function (e) {
@@ -1541,8 +1283,6 @@ document.addEventListener(
 )
 
 const NAV_DURATION = 400
-// On-screen scale below which Recenter also zooms in, so the node is legible.
-const RECENTER_MIN_SCALE = 0.6
 
 // The live zoom: graphviz's own, or the one attached to a restored cached SVG.
 function activeZoom() {
@@ -1560,125 +1300,11 @@ export function resetGraph() {
     else state.graphviz.resetZoom(t)
 }
 
-// Pan the selected node to the middle of the canvas, zooming in if it's too small
-// to read. With nothing selected, re-fit the whole graph.
-export function recenterSelection() {
-    const el = state.selectedNode && nodeEls.get(state.selectedNode)
-    if (!el) return resetGraph()
-    panToNode(el, { zoomIn: true })
-}
-
-// Centre `el` in the visible canvas. `onlyIfHidden` leaves the view alone when
-// the node is already on screen; `zoomIn` also zooms if it's too small to read.
-function panToNode(el, { onlyIfHidden = false, zoomIn = false } = {}) {
-    moveView(el.getBoundingClientRect(), { onlyIfHidden, zoomIn })
-}
-
-// Bring a screen-space box to the middle of the visible canvas. `zoomIn` zooms
-// up to legible if it's too small; `fit` scales so the whole box fits (never
-// past 1:1). `onlyIfHidden` skips boxes already on screen and legible.
-function moveView(box, { onlyIfHidden = false, zoomIn = false, fit = false } = {}) {
-    const z = activeZoom()
-    if (!z) return
-
-    // Zoom transforms live in the SVG's user space; convert screen px through its CTM.
-    const svgNode = z.svg.node()
-    const ctm = svgNode.getScreenCTM()
-    if (!ctm) return
-    const view = svgNode.getBoundingClientRect()
-    // The details drawer and the reach slider overlay the canvas; aim for
-    // what's left. Measured from layout, not the drawer's (maybe sliding) box.
-    const drawer = document.getElementById('details-col')
-    const right = drawer?.classList.contains('visible')
-        ? Math.min(view.right, drawer.offsetParent.getBoundingClientRect().right - drawer.offsetWidth)
-        : view.right
-    const ctl = document.getElementById('lineage-ctl')
-    const bottom = ctl && !ctl.hidden ? view.bottom - (ctl.offsetHeight + 24) : view.bottom
-    const scale = currentGraphScale()
-    const tooSmall = (zoomIn || fit) && scale < RECENTER_MIN_SCALE
-    const onScreen = box.left >= view.left && box.right <= right && box.top >= view.top && box.bottom <= bottom
-    if (onlyIfHidden && onScreen && !tooSmall) return
-
-    const cx = (view.left + right) / 2
-    const cy = (view.top + bottom) / 2
-    const t = d3.zoomTransform(svgNode)
-
-    let x = t.x + (cx - (box.left + box.right) / 2) / ctm.a
-    let y = t.y + (cy - (box.top + box.bottom) / 2) / ctm.d
-    let k = t.k
-    let f = 1
-    if (fit) {
-        const pad = 40
-        const w = Math.max(1, box.right - box.left)
-        const h = Math.max(1, box.bottom - box.top)
-        f = Math.min((right - view.left - 2 * pad) / w, (bottom - view.top - 2 * pad) / h, Math.max(1, 1 / scale))
-    } else if (tooSmall) {
-        f = 1 / scale
-    }
-    f = Math.min(f, ZOOM_EXTENT[1] / k)
-    if (f !== 1) {
-        // Scale about the canvas centre, where the box now sits.
-        const ux = (cx - ctm.e) / ctm.a
-        const uy = (cy - ctm.f) / ctm.d
-        x = ux - f * (ux - x)
-        y = uy - f * (uy - y)
-        k *= f
-    }
-
-    z.svg.transition().duration(NAV_DURATION).call(z.behavior.transform, d3.zoomIdentity.translate(x, y).scale(k))
-}
-
 // Back to the whole graph: no focus, no selection, fitted.
 export function showAll() {
     clearSelection()
     if (state.focusedNode) return unfocusNode()
     resetGraph()
-}
-
-export function collapseAllGroups() {
-    clearFocusState()
-    state.expandedGroups.clear()
-    updateGraph(true)
-}
-
-export function setGroupsExpanded(expand) {
-    clearFocusState()
-    state.expandedGroups = new Set(expand ? getAllGroupNames() : [])
-    updateGraph(true)
-}
-
-// Reflect current state in the graph toolbar's segmented controls and nav buttons.
-export function syncGraphToolbar() {
-    const setSeg = (id, value) => {
-        document.querySelectorAll(`#${id} .seg-btn`).forEach((b) => {
-            const on = b.dataset.value === value
-            b.classList.toggle('active', on)
-            b.setAttribute('aria-pressed', on)
-        })
-    }
-
-    const groups = getAllGroupNames()
-    const groupsCtl = document.getElementById('groups-ctl')
-    if (groupsCtl) groupsCtl.style.display = groups.length ? '' : 'none'
-    const expanded = groups.filter((g) => state.expandedGroups.has(g)).length
-    // Partly expanded (groups toggled one by one) lights neither segment.
-    setSeg('groups-ctl', expanded === groups.length ? 'expanded' : expanded === 0 ? 'collapsed' : null)
-
-    const recenter = document.getElementById('recenter-btn')
-    if (recenter) {
-        recenter.title = state.selectedNode
-            ? `Center the view on ${state.selectedNode}`
-            : 'Center and fit the graph (keeps focus and selection)'
-    }
-}
-
-function getAllGroupNames() {
-    if (!state.currentConfig?.pipelines) return []
-    const groups = new Set()
-    state.currentConfig.pipelines.forEach((p) => {
-        if (p.group) groups.add(p.group)
-    })
-    return Array.from(groups)
 }
 
 // Lineage view (pipelines and datasources) vs the Pipelines view.
@@ -1687,9 +1313,7 @@ export function setDatasourcesVisible(show) {
     state.pipelinesOnlyView = !show
     // Lineage differs between the two, so a focus cut in one doesn't carry over.
     clearFocusState()
-    if (state.selectedNode && !getLineageModel().nodes.has(state.selectedNode)) clearSelection()
-    state.pendingFocusReset = true
-    updateGraph(true)
+    refocusSelection()
 }
 
 export function setAnalysisMode(mode) {

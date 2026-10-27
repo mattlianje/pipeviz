@@ -12,9 +12,7 @@ import { filterPipelines, filterDatasources } from './filters.js'
 import {
     clearSelection,
     resetGraph,
-    recenterSelection,
     showAll,
-    setGroupsExpanded,
     toggleGroup,
     setDatasourcesVisible,
     searchNodes,
@@ -25,9 +23,6 @@ import {
     hideBlastRadiusModal,
     generateGraphvizDot,
     focusNode,
-    unfocusNode,
-    toggleFocus,
-    toggleHideUnrelated,
     stepBack
 } from './graph.js'
 import {
@@ -48,6 +43,7 @@ import {
     generateMermaidExport
 } from './export.js'
 import { renderStats } from './stats.js'
+import { setupEditor, toggleJsonPanel } from './editor.js'
 
 window.loadExample = loadExample
 window.loadFromFile = loadFromFile
@@ -58,9 +54,7 @@ window.filterPipelines = filterPipelines
 window.filterDatasources = filterDatasources
 window.clearSelection = clearSelection
 window.resetGraph = resetGraph
-window.recenterSelection = recenterSelection
 window.showAll = showAll
-window.setGroupsExpanded = setGroupsExpanded
 window.toggleGroup = toggleGroup
 window.setDatasourcesVisible = setDatasourcesVisible
 window.searchNodes = searchNodes
@@ -70,7 +64,7 @@ window.hideBlastRadiusModal = hideBlastRadiusModal
 window.selectNodeFromHash = selectNodeFromHash
 window.restoreBlastRadiusFromHash = restoreBlastRadiusFromHash
 window.focusNode = focusNode
-window.unfocusNode = unfocusNode
+window.stepBack = stepBack
 
 window.clearAttributeSelection = clearAttributeSelection
 window.resetAttributeGraph = resetAttributeGraph
@@ -90,21 +84,7 @@ window.toggleSpecModal = function () {
     modal.classList.toggle('show')
 }
 
-window.toggleJsonPanel = function () {
-    document.getElementById('json-panel').classList.toggle('hidden')
-}
-
-document.addEventListener(
-    'pointerdown',
-    function (e) {
-        const panel = document.getElementById('json-panel')
-        if (!panel || panel.classList.contains('hidden')) return
-        if (panel.contains(e.target)) return
-        if (e.target.closest('.json-panel-handle')) return
-        panel.classList.add('hidden')
-    },
-    true
-)
+window.toggleJsonPanel = toggleJsonPanel
 
 window.switchPanelTab = function (tab) {
     // Update tab buttons
@@ -112,12 +92,12 @@ window.switchPanelTab = function (tab) {
     document.querySelector(`.json-panel-tab[onclick*="${tab}"]`)?.classList.add('active')
 
     // Show/hide content areas
-    const editor = document.getElementById('json-input')
+    const editor = document.getElementById('json-code')
     const mermaidPane = document.getElementById('panel-export-mermaid')
     const dotPane = document.getElementById('panel-export-dot')
     const footer = document.querySelector('.json-panel-footer')
 
-    editor.style.display = tab === 'json' ? '' : 'none'
+    editor.classList.toggle('hidden', tab !== 'json')
     mermaidPane.classList.toggle('active', tab === 'mermaid')
     dotPane.classList.toggle('active', tab === 'dot')
     footer.style.display = tab === 'json' ? '' : 'none'
@@ -155,26 +135,12 @@ document.addEventListener('keydown', (e) => {
         window.toggleJsonPanel()
     }
     if (e.key === 'Escape') {
-        const jsonPanel = document.getElementById('json-panel')
-        if (jsonPanel && !jsonPanel.classList.contains('hidden')) {
-            jsonPanel.classList.add('hidden')
-            return
-        }
         const openModals = document.querySelectorAll('#spec-modal.show, #blast-radius-modal.show')
         openModals.forEach((m) => m.classList.remove('show'))
         if (openModals.length) return
-        // Otherwise Esc on the graph steps back: out of focus, then deselect.
+        // Otherwise Esc on the graph goes back to the full graph.
         if (e.target.closest?.('input, textarea, select')) return
         if (document.getElementById('pipelines-subview')?.offsetParent) stepBack()
-    }
-    // F focuses the selected node's lineage (and toggles back); H flips
-    // between dimming and hiding everything else.
-    const key = e.key.toLowerCase()
-    if ((key === 'f' || key === 'h') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (e.target.closest?.('input, textarea, select, [contenteditable]')) return
-        if (!document.getElementById('pipelines-subview')?.offsetParent) return
-        if (key === 'f') toggleFocus()
-        else toggleHideUnrelated()
     }
 })
 
@@ -244,6 +210,7 @@ window.addEventListener('load', () => {
     if (new URLSearchParams(window.location.search).get('embed') === '1') {
         document.body.classList.add('embedded')
     }
+    setupEditor()
     setupDragDrop()
     setupAutoProcess()
     loadFromUrl()

@@ -14,12 +14,6 @@ const models = new Map()
 // datasource behind it (e.g. "run after").
 export function pipelineDependencies(pipelines) {
     const names = new Set(pipelines.map((p) => p.name))
-    const groupMembers = new Map()
-    pipelines.forEach((p) => {
-        if (!p.group) return
-        if (!groupMembers.has(p.group)) groupMembers.set(p.group, [])
-        groupMembers.get(p.group).push(p.name)
-    })
     const producers = new Map()
     pipelines.forEach((p) =>
         p.output_sources?.forEach((s) => {
@@ -37,13 +31,12 @@ export function pipelineDependencies(pipelines) {
         )
     )
     pipelines.forEach((p) =>
-        p.upstream_pipelines?.forEach((ref) => {
-            // A reference may name a whole group.
-            const ups = names.has(ref) ? [ref] : groupMembers.get(ref) || []
-            ups.forEach((u) => {
-                const key = `${u}\0${p.name}`
-                if (u !== p.name && !deps.has(key)) deps.set(key, { from: u, to: p.name, kind: 'explicit' })
-            })
+        p.upstream_pipelines?.forEach((u) => {
+            // References that name a group are ignored: fanning them out to
+            // every member floods big graphs with thousands of edges.
+            if (!names.has(u)) return
+            const key = `${u}\0${p.name}`
+            if (u !== p.name && !deps.has(key)) deps.set(key, { from: u, to: p.name, kind: 'explicit' })
         })
     )
     return [...deps.values()]

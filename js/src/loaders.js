@@ -2,10 +2,11 @@ import { state, clearViewStateCache } from './state.js'
 import { exampleConfig } from './example.js'
 import { renderPipelines, renderDatasources } from './tables.js'
 import { updateFilters } from './filters.js'
-import { renderGraph } from './graph.js'
+import { renderGraph, setGraphSpinner } from './graph.js'
 import { populatePlannerSelect } from './export.js'
 import { renderStats } from './stats.js'
 import { escapeHtml } from './escape.js'
+import { refreshEditor, showJsonSummary, showJsonError } from './editor.js'
 
 export function loadExample() {
     document.getElementById('json-input').value = JSON.stringify(exampleConfig, null, 2)
@@ -21,9 +22,9 @@ export function formatJson() {
     try {
         const parsed = JSON.parse(textarea.value)
         textarea.value = JSON.stringify(parsed, null, 2)
+        refreshEditor()
     } catch (e) {
-        const statusDiv = document.getElementById('json-status')
-        statusDiv.innerHTML = '<span class="error">Invalid JSON: ' + escapeHtml(e.message) + '</span>'
+        showJsonError()
     }
 }
 
@@ -73,9 +74,7 @@ export async function generateShareableUrl() {
         await navigator.clipboard.writeText(shareableUrl)
         const statusDiv = document.getElementById('json-status')
         statusDiv.innerHTML = '<span class="success">Shareable URL copied to clipboard!</span>'
-        setTimeout(() => {
-            statusDiv.innerHTML = ''
-        }, 3000)
+        setTimeout(showJsonSummary, 3000)
     } catch (e) {
         prompt('Copy this shareable URL:', shareableUrl)
     }
@@ -91,9 +90,7 @@ async function tryLoadPipevizJson() {
             loadJson()
             const statusDiv = document.getElementById('json-status')
             statusDiv.innerHTML = '<span class="success">Loaded pipeviz.json</span>'
-            setTimeout(() => {
-                statusDiv.innerHTML = ''
-            }, 3000)
+            setTimeout(showJsonSummary, 3000)
             return true
         }
     } catch (error) {}
@@ -109,6 +106,7 @@ async function loadFromConfigUrl(url) {
         document.getElementById('json-input').value = JSON.stringify(config, null, 2)
         loadJson()
     } catch (error) {
+        setGraphSpinner(false)
         const statusDiv = document.getElementById('json-status')
         if (statusDiv) {
             statusDiv.innerHTML = `<span class="error">Error loading pipeline data: ${escapeHtml(error.message)}</span>`
@@ -246,43 +244,52 @@ function isGitHubHost(url) {
     }
 }
 
+// A .json file dropped anywhere on the page loads it.
 export function setupDragDrop() {
     const textarea = document.getElementById('json-input')
-    if (!textarea) return
-    ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
-        textarea.addEventListener(
-            eventName,
-            (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-            },
-            false
-        )
-    })
+    const overlay = document.getElementById('drop-overlay')
+    if (!textarea || document.body.classList.contains('embedded')) return
+    const hasFiles = (e) => e.dataTransfer?.types?.includes('Files')
+    let depth = 0
 
-    textarea.addEventListener(
-        'drop',
-        function (e) {
-            const files = e.dataTransfer.files
-            if (files.length > 0) {
-                const file = files[0]
-                if (file.type === 'application/json' || file.name.endsWith('.json')) {
-                    const reader = new FileReader()
-                    reader.onload = function (ev) {
-                        try {
-                            const parsed = JSON.parse(ev.target.result)
-                            textarea.value = JSON.stringify(parsed, null, 2)
-                        } catch (error) {
-                            textarea.value = ev.target.result
-                        }
-                        loadJson()
-                    }
-                    reader.readAsText(file)
-                }
+    document.addEventListener('dragenter', (e) => {
+        if (!hasFiles(e)) return
+        e.preventDefault()
+        if (depth++ === 0) overlay?.classList.add('show')
+    })
+    document.addEventListener('dragover', (e) => {
+        if (hasFiles(e)) e.preventDefault()
+    })
+    document.addEventListener('dragleave', (e) => {
+        if (!hasFiles(e)) return
+        if (--depth <= 0) {
+            depth = 0
+            overlay?.classList.remove('show')
+        }
+    })
+    document.addEventListener('drop', (e) => {
+        if (!hasFiles(e)) return
+        e.preventDefault()
+        depth = 0
+        overlay?.classList.remove('show')
+        const file = e.dataTransfer.files[0]
+        if (!file) return
+        if (!(file.type === 'application/json' || file.name.endsWith('.json'))) {
+            document.getElementById('json-status').innerHTML = '<span class="error">Please drop a .json file</span>'
+            return
+        }
+        const reader = new FileReader()
+        reader.onload = function (ev) {
+            try {
+                const parsed = JSON.parse(ev.target.result)
+                textarea.value = JSON.stringify(parsed, null, 2)
+            } catch (error) {
+                textarea.value = ev.target.result
             }
-        },
-        false
-    )
+            loadJson()
+        }
+        reader.readAsText(file)
+    })
 }
 
 export function loadFromFile(event) {
@@ -319,13 +326,19 @@ export function setupAutoProcess() {
                 statusDiv.innerHTML = ''
                 return
             }
+            let parsed
             try {
-                JSON.parse(content)
-                statusDiv.innerHTML = '<span class="success">Valid JSON</span>'
-                loadJson()
+                parsed = JSON.parse(content)
             } catch (e) {
-                statusDiv.innerHTML = `<span class="error">Invalid JSON: ${escapeHtml(e.message)}</span>`
+                showJsonError()
+                return
             }
+            // Whitespace-only edits (or undoing back) leave the graph as it is.
+            if (state.currentConfig && JSON.stringify(parsed) === JSON.stringify(state.currentConfig)) {
+                showJsonSummary()
+                return
+            }
+            loadJson()
         }, 500)
     })
 }
@@ -333,8 +346,10 @@ export function setupAutoProcess() {
 export function loadJson() {
     const jsonText = document.getElementById('json-input').value.trim()
     const statusDiv = document.getElementById('json-status')
+    refreshEditor()
 
     if (!jsonText) {
+        setGraphSpinner(false)
         statusDiv.innerHTML = '<span class="error">Please enter JSON configuration</span>'
         return
     }
@@ -344,7 +359,7 @@ export function loadJson() {
         // Groups start expanded.
         state.expandedGroups = new Set((state.currentConfig.pipelines || []).filter((p) => p.group).map((p) => p.group))
         clearViewStateCache()
-        statusDiv.innerHTML = ''
+        showJsonSummary()
 
         renderGraph()
         renderPipelines()
@@ -353,6 +368,7 @@ export function loadJson() {
         populatePlannerSelect()
         renderStats()
     } catch (error) {
-        statusDiv.innerHTML = `<span class="error">JSON Parse Error: ${escapeHtml(error.message)}</span>`
+        setGraphSpinner(false)
+        if (!showJsonError()) statusDiv.innerHTML = `<span class="error">${escapeHtml(error.message)}</span>`
     }
 }

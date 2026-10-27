@@ -14,7 +14,6 @@ export const state = {
     // Lineage hops lit around the selection, each way (Infinity = all, 0 = none).
     reachUp: Infinity,
     reachDown: Infinity,
-    hideUnrelated: null, // hide (vs dim) off-lineage nodes; null = by graph size
     pendingFocusReset: false,
     viewStateCache: new Map(),
     attributeGraphviz: null,
