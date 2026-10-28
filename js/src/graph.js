@@ -162,8 +162,8 @@ export function generateGraphvizDot() {
     const drawn = new Set([...pipelines.map((p) => p.name), ...allDataSources.keys()])
 
     // Focused: place upstream left and downstream right of the focus. Collapsed
-    // groups can be both (cycles), and Graphviz breaks cycles arbitrarily, so
-    // edges pointing backward along -hops..0..+hops don't constrain ranking.
+    // groups can be both (cycles); when breaking those, prefer dropping edges
+    // that point backward along -hops..0..+hops.
     const focusPos = new Map()
     if (state.focusedNode) {
         const { up, down } = lineageHops(state.focusedNode)
@@ -175,14 +175,20 @@ export function generateGraphvizDot() {
     }
     const isBackward = (from, to) => focusPos.has(from) && focusPos.has(to) && focusPos.get(from) > focusPos.get(to)
 
+    const edges = getLineageModel().edges.filter(({ from, to }) => drawn.has(from) && drawn.has(to))
+    const unranked = cycleBreakingEdges(edges, drawn, (e) => {
+        if (e.kind !== 'explicit' && allDataSources.has(e.from)) return 0
+        return (isBackward(e.from, e.to) ? 2 : 0) + (e.kind === 'explicit' ? 2 : 1)
+    })
+
     dot += '\n'
-    getLineageModel().edges.forEach(({ from, to, kind }) => {
-        if (!drawn.has(from) || !drawn.has(to)) return
+    edges.forEach((e) => {
+        const { from, to, kind } = e
         const style =
             kind === 'explicit'
                 ? `color="${explicitEdgeColor}", style="dashed", arrowsize=0.7`
                 : `color="${edgeColor}", arrowsize=0.8`
-        const constraint = isBackward(from, to) ? ', constraint=false' : ''
+        const constraint = unranked.has(e) ? ', constraint=false' : ''
         dot += `    "${escapeDot(from)}" -> "${escapeDot(to)}" [${style}${constraint}];\n`
     })
 
@@ -194,6 +200,105 @@ export function generateGraphvizDot() {
             : 'splines=true;'
     dot += `\n    overlap=false; ${layoutAttrs}\n}`
     return dot
+}
+
+// Graphviz breaks cycles arbitrarily, often by flipping an input edge so a
+// datasource lands right of its reader. Instead pick the edges to drop from
+// ranking ourselves: within each cycle (SCC), add edges in `priority` order
+// (lowest first) and drop any that would close a loop. Input edges get
+// priority 0 and can't form a cycle on their own, so they're always kept.
+function cycleBreakingEdges(edges, nodes, priority) {
+    const adj = new Map()
+    edges.forEach(({ from, to }) => {
+        if (!adj.has(from)) adj.set(from, [])
+        adj.get(from).push(to)
+    })
+    const comp = sccIds(nodes, adj)
+    const intra = edges
+        .filter((e) => comp.get(e.from) === comp.get(e.to))
+        .map((e) => ({ e, p: priority(e) }))
+        .sort((a, b) => a.p - b.p)
+
+    const kept = new Map()
+    const reaches = (a, b) => {
+        const seen = new Set([a])
+        const queue = [a]
+        while (queue.length) {
+            const n = queue.pop()
+            if (n === b) return true
+            for (const m of kept.get(n) || []) {
+                if (!seen.has(m)) {
+                    seen.add(m)
+                    queue.push(m)
+                }
+            }
+        }
+        return false
+    }
+
+    const dropped = new Set()
+    intra.forEach(({ e }) => {
+        if (reaches(e.to, e.from)) {
+            dropped.add(e)
+        } else {
+            if (!kept.has(e.from)) kept.set(e.from, [])
+            kept.get(e.from).push(e.to)
+        }
+    })
+    return dropped
+}
+
+// Iterative Tarjan: node -> strongly connected component id.
+function sccIds(nodes, adj) {
+    const index = new Map()
+    const low = new Map()
+    const comp = new Map()
+    const stack = []
+    const onStack = new Set()
+    let i = 0
+    let c = 0
+    const visit = (n) => {
+        index.set(n, i)
+        low.set(n, i)
+        i++
+        stack.push(n)
+        onStack.add(n)
+    }
+    for (const root of nodes) {
+        if (index.has(root)) continue
+        visit(root)
+        const work = [[root, 0]]
+        while (work.length) {
+            const frame = work[work.length - 1]
+            const n = frame[0]
+            const next = adj.get(n) || []
+            if (frame[1] < next.length) {
+                const m = next[frame[1]++]
+                if (!index.has(m)) {
+                    visit(m)
+                    work.push([m, 0])
+                } else if (onStack.has(m)) {
+                    low.set(n, Math.min(low.get(n), index.get(m)))
+                }
+            } else {
+                work.pop()
+                if (work.length) {
+                    const p = work[work.length - 1][0]
+                    low.set(p, Math.min(low.get(p), low.get(n)))
+                }
+                if (low.get(n) === index.get(n)) {
+                    let m
+                    do {
+                        m = stack.pop()
+                        onStack.delete(m)
+                        comp.set(m, c)
+                    } while (m !== n)
+                    c++
+                }
+            }
+        }
+    }
+    return comp
 }
 
 let graphTabListenerAdded = false
